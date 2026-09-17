@@ -1,11 +1,11 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
 # =====================================
-# CONEXÃO
+# CONEXÃƒO
 # =====================================
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -49,7 +49,7 @@ FROM faixa_etaria
 """, conn)
 
 # =====================================
-# FAIXA ETÁRIA DOMINANTE
+# FAIXA ETÃRIA DOMINANTE
 # =====================================
 
 faixa_top = (
@@ -64,7 +64,7 @@ faixa_top = (
 )
 
 # =====================================
-# PERFIL EPIDEMIOLÓGICO
+# PERFIL EPIDEMIOLÃ“GICO
 # =====================================
 
 perfil = priorizacao.merge(
@@ -97,7 +97,7 @@ perfil = perfil.merge(
 )
 
 # =====================================
-# ORDENAÇÃO
+# ORDENAÃ‡ÃƒO
 # =====================================
 
 perfil = perfil.sort_values(
@@ -109,7 +109,7 @@ perfil = perfil.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== PERFIL EPIDEMIOLÓGICO ===\n")
+print("\n=== PERFIL EPIDEMIOLÃ“GICO ===\n")
 
 print(
     perfil[

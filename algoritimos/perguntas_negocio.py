@@ -1,19 +1,19 @@
-import sqlite3
+﻿import sqlite3
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 cursor = conn.cursor()
 
 print("\n=== ESCUDO FEMININO - CONSULTAS ===\n")
 
-print("1 - Qual câncer merece mais atenção?")
-print("2 - Quais são as 3 maiores prioridades?")
-print("3 - Qual câncer está mais acima da tendência estadual?")
+print("1 - Qual cÃ¢ncer merece mais atenÃ§Ã£o?")
+print("2 - Quais sÃ£o as 3 maiores prioridades?")
+print("3 - Qual cÃ¢ncer estÃ¡ mais acima da tendÃªncia estadual?")
 print("4 - Existem anomalias?")
-print("5 - Mostrar relatório executivo")
+print("5 - Mostrar relatÃ³rio executivo")
 
-opcao = input("\nEscolha uma opção: ")
+opcao = input("\nEscolha uma opÃ§Ã£o: ")
 
 if opcao == "1":
 
@@ -30,16 +30,16 @@ if opcao == "1":
     print("\nResposta:\n")
 
     print(
-        f"O câncer que merece maior atenção é "
+        f"O cÃ¢ncer que merece maior atenÃ§Ã£o Ã© "
         f"{resultado[0]}."
     )
 
     print(
-        f"Pontuação: {resultado[1]:.2f}"
+        f"PontuaÃ§Ã£o: {resultado[1]:.2f}"
     )
 
     print(
-        f"Classificação: {resultado[2]}"
+        f"ClassificaÃ§Ã£o: {resultado[2]}"
     )
 
 elif opcao == "2":
@@ -58,7 +58,7 @@ elif opcao == "2":
     for i, linha in enumerate(resultado, start=1):
 
         print(
-            f"{i}º {linha[0]} "
+            f"{i}Âº {linha[0]} "
             f"({linha[1]:.2f})"
         )
 
@@ -77,7 +77,7 @@ elif opcao == "3":
 
     print(
         f"{resultado[0]} apresentou desvio de "
-        f"{resultado[1]:.2f}% acima da tendência estadual."
+        f"{resultado[1]:.2f}% acima da tendÃªncia estadual."
     )
 
 elif opcao == "4":
@@ -117,6 +117,6 @@ elif opcao == "5":
 
 else:
 
-    print("Opção inválida.")
+    print("OpÃ§Ã£o invÃ¡lida.")
 
 conn.close()

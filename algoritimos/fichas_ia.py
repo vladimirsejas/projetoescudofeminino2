@@ -1,7 +1,7 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -16,21 +16,21 @@ fichas = []
 for _, row in df.iterrows():
 
     ficha = f"""
-CÂNCER: {row['tipo_cancer']}
+CÃ‚NCER: {row['tipo_cancer']}
 
 PRIORIDADE:
 {row['nivel_prioridade']}
 
-PONTUAÇÃO:
+PONTUAÃ‡ÃƒO:
 {row['pontuacao_final']:.2f}
 
 MORTALIDADE:
 {row['taxa_mortalidade']:.2f}%
 
-FAIXA ETÁRIA PREDOMINANTE:
+FAIXA ETÃRIA PREDOMINANTE:
 {row['faixa_etaria']}
 
-PERMANÊNCIA MÉDIA:
+PERMANÃŠNCIA MÃ‰DIA:
 {row['permanencia_media']:.2f} dias
 
 CUSTO TOTAL:

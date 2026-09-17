@@ -1,6 +1,6 @@
-import os
+﻿import os
 
-BASE_DADOS = r"C:\projetoescudofeminino\dados"
+BASE_DADOS = r"C:\projetoescudofeminino2\dados"
 
 for pasta in os.listdir(BASE_DADOS):
     print("PASTA:", pasta)

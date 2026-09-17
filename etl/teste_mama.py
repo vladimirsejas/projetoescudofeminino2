@@ -1,6 +1,6 @@
-import pandas as pd
+﻿import pandas as pd
 
-arquivo = r"C:\projetoescudofeminino\dados\cancer_mama_rio_claro\cancer_mama_mulheres_rio_claro_2021_2025.csv"
+arquivo = r"C:\projetoescudofeminino2\dados\cancer_mama_rio_claro\cancer_mama_mulheres_rio_claro_2021_2025.csv"
 
 df = pd.read_csv(
     arquivo,
@@ -8,7 +8,7 @@ df = pd.read_csv(
     encoding="latin1"
 )
 
-print("INTERNAÇÕES POR ANO")
+print("INTERNAÃ‡Ã•ES POR ANO")
 print("-" * 30)
 
 internacoes = df.groupby("ANO_CMPT").size()

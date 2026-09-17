@@ -1,7 +1,7 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -14,7 +14,7 @@ print("\n=== ESCUDO FEMININO IA ===\n")
 
 pergunta = input("Pergunta: ").upper()
 
-if "ATENCAO" in pergunta or "ATENÇÃO" in pergunta:
+if "ATENCAO" in pergunta or "ATENÃ‡ÃƒO" in pergunta:
 
     top = pd.read_sql("""
     SELECT *
@@ -28,17 +28,17 @@ if "ATENCAO" in pergunta or "ATENÇÃO" in pergunta:
     print("\nResposta:\n")
 
     print(
-        f"O câncer que merece maior atenção atualmente "
-        f"é {linha['tipo_cancer']}."
+        f"O cÃ¢ncer que merece maior atenÃ§Ã£o atualmente "
+        f"Ã© {linha['tipo_cancer']}."
     )
 
     print(
-        f"Classificação: "
+        f"ClassificaÃ§Ã£o: "
         f"{linha['nivel_prioridade']}."
     )
 
     print(
-        f"Pontuação final: "
+        f"PontuaÃ§Ã£o final: "
         f"{linha['pontuacao_final']:.2f}."
     )
 
@@ -56,7 +56,7 @@ elif "TOP" in pergunta:
     for i, row in top3.iterrows():
 
         print(
-            f"{i+1}º "
+            f"{i+1}Âº "
             f"{row['tipo_cancer']} "
             f"({row['pontuacao_final']:.2f})"
         )
@@ -89,7 +89,7 @@ elif "ANOMALIA" in pergunta:
 else:
 
     print(
-        "\nPergunta ainda não reconhecida "
+        "\nPergunta ainda nÃ£o reconhecida "
         "pela IA."
     )
 

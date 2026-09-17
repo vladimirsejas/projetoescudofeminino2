@@ -1,6 +1,6 @@
-import sqlite3
+﻿import sqlite3
 
-banco = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+banco = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conexao = sqlite3.connect(banco)
 

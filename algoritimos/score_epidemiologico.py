@@ -1,16 +1,16 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
 # =====================================
-# CONEXÃO
+# CONEXÃƒO
 # =====================================
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
 # =====================================
-# INTERNAÇÕES E ÓBITOS
+# INTERNAÃ‡Ã•ES E Ã“BITOS
 # =====================================
 
 df = pd.read_sql("""
@@ -46,7 +46,7 @@ crescimento["crescimento"] = (
 ) * 100
 
 # =====================================
-# JUNÇÃO DOS DADOS
+# JUNÃ‡ÃƒO DOS DADOS
 # =====================================
 
 df = df.merge(
@@ -60,7 +60,7 @@ df = df.merge(
 )
 
 # =====================================
-# NORMALIZAÇÃO
+# NORMALIZAÃ‡ÃƒO
 # =====================================
 
 df["internacoes_norm"] = (
@@ -82,7 +82,7 @@ df["crescimento_norm"] = (
 ) * 100
 
 # =====================================
-# SCORE EPIDEMIOLÓGICO
+# SCORE EPIDEMIOLÃ“GICO
 # =====================================
 
 df["score"] = (
@@ -94,7 +94,7 @@ df["score"] = (
 )
 
 # =====================================
-# CLASSIFICAÇÃO
+# CLASSIFICAÃ‡ÃƒO
 # =====================================
 
 def classificar(score):
@@ -115,7 +115,7 @@ def classificar(score):
 df["prioridade"] = df["score"].apply(classificar)
 
 # =====================================
-# ORDENAÇÃO
+# ORDENAÃ‡ÃƒO
 # =====================================
 
 df = df.sort_values(
@@ -127,7 +127,7 @@ df = df.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== SCORE EPIDEMIOLÓGICO ===\n")
+print("\n=== SCORE EPIDEMIOLÃ“GICO ===\n")
 
 print(
     df[

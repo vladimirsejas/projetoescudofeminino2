@@ -1,7 +1,7 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -16,18 +16,18 @@ memorias = []
 for _, row in df.iterrows():
 
     texto = f"""
-Câncer: {row['tipo_cancer']}.
+CÃ¢ncer: {row['tipo_cancer']}.
 
-Pontuação final: {row['pontuacao_final']:.2f}.
+PontuaÃ§Ã£o final: {row['pontuacao_final']:.2f}.
 
-Classificação: {row['nivel_prioridade']}.
+ClassificaÃ§Ã£o: {row['nivel_prioridade']}.
 
 Evento: {row['evento']}.
 
-Situação de anomalia:
+SituaÃ§Ã£o de anomalia:
 {row['situacao']}.
 
-Recomendação:
+RecomendaÃ§Ã£o:
 {row['recomendacao']}
 """
 
@@ -40,7 +40,7 @@ Recomendação:
 
 resultado = pd.DataFrame(memorias)
 
-print("\n=== MEMÓRIA DA IA ===\n")
+print("\n=== MEMÃ“RIA DA IA ===\n")
 
 for _, row in resultado.iterrows():
 

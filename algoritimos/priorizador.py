@@ -1,7 +1,7 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -77,7 +77,7 @@ df = df.sort_values(
     ascending=False
 )
 
-print("\n=== PRIORIZAÇÃO EXECUTIVA ===\n")
+print("\n=== PRIORIZAÃ‡ÃƒO EXECUTIVA ===\n")
 
 print(
     df[

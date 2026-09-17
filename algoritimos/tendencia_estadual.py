@@ -1,11 +1,11 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
 # =====================================
-# CONEXÃO
+# CONEXÃƒO
 # =====================================
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -26,7 +26,7 @@ GROUP BY tipo_cancer, origem
 df = pd.read_sql(query, conn)
 
 # =====================================
-# VARIAÇÃO %
+# VARIAÃ‡ÃƒO %
 # =====================================
 
 df["variacao"] = (
@@ -74,7 +74,7 @@ def classificar(desvio):
 pivot["evento"] = pivot["desvio"].apply(classificar)
 
 # =====================================
-# ORDENAÇÃO
+# ORDENAÃ‡ÃƒO
 # =====================================
 
 pivot = pivot.sort_values(
@@ -86,7 +86,7 @@ pivot = pivot.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== TENDÊNCIA ESTADUAL ===\n")
+print("\n=== TENDÃŠNCIA ESTADUAL ===\n")
 
 print(
     pivot[

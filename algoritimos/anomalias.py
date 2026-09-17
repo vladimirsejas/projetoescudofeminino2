@@ -1,11 +1,11 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
 # =====================================
-# CONEXÃO
+# CONEXÃƒO
 # =====================================
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -24,7 +24,7 @@ ORDER BY tipo_cancer, ano
 """, conn)
 
 # =====================================
-# DETECÇÃO DE ANOMALIAS
+# DETECÃ‡ÃƒO DE ANOMALIAS
 # =====================================
 
 resultado = []

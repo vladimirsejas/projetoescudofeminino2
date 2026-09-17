@@ -1,9 +1,9 @@
-import pandas as pd
+﻿import pandas as pd
 import sqlite3
 
-arquivo = r"C:\projetoescudofeminino\dados\cancer_mama_rio_claro\cancer_mama_mulheres_rio_claro_2021_2025.csv"
+arquivo = r"C:\projetoescudofeminino2\dados\cancer_mama_rio_claro\cancer_mama_mulheres_rio_claro_2021_2025.csv"
 
-banco = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+banco = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 df = pd.read_csv(
     arquivo,
@@ -32,5 +32,6 @@ dados.to_sql(
 
 conexao.close()
 
-print("Carga concluída com sucesso!")
+print("Carga concluÃ­da com sucesso!")
 print("Registros carregados:", len(dados))
+

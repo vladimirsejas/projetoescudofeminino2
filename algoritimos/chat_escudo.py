@@ -1,11 +1,11 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
 # =====================================
-# CONEXÃO
+# CONEXÃƒO
 # =====================================
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -43,7 +43,7 @@ while True:
     respondeu = False
 
     # =====================================
-    # PERFIL DE CÂNCER
+    # PERFIL DE CÃ‚NCER
     # =====================================
 
     for _, row in fichas.iterrows():
@@ -62,7 +62,7 @@ while True:
 
     if not respondeu and (
         "ATENCAO" in pergunta_upper
-        or "ATENÇÃO" in pergunta_upper
+        or "ATENÃ‡ÃƒO" in pergunta_upper
         or "PRIORIDADE" in pergunta_upper
         or "RISCO" in pergunta_upper
     ):
@@ -77,17 +77,17 @@ while True:
         print("\nResposta:\n")
 
         print(
-            f"O câncer que merece maior atenção "
-            f"atualmente é {r['tipo_cancer']}."
+            f"O cÃ¢ncer que merece maior atenÃ§Ã£o "
+            f"atualmente Ã© {r['tipo_cancer']}."
         )
 
         print(
-            f"Classificação: "
+            f"ClassificaÃ§Ã£o: "
             f"{r['nivel_prioridade']}."
         )
 
         print(
-            f"Pontuação final: "
+            f"PontuaÃ§Ã£o final: "
             f"{r['pontuacao_final']:.2f}."
         )
 
@@ -100,7 +100,7 @@ while True:
     if not respondeu and (
         "MORTALIDADE" in pergunta_upper
         or "OBITO" in pergunta_upper
-        or "ÓBITO" in pergunta_upper
+        or "Ã“BITO" in pergunta_upper
         or "MATA" in pergunta_upper
     ):
 
@@ -154,12 +154,12 @@ while True:
         respondeu = True
 
     # =====================================
-    # PERMANÊNCIA
+    # PERMANÃŠNCIA
     # =====================================
 
     if not respondeu and (
         "PERMANENCIA" in pergunta_upper
-        or "PERMANÊNCIA" in pergunta_upper
+        or "PERMANÃŠNCIA" in pergunta_upper
         or "LEITO" in pergunta_upper
         or "INTERNADO" in pergunta_upper
     ):
@@ -175,25 +175,25 @@ while True:
 
         print(
             f"{r['tipo_cancer']} apresenta "
-            f"a maior permanência hospitalar."
+            f"a maior permanÃªncia hospitalar."
         )
 
         print(
-            f"Média: "
+            f"MÃ©dia: "
             f"{r['permanencia_media']:.2f} dias."
         )
 
         respondeu = True
 
     # =====================================
-    # FAIXA ETÁRIA
+    # FAIXA ETÃRIA
     # =====================================
 
     if not respondeu and (
         "IDADE" in pergunta_upper
         or "FAIXA" in pergunta_upper
         or "ETARIA" in pergunta_upper
-        or "ETÁRIA" in pergunta_upper
+        or "ETÃRIA" in pergunta_upper
     ):
 
         print("\nResposta:\n")
@@ -214,7 +214,7 @@ while True:
     if not respondeu:
 
         print(
-            "\nAinda não compreendi essa pergunta."
+            "\nAinda nÃ£o compreendi essa pergunta."
         )
 
 conn.close()

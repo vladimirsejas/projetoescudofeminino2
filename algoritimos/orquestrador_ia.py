@@ -1,7 +1,7 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
@@ -15,7 +15,7 @@ pergunta = input("Pergunta: ").upper()
 
 if (
     "ATENCAO" in pergunta
-    or "ATENÇÃO" in pergunta
+    or "ATENÃ‡ÃƒO" in pergunta
     or "PRIORIDADE" in pergunta
     or "RISCO" in pergunta
 ):
@@ -32,8 +32,8 @@ if (
     print("\nResposta:\n")
 
     print(
-        f"O câncer que merece maior atenção "
-        f"é {r['tipo_cancer']}."
+        f"O cÃ¢ncer que merece maior atenÃ§Ã£o "
+        f"Ã© {r['tipo_cancer']}."
     )
 
 # =====================================
@@ -43,7 +43,7 @@ if (
 elif (
     "ANOMALIA" in pergunta
     or "PADRAO" in pergunta
-    or "PADRÃO" in pergunta
+    or "PADRÃƒO" in pergunta
 ):
 
     df = pd.read_sql("""
@@ -69,12 +69,12 @@ elif (
         )
 
 # =====================================
-# TENDÊNCIA
+# TENDÃŠNCIA
 # =====================================
 
 elif (
     "TENDENCIA" in pergunta
-    or "TENDÊNCIA" in pergunta
+    or "TENDÃŠNCIA" in pergunta
     or "ESTADUAL" in pergunta
 ):
 
@@ -90,20 +90,20 @@ elif (
     print("\nResposta:\n")
 
     print(
-        f"{r['tipo_cancer']} está "
+        f"{r['tipo_cancer']} estÃ¡ "
         f"{r['desvio']:.2f}% acima "
-        f"da tendência estadual."
+        f"da tendÃªncia estadual."
     )
 
 # =====================================
-# INCIDÊNCIA
+# INCIDÃŠNCIA
 # =====================================
 
 elif (
     "INCIDENCIA" in pergunta
-    or "INCIDÊNCIA" in pergunta
+    or "INCIDÃŠNCIA" in pergunta
     or "INTERNACOES" in pergunta
-    or "INTERNAÇÕES" in pergunta
+    or "INTERNAÃ‡Ã•ES" in pergunta
 ):
 
     df = pd.read_sql("""
@@ -121,15 +121,15 @@ elif (
     print("\nResposta:\n")
 
     print(
-        f"O câncer com maior incidência "
-        f"hospitalar é "
+        f"O cÃ¢ncer com maior incidÃªncia "
+        f"hospitalar Ã© "
         f"{r['tipo_cancer']}."
     )
 
 else:
 
     print(
-        "\nPergunta ainda não reconhecida."
+        "\nPergunta ainda nÃ£o reconhecida."
     )
 
 conn.close()

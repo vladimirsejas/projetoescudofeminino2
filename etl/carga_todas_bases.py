@@ -1,9 +1,9 @@
-import os
+﻿import os
 import pandas as pd
 import sqlite3
 
-BASE_DADOS = r"C:\projetoescudofeminino\dados"
-BANCO = r"C:\projetoescudofeminino\banco\escudo_feminino.db"
+BASE_DADOS = r"C:\projetoescudofeminino2\dados"
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 MAPA = {
     "cancer_mama_rio_claro": ("MAMA", "RIO_CLARO"),
@@ -96,3 +96,4 @@ print("\n" + "=" * 60)
 print("CARGA FINALIZADA")
 print("TOTAL:", total_registros)
 print("=" * 60)
+
