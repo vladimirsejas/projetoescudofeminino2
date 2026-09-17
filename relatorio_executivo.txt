@@ -1,0 +1,44 @@
+
+RELATÓRIO EXECUTIVO - ESCUDO FEMININO
+
+Principal prioridade epidemiológica:
+
+COLO_UTERO
+
+Pontuação final:
+102.15
+
+Classificação:
+CRITICA
+
+----------------------------------------
+
+TOP 3 PRIORIDADES
+
+1º COLO_UTERO
+   Score: 102.15
+
+2º MAMA
+   Score: 97.63
+
+3º PELE_NAO_MELANOMA
+   Score: 80.67
+
+----------------------------------------
+
+ANÁLISE AUTOMÁTICA
+
+O câncer de maior prioridade atualmente é
+COLO_UTERO.
+
+Este resultado foi obtido pela combinação
+dos indicadores epidemiológicos,
+desvios em relação à tendência estadual
+e análise de anomalias.
+
+A classificação final foi
+CRITICA.
+
+Recomenda-se acompanhamento contínuo
+dos grupos classificados com maior
+prioridade epidemiológica.
