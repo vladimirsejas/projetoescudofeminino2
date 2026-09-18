@@ -100,13 +100,26 @@ if anomalias_ativas.empty:
     escrever("Nenhuma anomalia identificada no período analisado.")
 else:
     for _, row in anomalias_ativas.iterrows():
-        escrever(
+
+        if pd.isna(row["desvio_percentual"]):
+            desvio_texto = "sem histórico anterior para comparar"
+        else:
+            desvio_texto = (
+                f"desvio de {row['desvio_percentual']:.1f}% em relação "
+                f"à média histórica de {row['media_historica']:.1f} "
+                f"internações/ano"
+            )
+
+        linha = (
             f"- {row['tipo_cancer']}: {row['situacao']} "
-            f"(desvio de {row['desvio_percentual']:.1f}% em relação "
-            f"à média histórica de {row['media_historica']:.1f} "
-            f"internações/ano; valor observado em 2025: "
+            f"({desvio_texto}; valor observado em 2025: "
             f"{int(row['valor_2025'])})."
         )
+
+        if row.get("confiabilidade", "OK") != "OK":
+            linha += f" [{row['confiabilidade']}]"
+
+        escrever(linha)
 
 # =====================================
 # 3. PRIORIDADES

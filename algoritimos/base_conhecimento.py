@@ -47,7 +47,8 @@ anomalias = pd.read_sql(
         media_historica,
         valor_2025,
         desvio_percentual,
-        situacao
+        situacao,
+        confiabilidade AS confiabilidade_anomalia
     FROM anomalias
     """,
     conn
@@ -148,12 +149,20 @@ def gerar_motivo(row):
         )
 
     if row["situacao"] == "ANOMALIA_POSITIVA":
-        partes.append(
-            f"o volume de 2025 ({int(row['valor_2025'])} internações) "
-            f"ficou {row['desvio_percentual']:.1f}% acima da média "
-            f"histórica, o que caracteriza um desvio fora do padrão "
-            f"dos anos anteriores"
-        )
+        if pd.isna(row["desvio_percentual"]):
+            partes.append(
+                f"o volume de 2025 ({int(row['valor_2025'])} "
+                f"internações) surgiu sem nenhum histórico anterior "
+                f"registrado, o que por si só já é um padrão fora "
+                f"do comum"
+            )
+        else:
+            partes.append(
+                f"o volume de 2025 ({int(row['valor_2025'])} "
+                f"internações) ficou {row['desvio_percentual']:.1f}% "
+                f"acima da média histórica, o que caracteriza um "
+                f"desvio fora do padrão dos anos anteriores"
+            )
 
     elif row["situacao"] == "ANOMALIA_NEGATIVA":
         partes.append(
@@ -179,6 +188,17 @@ def gerar_motivo(row):
             f"cautela, pois é calculado sobre uma base pequena de "
             f"casos em 2024 — uma variação em números absolutos "
             f"pequenos gera percentuais desproporcionalmente altos."
+        )
+
+    if (
+        row["situacao"] != "NORMAL"
+        and row.get("confiabilidade_anomalia", "OK") != "OK"
+    ):
+        motivo += (
+            f" ATENÇÃO: {row['confiabilidade_anomalia']}. A anomalia "
+            f"apontada acima também deve ser lida com cautela pelo "
+            f"mesmo motivo — média histórica baixa infla qualquer "
+            f"variação percentual."
         )
 
     return motivo

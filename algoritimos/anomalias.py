@@ -1,8 +1,8 @@
-﻿import sqlite3
+import sqlite3
 import pandas as pd
 
 # =====================================
-# CONEXÃƒO
+# CONEXÃO
 # =====================================
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
@@ -24,8 +24,16 @@ ORDER BY tipo_cancer, ano
 """, conn)
 
 # =====================================
-# DETECÃ‡ÃƒO DE ANOMALIAS
+# DETECÇÃO DE ANOMALIAS
+#
+# LIMIAR_AMOSTRA_PEQUENA: abaixo dessa média
+# histórica, um desvio percentual pode ser
+# enganoso (poucos casos fazem qualquer
+# variação parecer dramática). Mesmo
+# problema já corrigido em tendencia_estadual.py.
 # =====================================
+
+LIMIAR_AMOSTRA_PEQUENA = 10
 
 resultado = []
 
@@ -53,27 +61,65 @@ for cancer in df["tipo_cancer"].unique():
 
     valor_2025 = atual.iloc[0]["internacoes"]
 
-    desvio = (
-        (valor_2025 - media_historica)
-        / media_historica
-    ) * 100
+    # -------------------------------------
+    # Proteção contra média histórica zero.
+    # Sem isso, a divisão abaixo produz
+    # infinito ou "não é um número" (nan) e
+    # esses valores se propagam quebrando
+    # tudo que ler essa tabela depois.
+    # -------------------------------------
 
-    if desvio >= 50:
-        situacao = "ANOMALIA_POSITIVA"
+    if media_historica == 0:
 
-    elif desvio <= -50:
-        situacao = "ANOMALIA_NEGATIVA"
+        if valor_2025 == 0:
+            desvio = 0.0
+            situacao = "NORMAL"
+        else:
+            desvio = float("inf")
+            situacao = "ANOMALIA_POSITIVA"
+
+        confiabilidade = (
+            "BAIXA (não havia nenhuma internação histórica "
+            "registrada antes de 2025 — desvio percentual não "
+            "pode ser calculado de forma confiável)"
+        )
 
     else:
-        situacao = "NORMAL"
+
+        desvio = (
+            (valor_2025 - media_historica)
+            / media_historica
+        ) * 100
+
+        if desvio >= 50:
+            situacao = "ANOMALIA_POSITIVA"
+
+        elif desvio <= -50:
+            situacao = "ANOMALIA_NEGATIVA"
+
+        else:
+            situacao = "NORMAL"
+
+        if media_historica < LIMIAR_AMOSTRA_PEQUENA:
+            confiabilidade = (
+                f"BAIXA (média histórica de apenas "
+                f"{media_historica:.1f} internações/ano — "
+                f"percentual pode enganar)"
+            )
+        else:
+            confiabilidade = "OK"
 
     resultado.append(
         {
             "tipo_cancer": cancer,
             "media_historica": round(media_historica, 2),
             "valor_2025": int(valor_2025),
-            "desvio_percentual": round(desvio, 2),
-            "situacao": situacao
+            "desvio_percentual": (
+                None if desvio == float("inf")
+                else round(desvio, 2)
+            ),
+            "situacao": situacao,
+            "confiabilidade": confiabilidade
         }
     )
 
@@ -85,7 +131,8 @@ anomalias = pd.DataFrame(resultado)
 
 anomalias = anomalias.sort_values(
     "desvio_percentual",
-    ascending=False
+    ascending=False,
+    na_position="first"
 )
 
 # =====================================
@@ -94,7 +141,7 @@ anomalias = anomalias.sort_values(
 
 print("\n=== ANOMALIAS DETECTADAS ===\n")
 
-print(anomalias)
+print(anomalias.to_string(index=False))
 
 # =====================================
 # GRAVAR SQLITE
@@ -107,6 +154,6 @@ anomalias.to_sql(
     index=False
 )
 
-print("\nTabela anomalias criada com sucesso.")
+print("\nTabela anomalias atualizada com sucesso.")
 
 conn.close()

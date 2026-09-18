@@ -1,15 +1,15 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import sqlite3
 import plotly.express as px
 
 # ==================================================
-# CONFIGURAÃ‡ÃƒO
+# CONFIGURAÇÃO
 # ==================================================
 
 st.set_page_config(
     page_title="Escudo Feminino",
-    page_icon="ðŸŽ—ï¸",
+    page_icon="🎗️",
     layout="wide"
 )
 
@@ -73,7 +73,7 @@ sp_vals = origens.loc[
 sp = int(sp_vals[0]) if len(sp_vals) > 0 else 0
 
 # ==================================================
-# KPIs AVANÃ‡ADOS
+# KPIs AVANÇADOS
 # ==================================================
 
 valor_total = pd.read_sql(
@@ -101,15 +101,15 @@ obitos = pd.read_sql(
 ).iloc[0]["total"] or 0
 
 # ==================================================
-# CABEÃ‡ALHO
+# CABEÇALHO
 # ==================================================
 
-st.title("ðŸŽ—ï¸ Escudo Feminino")
+st.title("🎗️ Escudo Feminino")
 
 st.markdown("""
-### Monitoramento de InternaÃ§Ãµes por CÃ¢ncer Feminino
+### Sistema de Apoio à Decisão para Saúde Pública
 
-**Rio Claro x Estado de SÃ£o Paulo**
+**Rio Claro x Estado de São Paulo**
 """)
 
 # ==================================================
@@ -120,22 +120,131 @@ col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Total de Registros", f"{int(total):,}")
 col2.metric("Rio Claro", f"{rio_claro:,}")
-col3.metric("SÃ£o Paulo", f"{sp:,}")
-col4.metric("CÃ¢ncer LÃ­der", lider)
+col3.metric("São Paulo", f"{sp:,}")
+col4.metric("Câncer Líder", lider)
 
 st.divider()
 
 col5, col6, col7 = st.columns(3)
 
 col5.metric("Valor Total", f"R$ {valor_total:,.2f}")
-col6.metric("PermanÃªncia MÃ©dia", f"{permanencia_media:.1f} dias")
-col7.metric("Ã“bitos", f"{int(obitos):,}")
+col6.metric("Permanência Média", f"{permanencia_media:.1f} dias")
+col7.metric("Óbitos", f"{int(obitos):,}")
+
+st.divider()
 
 # ==================================================
-# RANKING DOS CÃ‚NCERES
+# PRIORIZAÇÃO E EXPLICAÇÃO
+#
+# Esta é a seção nova: traz pro dashboard o mesmo
+# conhecimento (motivo, impacto, recomendação) que
+# o chat_escudo.py já entrega — até agora o painel
+# só mostrava gráficos, sem explicar "e daí".
 # ==================================================
 
-st.subheader("ðŸ“Š Ranking dos CÃ¢nceres")
+st.subheader("🎯 Priorização e Recomendações")
+
+try:
+    base = pd.read_sql(
+        """
+        SELECT *
+        FROM base_conhecimento
+        ORDER BY pontuacao_final DESC
+        """,
+        conexao
+    )
+
+    cores_prioridade = {
+        "CRITICA": "🔴",
+        "ALTA": "🟠",
+        "MEDIA": "🟡",
+        "BAIXA": "🟢",
+    }
+
+    for _, row in base.iterrows():
+
+        emoji = cores_prioridade.get(row["nivel_prioridade"], "⚪")
+
+        titulo = (
+            f"{emoji} {row['tipo_cancer']} — "
+            f"{row['nivel_prioridade']} "
+            f"(pontuação {row['pontuacao_final']:.2f})"
+        )
+
+        with st.expander(titulo):
+
+            st.markdown("**Por que acontece:**")
+            st.write(row["motivo"])
+
+            st.markdown("**Impacto:**")
+            st.write(row["impacto"])
+
+            st.markdown("**Recomendação:**")
+            st.write(row["recomendacao"])
+
+            avisos = []
+
+            if row.get("confiabilidade", "OK") != "OK":
+                avisos.append(
+                    f"Tendência estadual: {row['confiabilidade']}"
+                )
+
+            if row.get("confiabilidade_anomalia", "OK") not in (
+                "OK", None
+            ) and pd.notna(row.get("confiabilidade_anomalia")):
+                avisos.append(
+                    f"Anomalia: {row['confiabilidade_anomalia']}"
+                )
+
+            for aviso in avisos:
+                st.warning(aviso)
+
+except Exception as e:
+    st.warning(
+        f"Não foi possível carregar 'base_conhecimento': {e}. "
+        f"Rode algoritimos\\base_conhecimento.py antes de abrir o "
+        f"dashboard."
+    )
+
+st.divider()
+
+# ==================================================
+# RELATÓRIO EXECUTIVO
+#
+# Mostra o mesmo relatorio_executivo.txt que o chat
+# lê quando alguém pede um relatório — aqui, pronto
+# pra ler ou baixar direto do painel.
+# ==================================================
+
+st.subheader("📋 Relatório Executivo")
+
+try:
+    with open("relatorio_executivo.txt", "r", encoding="utf-8") as arquivo:
+        texto_relatorio = arquivo.read()
+
+    with st.expander("Ver relatório executivo completo"):
+        st.text(texto_relatorio)
+
+    st.download_button(
+        label="Baixar relatório executivo (.txt)",
+        data=texto_relatorio,
+        file_name="relatorio_executivo.txt",
+        mime="text/plain"
+    )
+
+except FileNotFoundError:
+    st.info(
+        "Relatório executivo ainda não foi gerado. Rode "
+        "algoritimos\\relatorio_executivo.py na raiz do projeto."
+    )
+
+st.divider()
+
+# ==================================================
+# RANKING DOS CÂNCERES
+# ==================================================
+
+st.subheader("📊 Ranking dos Cânceres")
 
 fig_ranking = px.bar(
     ranking,
@@ -143,7 +252,7 @@ fig_ranking = px.bar(
     y="total",
     color="total",
     text="total",
-    title="Ranking de InternaÃ§Ãµes por Tipo de CÃ¢ncer"
+    title="Ranking de Internações por Tipo de Câncer"
 )
 
 st.plotly_chart(
@@ -168,7 +277,7 @@ comparativo = pd.read_sql(
     conexao
 )
 
-st.subheader("ðŸ¥ Rio Claro x SÃ£o Paulo")
+st.subheader("🏥 Rio Claro x São Paulo")
 
 fig_comparativo = px.bar(
     comparativo,
@@ -184,13 +293,13 @@ st.plotly_chart(
 )
 
 # ==================================================
-# EVOLUÃ‡ÃƒO TEMPORAL
+# EVOLUÇÃO TEMPORAL
 # ==================================================
 
-st.subheader("ðŸ“ˆ EvoluÃ§Ã£o Temporal")
+st.subheader("📈 Evolução Temporal")
 
 cancer_escolhido = st.selectbox(
-    "Selecione o cÃ¢ncer",
+    "Selecione o câncer",
     ranking["tipo_cancer"].tolist()
 )
 
@@ -213,7 +322,7 @@ fig_evolucao = px.line(
     x="ano",
     y="internacoes",
     markers=True,
-    title=f"EvoluÃ§Ã£o Temporal - {cancer_escolhido}"
+    title=f"Evolução Temporal - {cancer_escolhido}"
 )
 
 st.plotly_chart(
@@ -222,10 +331,14 @@ st.plotly_chart(
 )
 
 # ==================================================
-# ALERTAS ANALÃTICOS
+# ALERTAS ANALÍTICOS
+#
+# Agora mostra também o selo de confiabilidade
+# estatística quando o desvio vem de uma base
+# pequena de casos.
 # ==================================================
 
-st.subheader("ðŸš¨ Alertas AnalÃ­ticos")
+st.subheader("🚨 Alertas Analíticos")
 
 eventos = pd.read_sql(
     """
@@ -243,6 +356,9 @@ for _, row in eventos.iterrows():
         f"({row['desvio']:.2f}%)"
     )
 
+    if row.get("confiabilidade", "OK") != "OK":
+        mensagem += f" — ⚠️ {row['confiabilidade']}"
+
     if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
         st.error(mensagem)
 
@@ -253,61 +369,7 @@ for _, row in eventos.iterrows():
         st.info(mensagem)
 
 # ==================================================
-# PRIORIZAÃ‡ÃƒO EPIDEMIOLÃ“GICA
-# ==================================================
-
-st.subheader("ðŸ† PriorizaÃ§Ã£o EpidemiolÃ³gica")
-
-try:
-    score_df = pd.read_sql(
-        """
-        SELECT *
-        FROM indicadores_epidemiologicos
-        """,
-        conexao
-    )
-
-    # Tenta ordenar por uma coluna de score/pontuaÃ§Ã£o, se existir
-    coluna_score = None
-    for candidato in ["score", "pontuacao", "score_epidemiologico", "indice"]:
-        if candidato in score_df.columns:
-            coluna_score = candidato
-            break
-
-    if coluna_score:
-        score_df = score_df.sort_values(by=coluna_score, ascending=False)
-
-    st.dataframe(score_df, use_container_width=True)
-
-    # SÃ³ desenha o grÃ¡fico se houver uma coluna de score numÃ©rica
-    # e uma coluna de cÃ¢ncer para usar no eixo X
-    coluna_cancer = None
-    for candidato in ["tipo_cancer", "cancer", "tipo"]:
-        if candidato in score_df.columns:
-            coluna_cancer = candidato
-            break
-
-    if coluna_score and coluna_cancer:
-        fig_score = px.bar(
-            score_df,
-            x=coluna_cancer,
-            y=coluna_score,
-            color=coluna_score,
-            text=coluna_score,
-            title="PriorizaÃ§Ã£o EpidemiolÃ³gica"
-        )
-        st.plotly_chart(
-            fig_score,
-            use_container_width=True
-        )
-
-except Exception as e:
-    st.warning(
-        f"NÃ£o foi possÃ­vel carregar a tabela 'indicadores_epidemiologicos': {e}"
-    )
-
-# ==================================================
-# FECHAMENTO DA CONEXÃƒO
+# FECHAMENTO DA CONEXÃO
 # ==================================================
 
 conexao.close()
