@@ -33,7 +33,8 @@ tendencia = pd.read_sql(
         RIO_CLARO,
         SP,
         desvio,
-        evento
+        evento,
+        confiabilidade
     FROM tendencia_estadual
     """,
     conn
@@ -170,6 +171,15 @@ def gerar_motivo(row):
         "mudança de protocolo de diagnóstico, campanha de rastreamento "
         "ou fator sazonal)."
     )
+
+    if row.get("confiabilidade", "OK") != "OK":
+        motivo += (
+            f" ATENÇÃO: {row['confiabilidade']}. O percentual de "
+            f"desvio em relação ao Estado deve ser interpretado com "
+            f"cautela, pois é calculado sobre uma base pequena de "
+            f"casos em 2024 — uma variação em números absolutos "
+            f"pequenos gera percentuais desproporcionalmente altos."
+        )
 
     return motivo
 

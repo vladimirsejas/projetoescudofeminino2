@@ -137,10 +137,15 @@ for _, row in tendencia_df.sort_values(
     else:
         direcao = "no mesmo ritmo"
 
-    escrever(
+    linha = (
         f"- {row['tipo_cancer']}: {direcao} da tendência estadual "
         f"({row['evento']})."
     )
+
+    if row.get("confiabilidade", "OK") != "OK":
+        linha += f" [{row['confiabilidade']}]"
+
+    escrever(linha)
 
 # =====================================
 # 5. RECOMENDAÇÕES

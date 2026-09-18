@@ -1,8 +1,8 @@
-﻿import sqlite3
+import sqlite3
 import pandas as pd
 
 # =====================================
-# CONEXÃƒO
+# CONEXÃO
 # =====================================
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
@@ -26,7 +26,7 @@ GROUP BY tipo_cancer, origem
 df = pd.read_sql(query, conn)
 
 # =====================================
-# VARIAÃ‡ÃƒO %
+# VARIAÇÃO %
 # =====================================
 
 df["variacao"] = (
@@ -36,7 +36,7 @@ df["variacao"] = (
 ) * 100
 
 # =====================================
-# PIVOT
+# PIVOT DA VARIAÇÃO
 # =====================================
 
 pivot = df.pivot_table(
@@ -46,6 +46,32 @@ pivot = df.pivot_table(
 ).reset_index()
 
 pivot.columns.name = None
+
+# =====================================
+# PIVOT DA BASE (ano_2024)
+#
+# Guardamos também o número absoluto de
+# internações em 2024, para poder avaliar
+# se o percentual calculado é confiável ou
+# se está inflado por uma base pequena.
+# =====================================
+
+pivot_base = df.pivot_table(
+    index="tipo_cancer",
+    columns="origem",
+    values="ano_2024"
+).reset_index()
+
+pivot_base.columns.name = None
+
+pivot_base = pivot_base.rename(
+    columns={
+        "RIO_CLARO": "base_RIO_CLARO",
+        "SP": "base_SP"
+    }
+)
+
+pivot = pivot.merge(pivot_base, on="tipo_cancer", how="left")
 
 # =====================================
 # DESVIO
@@ -74,7 +100,41 @@ def classificar(desvio):
 pivot["evento"] = pivot["desvio"].apply(classificar)
 
 # =====================================
-# ORDENAÃ‡ÃƒO
+# CONFIABILIDADE ESTATÍSTICA
+#
+# Um percentual calculado sobre uma base
+# pequena de casos em 2024 pode parecer
+# dramático sem ser representativo (ex.:
+# ir de 2 para 9 casos já é +350%, mesmo
+# sendo uma variação pequena em números
+# absolutos). Abaixo do limiar, marcamos
+# a linha como de baixa confiabilidade.
+# =====================================
+
+LIMIAR_AMOSTRA_PEQUENA = 10
+
+def classificar_confiabilidade(row):
+
+    if row["base_RIO_CLARO"] < LIMIAR_AMOSTRA_PEQUENA:
+        return (
+            f"BAIXA (apenas {int(row['base_RIO_CLARO'])} internações "
+            f"em Rio Claro em 2024 — percentual pode enganar)"
+        )
+
+    if row["base_SP"] < LIMIAR_AMOSTRA_PEQUENA:
+        return (
+            f"BAIXA (apenas {int(row['base_SP'])} internações "
+            f"no Estado em 2024 — percentual pode enganar)"
+        )
+
+    return "OK"
+
+pivot["confiabilidade"] = pivot.apply(
+    classificar_confiabilidade, axis=1
+)
+
+# =====================================
+# ORDENAÇÃO
 # =====================================
 
 pivot = pivot.sort_values(
@@ -86,7 +146,7 @@ pivot = pivot.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== TENDÃŠNCIA ESTADUAL ===\n")
+print("\n=== TENDÊNCIA ESTADUAL ===\n")
 
 print(
     pivot[
@@ -95,9 +155,10 @@ print(
             "RIO_CLARO",
             "SP",
             "desvio",
-            "evento"
+            "evento",
+            "confiabilidade"
         ]
-    ]
+    ].to_string(index=False)
 )
 
 # =====================================
@@ -111,6 +172,6 @@ pivot.to_sql(
     index=False
 )
 
-print("\nTabela tendencia_estadual criada.")
+print("\nTabela tendencia_estadual atualizada com sucesso.")
 
 conn.close()

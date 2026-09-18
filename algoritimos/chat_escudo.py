@@ -1,4 +1,5 @@
 import sqlite3
+import unicodedata
 import pandas as pd
 from datetime import datetime
 
@@ -193,83 +194,103 @@ def registrar_pergunta(pergunta, categoria, reconhecida):
 
 
 # =====================================
+# NORMALIZAÇÃO DE TEXTO
+#
+# Remove acentos antes de comparar, para que
+# "atenção" e "atencao" sejam tratados como
+# a mesma coisa — sem precisar listar as duas
+# formas em cada categoria.
+# =====================================
+
+def normalizar(texto):
+
+    sem_acento = unicodedata.normalize("NFKD", texto)
+    sem_acento = "".join(
+        c for c in sem_acento if not unicodedata.combining(c)
+    )
+
+    return sem_acento.upper()
+
+
+# =====================================
 # MOTOR DE INTENÇÕES
 #
 # União de todas as palavras-chave que estavam
 # espalhadas em chat_escudo.py, motor_respostas.py,
 # orquestrador_ia.py e perguntas_negocio.py.
+#
+# As listas abaixo usam só a forma SEM acento —
+# a normalização já cuida do resto.
 # =====================================
 
-def classificar_intencao(pergunta_upper):
+def classificar_intencao(pergunta_norm):
 
     for cancer in canceres:
-        if cancer in pergunta_upper:
+        cancer_norm = normalizar(cancer.replace("_", " "))
+        if cancer in pergunta_norm or cancer_norm in pergunta_norm:
             return "CANCER_ESPECIFICO"
 
     # perguntas panorâmicas — precisam vir antes de PRIORIDADE_MAXIMA,
     # senão "como está Rio Claro" nunca seria alcançada
-    if any(p in pergunta_upper for p in (
-        "COMO ESTA", "COMO ESTÁ", "SITUACAO GERAL", "SITUAÇÃO GERAL",
-        "VISAO GERAL", "VISÃO GERAL", "PANORAMA",
+    if any(p in pergunta_norm for p in (
+        "COMO ESTA", "SITUACAO GERAL", "VISAO GERAL", "PANORAMA",
         "MELHORANDO", "PIORANDO"
     )):
         return "SITUACAO_GERAL"
 
-    if any(p in pergunta_upper for p in (
-        "ATENCAO", "ATENÇÃO", "PRIORIDADE", "PRIORITARIO", "PRIORITÁRIO",
-        "RISCO", "GRAVE", "GRAVIDADE", "PREOCUPA", "PREOCUPANTE",
-        "URGENTE", "URGENCIA", "URGÊNCIA", "SERIO", "SÉRIO",
-        "INVESTIR", "RECURSOS", "ONDE AGIR", "O QUE FAZER"
+    if any(p in pergunta_norm for p in (
+        "ATENCAO", "PRIORIDADE", "PRIORITARIO", "RISCO", "GRAVE",
+        "GRAVIDADE", "PREOCUPA", "PREOCUPANTE", "URGENTE", "URGENCIA",
+        "SERIO", "INVESTIR", "RECURSOS", "ONDE AGIR", "O QUE FAZER"
     )):
         return "PRIORIDADE_MAXIMA"
 
-    if any(p in pergunta_upper for p in (
-        "TOP", "3 MAIORES", "TRÊS MAIORES", "TRES MAIORES", "RANKING"
+    if any(p in pergunta_norm for p in (
+        "TOP", "3 MAIORES", "TRES MAIORES", "RANKING"
     )):
         return "TOP_PRIORIDADES"
 
-    if any(p in pergunta_upper for p in (
-        "MORTALIDADE", "OBITO", "ÓBITO", "MATA", "MORTE", "MORTAL",
-        "LETAL", "LETALIDADE"
+    if any(p in pergunta_norm for p in (
+        "MORTALIDADE", "OBITO", "MATA", "MORTE", "MORTAL", "LETAL",
+        "LETALIDADE"
     )):
         return "MORTALIDADE"
 
-    if any(p in pergunta_upper for p in (
+    if any(p in pergunta_norm for p in (
         "CUSTO", "CUSTOS", "GASTO", "GASTOS", "FINANCEIRO",
-        "ORCAMENTO", "ORÇAMENTO", "DINHEIRO", "CARO"
+        "ORCAMENTO", "DINHEIRO", "CARO"
     )):
         return "CUSTO"
 
-    if any(p in pergunta_upper for p in (
-        "PERMANENCIA", "PERMANÊNCIA", "LEITO", "LEITOS", "INTERNADO",
-        "DIAS INTERNADO", "OCUPACAO", "OCUPAÇÃO"
+    if any(p in pergunta_norm for p in (
+        "PERMANENCIA", "LEITO", "LEITOS", "INTERNADO",
+        "DIAS INTERNADO", "OCUPACAO"
     )):
         return "PERMANENCIA"
 
-    if any(p in pergunta_upper for p in (
-        "IDADE", "FAIXA", "ETARIA", "ETÁRIA", "JOVEM", "IDOSA", "IDOSAS"
+    if any(p in pergunta_norm for p in (
+        "IDADE", "FAIXA", "ETARIA", "JOVEM", "IDOSA", "IDOSAS"
     )):
         return "FAIXA_ETARIA"
 
-    if any(p in pergunta_upper for p in (
-        "TENDENCIA", "TENDÊNCIA", "ESTADUAL", "CRESCENDO", "CAINDO",
+    if any(p in pergunta_norm for p in (
+        "TENDENCIA", "ESTADUAL", "CRESCENDO", "CAINDO",
         "ACOMPANHA O ESTADO", "COMPARADO AO ESTADO", "COMPARADO A SP"
     )):
         return "TENDENCIA_ESTADUAL"
 
-    if any(p in pergunta_upper for p in (
-        "ANOMALIA", "ANOMALIAS", "PADRAO", "PADRÃO", "ALERTA", "ALERTAS",
-        "FORA DO NORMAL", "ATIPICO", "ATÍPICO"
+    if any(p in pergunta_norm for p in (
+        "ANOMALIA", "ANOMALIAS", "PADRAO", "ALERTA", "ALERTAS",
+        "FORA DO NORMAL", "ATIPICO"
     )):
         return "ANOMALIAS"
 
-    if any(p in pergunta_upper for p in (
-        "INCIDENCIA", "INCIDÊNCIA", "INTERNACOES", "INTERNAÇÕES",
-        "MAIS CASOS", "MAIS COMUM"
+    if any(p in pergunta_norm for p in (
+        "INCIDENCIA", "INTERNACOES", "MAIS CASOS", "MAIS COMUM"
     )):
         return "INCIDENCIA"
 
-    if "RELATORIO" in pergunta_upper or "RELATÓRIO" in pergunta_upper:
+    if "RELATORIO" in pergunta_norm:
         return "RELATORIO_EXECUTIVO"
 
     return "DESCONHECIDA"
@@ -279,11 +300,15 @@ def classificar_intencao(pergunta_upper):
 # RESPOSTAS
 # =====================================
 
-def responder(intencao, pergunta_upper):
+def responder(intencao, pergunta_norm):
 
     if intencao == "CANCER_ESPECIFICO":
 
-        cancer = next(c for c in canceres if c in pergunta_upper)
+        cancer = next(
+            c for c in canceres
+            if c in pergunta_norm
+            or normalizar(c.replace("_", " ")) in pergunta_norm
+        )
 
         if PERFIL == "SIMPLES":
             linha = base_df[base_df["tipo_cancer"] == cancer]
@@ -486,6 +511,9 @@ def responder(intencao, pergunta_upper):
                 f"abaixo da tendência estadual."
             )
 
+        if r.get("confiabilidade", "OK") != "OK":
+            print(f"\nAtenção: {r['confiabilidade']}.")
+
         return
 
     if intencao == "ANOMALIAS":
@@ -562,11 +590,11 @@ while True:
     if pergunta.lower() == "sair":
         break
 
-    pergunta_upper = pergunta.upper()
+    pergunta_norm = normalizar(pergunta)
 
-    intencao = classificar_intencao(pergunta_upper)
+    intencao = classificar_intencao(pergunta_norm)
 
-    responder(intencao, pergunta_upper)
+    responder(intencao, pergunta_norm)
 
     registrar_pergunta(
         pergunta,
