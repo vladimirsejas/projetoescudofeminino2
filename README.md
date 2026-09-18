@@ -8,8 +8,8 @@ O projeto é um **Sistema de Apoio à Decisão para Políticas Públicas baseado
 em Inteligência Analítica** — o chat é apenas a interface de acesso; o
 produto de verdade é o conhecimento estruturado que existe por trás dele.
 
-Trabalho da disciplina de GATEC (graduação em IA) — Fatec Rio Claro, 3º
-semestre.
+Trabalho acadêmico de graduação em Inteligência Artificial — Fatec Rio
+Claro, 3º semestre.
 
 ---
 
