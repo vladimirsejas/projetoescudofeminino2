@@ -26,6 +26,7 @@ TABELAS_NECESSARIAS = [
     "custos_hospitalares",
     "permanencia_hospitalar",
     "faixa_etaria",
+    "base_conhecimento",
     "memoria_ia",
     "internacoes",
 ]
@@ -92,9 +93,80 @@ mortalidade_df = pd.read_sql("SELECT * FROM mortalidade", conn)
 custos_df = pd.read_sql("SELECT * FROM custos_hospitalares", conn)
 permanencia_df = pd.read_sql("SELECT * FROM permanencia_hospitalar", conn)
 faixa_df = pd.read_sql("SELECT * FROM faixa_etaria", conn)
+base_df = pd.read_sql("SELECT * FROM base_conhecimento", conn)
 memoria = pd.read_sql("SELECT * FROM memoria_ia", conn)
 
 canceres = priorizacao["tipo_cancer"].tolist()
+
+
+# =====================================
+# ADAPTAÇÃO POR PÚBLICO (Missão técnica nº 7)
+#
+# Mesmos fatos, dois níveis de linguagem.
+# Técnico: para secretário, prefeito, gestor hospitalar,
+# pesquisador — todos acostumados a números e termos técnicos.
+# Simples: para população em geral — sem jargão, sem
+# pontuação, foco em conclusão e ação.
+# =====================================
+
+RECOMENDACAO_SIMPLES = {
+    "CRITICA": "priorizar esse câncer nas ações de saúde imediatamente.",
+    "ALTA": "acompanhar de perto e incluir entre as prioridades de curto prazo.",
+    "MEDIA": "manter monitoramento regular, sem urgência no momento.",
+    "BAIXA": "manter o acompanhamento de rotina que já é feito.",
+}
+
+
+def gerar_resposta_simples(row):
+
+    texto = (
+        f"{row['tipo_cancer']} está com nível de atenção "
+        f"{row['nivel_prioridade']} em Rio Claro.\n"
+    )
+
+    if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
+        texto += (
+            "\nO número de casos está crescendo mais rápido em "
+            "Rio Claro do que na média do Estado de São Paulo."
+        )
+    elif row["evento"] == "ABAIXO_DA_TENDENCIA_ESTADUAL":
+        texto += (
+            "\nO número de casos está crescendo mais devagar em "
+            "Rio Claro do que na média do Estado de São Paulo."
+        )
+    else:
+        texto += (
+            "\nO número de casos em Rio Claro segue no mesmo ritmo "
+            "do Estado de São Paulo."
+        )
+
+    if row["situacao"] == "ANOMALIA_POSITIVA":
+        texto += (
+            "\nEm 2025 houve um aumento fora do normal nesse tipo "
+            "de câncer, que ainda precisa ser investigado."
+        )
+    elif row["situacao"] == "ANOMALIA_NEGATIVA":
+        texto += (
+            "\nEm 2025 houve uma queda fora do normal nesse tipo "
+            "de câncer, que ainda precisa ser investigada."
+        )
+
+    recomendacao = RECOMENDACAO_SIMPLES.get(
+        row["nivel_prioridade"], "manter o acompanhamento de rotina."
+    )
+
+    texto += f"\n\nO que a cidade deveria fazer: {recomendacao.capitalize()}"
+
+    return texto
+
+
+print("\nPara adaptar a linguagem das respostas, escolha um perfil:")
+print("  [1] Técnico (gestor, secretário, pesquisador) — padrão")
+print("  [2] Simples (população em geral, sem termos técnicos)")
+
+escolha_perfil = input("Digite 1 ou 2 (ou Enter para técnico): ").strip()
+
+PERFIL = "SIMPLES" if escolha_perfil == "2" else "TECNICO"
 
 
 # =====================================
@@ -134,48 +206,66 @@ def classificar_intencao(pergunta_upper):
         if cancer in pergunta_upper:
             return "CANCER_ESPECIFICO"
 
+    # perguntas panorâmicas — precisam vir antes de PRIORIDADE_MAXIMA,
+    # senão "como está Rio Claro" nunca seria alcançada
     if any(p in pergunta_upper for p in (
-        "ATENCAO", "ATENÇÃO", "PRIORIDADE", "RISCO"
+        "COMO ESTA", "COMO ESTÁ", "SITUACAO GERAL", "SITUAÇÃO GERAL",
+        "VISAO GERAL", "VISÃO GERAL", "PANORAMA",
+        "MELHORANDO", "PIORANDO"
+    )):
+        return "SITUACAO_GERAL"
+
+    if any(p in pergunta_upper for p in (
+        "ATENCAO", "ATENÇÃO", "PRIORIDADE", "PRIORITARIO", "PRIORITÁRIO",
+        "RISCO", "GRAVE", "GRAVIDADE", "PREOCUPA", "PREOCUPANTE",
+        "URGENTE", "URGENCIA", "URGÊNCIA", "SERIO", "SÉRIO",
+        "INVESTIR", "RECURSOS", "ONDE AGIR", "O QUE FAZER"
     )):
         return "PRIORIDADE_MAXIMA"
 
     if any(p in pergunta_upper for p in (
-        "TOP", "3 MAIORES", "TRÊS MAIORES", "TRES MAIORES"
+        "TOP", "3 MAIORES", "TRÊS MAIORES", "TRES MAIORES", "RANKING"
     )):
         return "TOP_PRIORIDADES"
 
     if any(p in pergunta_upper for p in (
-        "MORTALIDADE", "OBITO", "ÓBITO", "MATA", "MORTE"
+        "MORTALIDADE", "OBITO", "ÓBITO", "MATA", "MORTE", "MORTAL",
+        "LETAL", "LETALIDADE"
     )):
         return "MORTALIDADE"
 
     if any(p in pergunta_upper for p in (
-        "CUSTO", "CUSTOS", "GASTO", "FINANCEIRO"
+        "CUSTO", "CUSTOS", "GASTO", "GASTOS", "FINANCEIRO",
+        "ORCAMENTO", "ORÇAMENTO", "DINHEIRO", "CARO"
     )):
         return "CUSTO"
 
     if any(p in pergunta_upper for p in (
-        "PERMANENCIA", "PERMANÊNCIA", "LEITO", "INTERNADO"
+        "PERMANENCIA", "PERMANÊNCIA", "LEITO", "LEITOS", "INTERNADO",
+        "DIAS INTERNADO", "OCUPACAO", "OCUPAÇÃO"
     )):
         return "PERMANENCIA"
 
     if any(p in pergunta_upper for p in (
-        "IDADE", "FAIXA", "ETARIA", "ETÁRIA"
+        "IDADE", "FAIXA", "ETARIA", "ETÁRIA", "JOVEM", "IDOSA", "IDOSAS"
     )):
         return "FAIXA_ETARIA"
 
     if any(p in pergunta_upper for p in (
-        "TENDENCIA", "TENDÊNCIA", "ESTADUAL"
+        "TENDENCIA", "TENDÊNCIA", "ESTADUAL", "CRESCENDO", "CAINDO",
+        "ACOMPANHA O ESTADO", "COMPARADO AO ESTADO", "COMPARADO A SP"
     )):
         return "TENDENCIA_ESTADUAL"
 
     if any(p in pergunta_upper for p in (
-        "ANOMALIA", "PADRAO", "PADRÃO"
+        "ANOMALIA", "ANOMALIAS", "PADRAO", "PADRÃO", "ALERTA", "ALERTAS",
+        "FORA DO NORMAL", "ATIPICO", "ATÍPICO"
     )):
         return "ANOMALIAS"
 
     if any(p in pergunta_upper for p in (
-        "INCIDENCIA", "INCIDÊNCIA", "INTERNACOES", "INTERNAÇÕES"
+        "INCIDENCIA", "INCIDÊNCIA", "INTERNACOES", "INTERNAÇÕES",
+        "MAIS CASOS", "MAIS COMUM"
     )):
         return "INCIDENCIA"
 
@@ -194,6 +284,18 @@ def responder(intencao, pergunta_upper):
     if intencao == "CANCER_ESPECIFICO":
 
         cancer = next(c for c in canceres if c in pergunta_upper)
+
+        if PERFIL == "SIMPLES":
+            linha = base_df[base_df["tipo_cancer"] == cancer]
+
+            if linha.empty:
+                print(f"\nAinda não há dados registrados para {cancer}.")
+                return
+
+            print("\n")
+            print(gerar_resposta_simples(linha.iloc[0]))
+            return
+
         linha = memoria[memoria["tipo_cancer"] == cancer]
 
         if linha.empty:
@@ -204,11 +306,76 @@ def responder(intencao, pergunta_upper):
         print(linha.iloc[0]["memoria"])
         return
 
+    if intencao == "SITUACAO_GERAL":
+
+        total = len(priorizacao)
+
+        criticos_altos = priorizacao[
+            priorizacao["nivel_prioridade"].isin(["CRITICA", "ALTA"])
+        ]
+
+        anomalias_ativas = anomalias_df[
+            anomalias_df["situacao"] != "NORMAL"
+        ]
+
+        acima_tendencia = tendencia[tendencia["desvio"] > 0]
+
+        print("\nPanorama geral de Rio Claro:\n")
+
+        print(
+            f"De {total} cânceres monitorados, "
+            f"{len(criticos_altos)} estão em nível CRÍTICO ou ALTA "
+            f"de prioridade."
+        )
+
+        print(
+            f"{len(anomalias_ativas)} apresentam anomalia "
+            f"(comportamento fora do padrão histórico observado "
+            f"nos anos anteriores)."
+        )
+
+        print(
+            f"{len(acima_tendencia)} estão crescendo mais rápido "
+            f"em Rio Claro do que no Estado de São Paulo."
+        )
+
+        top3 = priorizacao.sort_values(
+            "pontuacao_final", ascending=False
+        ).head(3)
+
+        print("\nTOP 3 PRIORIDADES:\n")
+
+        for i, (_, row) in enumerate(top3.iterrows(), start=1):
+            print(
+                f"{i}º {row['tipo_cancer']} — "
+                f"{row['nivel_prioridade']} "
+                f"({row['pontuacao_final']:.2f})"
+            )
+
+        print(
+            "\nPergunte pelo nome de um câncer específico para "
+            "ver o motivo, o impacto e a recomendação completos."
+        )
+        return
+
     if intencao == "PRIORIDADE_MAXIMA":
 
         r = priorizacao.sort_values(
             "pontuacao_final", ascending=False
         ).iloc[0]
+
+        if PERFIL == "SIMPLES":
+            linha = base_df[base_df["tipo_cancer"] == r["tipo_cancer"]]
+
+            print(
+                f"\nO câncer que merece maior atenção agora "
+                f"é {r['tipo_cancer']}.\n"
+            )
+
+            if not linha.empty:
+                print(gerar_resposta_simples(linha.iloc[0]))
+
+            return
 
         print("\nResposta:\n")
         print(
@@ -373,10 +540,10 @@ def responder(intencao, pergunta_upper):
 
     print("\nAinda não compreendi essa pergunta.")
     print(
-        "Tente perguntar sobre: prioridade, mortalidade, custo, "
-        "permanência, faixa etária, tendência estadual, anomalias, "
-        "incidência, relatório executivo, ou o nome de um câncer "
-        "específico (ex.: MAMA, COLO_UTERO)."
+        "Tente perguntar sobre: panorama geral, prioridade, "
+        "mortalidade, custo, permanência, faixa etária, tendência "
+        "estadual, anomalias, incidência, relatório executivo, "
+        "ou o nome de um câncer específico (ex.: MAMA, COLO_UTERO)."
     )
 
 
