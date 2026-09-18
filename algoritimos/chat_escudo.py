@@ -1,7 +1,12 @@
 import sqlite3
 import unicodedata
+import re
 import pandas as pd
 from datetime import datetime
+import os
+
+from motor_raciocinio import raciocinar_cancer, contexto_para_ia
+from ia_linguagem import responder_com_ia
 
 # =====================================
 # CONEXÃO
@@ -97,6 +102,14 @@ faixa_df = pd.read_sql("SELECT * FROM faixa_etaria", conn)
 base_df = pd.read_sql("SELECT * FROM base_conhecimento", conn)
 memoria = pd.read_sql("SELECT * FROM memoria_ia", conn)
 
+# vulnerabilidade é opcional — se ainda não foi gerada
+# (algoritimos\vulnerabilidade.py), o chat continua funcionando
+# normalmente, só essa categoria de pergunta fica indisponível
+try:
+    vulnerabilidade_df = pd.read_sql("SELECT * FROM vulnerabilidade", conn)
+except Exception:
+    vulnerabilidade_df = None
+
 canceres = priorizacao["tipo_cancer"].tolist()
 
 
@@ -169,6 +182,42 @@ escolha_perfil = input("Digite 1 ou 2 (ou Enter para técnico): ").strip()
 
 PERFIL = "SIMPLES" if escolha_perfil == "2" else "TECNICO"
 
+# IA de linguagem: quando ativa, interpreta a pergunta usando o
+# conhecimento estruturado do Escudo. Se não houver chave/API, o chat
+# continua funcionando pelo motor determinístico já existente.
+IA_ATIVA = os.getenv("ESCUDO_IA_ATIVA", "SIM").upper() == "SIM"
+
+
+def detectar_cancer(pergunta_norm):
+    for cancer in canceres:
+        cancer_norm = normalizar(cancer.replace("_", " "))
+        if cancer in pergunta_norm or cancer_norm in pergunta_norm:
+            return cancer
+    return None
+
+
+def tentar_resposta_com_ia(pergunta, pergunta_norm):
+    if not IA_ATIVA:
+        return False
+
+    cancer = detectar_cancer(pergunta_norm)
+    contexto = contexto_para_ia(pergunta, cancer)
+
+    try:
+        resposta_ia = responder_com_ia(
+            pergunta,
+            contexto,
+            PERFIL
+        )
+    except Exception as erro:
+        print(f"\nIA de linguagem indisponível: {erro}")
+        print("Continuando com o motor determinístico do Escudo.\n")
+        return False
+
+    print("\nResposta da IA Escudo Feminino:\n")
+    print(resposta_ia)
+    return True
+
 
 # =====================================
 # REGISTRO DE USO (Missão nº 9)
@@ -225,6 +274,21 @@ def normalizar(texto):
 
 def classificar_intencao(pergunta_norm):
 
+    # simulação precisa vir antes da checagem de nome de câncer,
+    # senão "simular reducao de 20% na MAMA" cairia como
+    # CANCER_ESPECIFICO em vez de SIMULACAO
+    if any(p in pergunta_norm for p in (
+        "SIMULAR", "SIMULACAO", "E SE REDUZIRMOS", "SE REDUZIR",
+        "SE DIMINUIR"
+    )):
+        return "SIMULACAO"
+
+    if any(p in pergunta_norm for p in (
+        "VULNERAVEL", "VULNERAVEIS", "VULNERABILIDADE",
+        "GRUPO DE RISCO", "QUEM ESTA EM RISCO", "MAIS EM RISCO"
+    )):
+        return "VULNERABILIDADE"
+
     for cancer in canceres:
         cancer_norm = normalizar(cancer.replace("_", " "))
         if cancer in pergunta_norm or cancer_norm in pergunta_norm:
@@ -241,7 +305,8 @@ def classificar_intencao(pergunta_norm):
     if any(p in pergunta_norm for p in (
         "ATENCAO", "PRIORIDADE", "PRIORITARIO", "RISCO", "GRAVE",
         "GRAVIDADE", "PREOCUPA", "PREOCUPANTE", "URGENTE", "URGENCIA",
-        "SERIO", "INVESTIR", "RECURSOS", "ONDE AGIR", "O QUE FAZER"
+        "SERIO", "INVESTIR", "RECURSOS", "ONDE AGIR", "O QUE FAZER",
+        "ESCOLHER", "EXIGEM ACAO", "EXIGE ACAO"
     )):
         return "PRIORIDADE_MAXIMA"
 
@@ -275,18 +340,19 @@ def classificar_intencao(pergunta_norm):
 
     if any(p in pergunta_norm for p in (
         "TENDENCIA", "ESTADUAL", "CRESCENDO", "CAINDO",
-        "ACOMPANHA O ESTADO", "COMPARADO AO ESTADO", "COMPARADO A SP"
+        "ACOMPANHA", "COMPARADO AO ESTADO", "COMPARADO A SP"
     )):
         return "TENDENCIA_ESTADUAL"
 
     if any(p in pergunta_norm for p in (
         "ANOMALIA", "ANOMALIAS", "PADRAO", "ALERTA", "ALERTAS",
-        "FORA DO NORMAL", "ATIPICO"
+        "FORA DO NORMAL", "ATIPICO", "ANORMA", "MUDOU"
     )):
         return "ANOMALIAS"
 
     if any(p in pergunta_norm for p in (
-        "INCIDENCIA", "INTERNACOES", "MAIS CASOS", "MAIS COMUM"
+        "INCIDENCIA", "INTERNACOES", "MAIS CASOS", "MAIS COMUM",
+        "AFETAM MAIS", "AFETA MAIS"
     )):
         return "INCIDENCIA"
 
@@ -301,6 +367,116 @@ def classificar_intencao(pergunta_norm):
 # =====================================
 
 def responder(intencao, pergunta_norm):
+
+    if intencao == "VULNERABILIDADE":
+
+        if vulnerabilidade_df is None:
+            print(
+                "\nEsse indicador ainda não foi calculado. Rode "
+                "algoritimos\\vulnerabilidade.py antes de perguntar "
+                "sobre grupos vulneráveis."
+            )
+            return
+
+        top = vulnerabilidade_df.sort_values(
+            "taxa_mortalidade_faixa", ascending=False
+        ).iloc[0]
+
+        print("\nResposta:\n")
+        print(
+            f"O grupo mais vulnerável identificado é: mulheres de "
+            f"{top['faixa_mais_vulneravel']} anos com {top['tipo_cancer']}, "
+            f"com taxa de mortalidade de "
+            f"{top['taxa_mortalidade_faixa']:.1f}% dentro desse recorte "
+            f"etário ({int(top['obitos_faixa'])} óbitos em "
+            f"{int(top['internacoes_faixa'])} internações)."
+        )
+
+        if top["confiabilidade"] != "OK":
+            print(f"\nAtenção: {top['confiabilidade']}.")
+
+        print(
+            "\nEsta é a faixa etária com maior taxa de mortalidade "
+            "proporcional dentro de cada câncer — não significa "
+            "necessariamente o maior número absoluto de casos."
+        )
+
+        return
+
+    if intencao == "SIMULACAO":
+
+        numeros = re.findall(r"\d+", pergunta_norm)
+        reducao_pct = int(numeros[0]) if numeros else 20
+        reducao_pct = max(0, min(reducao_pct, 100))
+
+        cancer_encontrado = next(
+            (
+                c for c in canceres
+                if c in pergunta_norm
+                or normalizar(c.replace("_", " ")) in pergunta_norm
+            ),
+            None
+        )
+
+        if cancer_encontrado is None:
+            cancer_encontrado = priorizacao.sort_values(
+                "pontuacao_final", ascending=False
+            ).iloc[0]["tipo_cancer"]
+
+        dados_sim = pd.read_sql(
+            """
+            SELECT
+                COUNT(*) AS internacoes,
+                SUM(obito) AS obitos,
+                SUM(valor_total) AS custo_total
+            FROM internacoes
+            WHERE tipo_cancer = ? AND origem = 'RIO_CLARO' AND ano = 2025
+            """,
+            conn,
+            params=(cancer_encontrado,)
+        )
+
+        internacoes_atual = int(dados_sim.iloc[0]["internacoes"] or 0)
+        obitos_atual = int(dados_sim.iloc[0]["obitos"] or 0)
+        custo_atual = float(dados_sim.iloc[0]["custo_total"] or 0)
+
+        print(
+            f"\nSimulação: {cancer_encontrado}, redução de "
+            f"{reducao_pct}% nas internações de 2025 em Rio Claro.\n"
+        )
+
+        if internacoes_atual == 0:
+            print(
+                f"Não há internações registradas para "
+                f"{cancer_encontrado} em Rio Claro em 2025 — "
+                f"sem base para simular."
+            )
+            return
+
+        fracao_reduzida = reducao_pct / 100
+
+        internacoes_evitadas = internacoes_atual * fracao_reduzida
+        obitos_evitados = obitos_atual * fracao_reduzida
+        economia = custo_atual * fracao_reduzida
+
+        print(
+            f"Internações evitadas/ano: {internacoes_evitadas:.0f} "
+            f"(de {internacoes_atual} atuais)"
+        )
+        print(
+            f"Óbitos evitados/ano (estimado): {obitos_evitados:.1f} "
+            f"(de {obitos_atual} atuais)"
+        )
+        print(f"Economia estimada/ano: R$ {economia:,.2f}")
+
+        print(
+            "\nEsta é uma estimativa proporcional simples — assume "
+            "que óbitos e custo caem na mesma proporção das "
+            "internações. Não é uma previsão epidemiológica precisa, "
+            "apenas uma ordem de grandeza para apoiar a discussão."
+        )
+
+        return
 
     if intencao == "CANCER_ESPECIFICO":
 
@@ -571,7 +747,9 @@ def responder(intencao, pergunta_norm):
         "Tente perguntar sobre: panorama geral, prioridade, "
         "mortalidade, custo, permanência, faixa etária, tendência "
         "estadual, anomalias, incidência, relatório executivo, "
-        "ou o nome de um câncer específico (ex.: MAMA, COLO_UTERO)."
+        "simular redução de X% (ex.: 'simular reducao de 20% na "
+        "MAMA'), grupos vulneráveis, ou o nome de um câncer "
+        "específico (ex.: MAMA, COLO_UTERO)."
     )
 
 
@@ -594,7 +772,8 @@ while True:
 
     intencao = classificar_intencao(pergunta_norm)
 
-    responder(intencao, pergunta_norm)
+    if not tentar_resposta_com_ia(pergunta, pergunta_norm):
+        responder(intencao, pergunta_norm)
 
     registrar_pergunta(
         pergunta,
