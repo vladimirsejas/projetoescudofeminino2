@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 import pandas as pd
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
@@ -15,32 +15,61 @@ memorias = []
 
 for _, row in df.iterrows():
 
+    # =====================================
+    # CAMADA 1 — O QUE ACONTECEU
+    # =====================================
+
+    o_que_aconteceu = (
+        f"{row['tipo_cancer']} está classificado como prioridade "
+        f"{row['nivel_prioridade']}, com pontuação final de "
+        f"{row['pontuacao_final']:.2f}."
+    )
+
+    # =====================================
+    # CAMADA 2 — ISSO É IMPORTANTE?
+    # =====================================
+
+    isso_e_importante = (
+        f"Isso é relevante porque {row['nivel_prioridade'].lower()} "
+        f"é o nível de atenção que a gestão de saúde deveria dar "
+        f"hoje a este câncer, em comparação com os demais "
+        f"monitorados pelo Escudo Feminino."
+    )
+
+    # =====================================
+    # TEXTO FINAL — 5 CAMADAS
+    # =====================================
+
     texto = f"""
-CÃ¢ncer: {row['tipo_cancer']}.
+CÂNCER: {row['tipo_cancer']}
 
-PontuaÃ§Ã£o final: {row['pontuacao_final']:.2f}.
+O QUE ACONTECEU:
+{o_que_aconteceu}
 
-ClassificaÃ§Ã£o: {row['nivel_prioridade']}.
+POR QUE ACONTECEU:
+{row['motivo']}
 
-Evento: {row['evento']}.
+ISSO É IMPORTANTE?
+{isso_e_importante}
 
-SituaÃ§Ã£o de anomalia:
-{row['situacao']}.
+QUAL O IMPACTO:
+{row['impacto']}
 
-RecomendaÃ§Ã£o:
+O QUE DEVE SER FEITO:
 {row['recomendacao']}
 """
 
     memorias.append(
         {
             "tipo_cancer": row["tipo_cancer"],
+            "nivel_prioridade": row["nivel_prioridade"],
             "memoria": texto.strip()
         }
     )
 
 resultado = pd.DataFrame(memorias)
 
-print("\n=== MEMÃ“RIA DA IA ===\n")
+print("\n=== MEMÓRIA DA IA ===\n")
 
 for _, row in resultado.iterrows():
 
@@ -54,6 +83,6 @@ resultado.to_sql(
     index=False
 )
 
-print("\nTabela memoria_ia criada com sucesso.")
+print("\nTabela memoria_ia atualizada com sucesso.")
 
 conn.close()

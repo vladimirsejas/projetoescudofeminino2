@@ -17,7 +17,7 @@ base = pd.read_sql(
 print("\n=== EXPLICADOR IA ===\n")
 
 cancer = input(
-    "Digite o cÃ¢ncer (ou ENTER para o primeiro): "
+    "Digite o cancer (ou ENTER para o primeiro): "
 ).upper()
 
 if cancer.strip() == "":
@@ -32,95 +32,77 @@ else:
 
     if filtro.empty:
 
-        print("\nCÃ¢ncer nÃ£o encontrado.")
+        print("\nCancer nao encontrado.")
         conn.close()
-        exit()
+        raise SystemExit
 
     registro = filtro.iloc[0]
 
-print("\n=== ANÃLISE EXECUTIVA ===\n")
+texto = []
 
-print(
-    f"CÃ¢ncer analisado: "
-    f"{registro['tipo_cancer']}"
+texto.append(
+    f"O cancer {registro['tipo_cancer']} "
+    f"foi classificado como prioridade "
+    f"{registro['nivel_prioridade']}."
 )
 
-print(
-    f"Prioridade: "
-    f"{registro['nivel_prioridade']}"
+texto.append(
+    f"Sua pontuacao final foi "
+    f"{registro['pontuacao_final']:.2f}."
 )
 
-print(
-    f"PontuaÃ§Ã£o Final: "
-    f"{registro['pontuacao_final']:.2f}"
+if registro["desvio"] > 0:
+
+    texto.append(
+        f"O comportamento apresentou desvio "
+        f"de {registro['desvio']:.2f}% acima "
+        f"da tendencia estadual."
+    )
+
+else:
+
+    texto.append(
+        f"O comportamento apresentou desvio "
+        f"de {abs(registro['desvio']):.2f}% abaixo "
+        f"da tendencia estadual."
+    )
+
+if registro["situacao"] == "ANOMALIA_POSITIVA":
+
+    texto.append(
+        "Foi identificada uma anomalia positiva "
+        "em relacao ao historico analisado."
+    )
+
+elif registro["situacao"] == "ANOMALIA_NEGATIVA":
+
+    texto.append(
+        "Foi identificada uma anomalia negativa "
+        "em relacao ao historico analisado."
+    )
+
+else:
+
+    texto.append(
+        "Nao foram identificadas anomalias "
+        "relevantes no periodo."
+    )
+
+texto.append(
+    f"O evento registrado foi "
+    f"{registro['evento']}."
 )
 
-print("\nJUSTIFICATIVAS:")
-
-print(
-    f"- Score epidemiolÃ³gico: "
-    f"{registro['score']:.2f}"
+texto.append(
+    f"A recomendacao atual e: "
+    f"{registro['recomendacao']}"
 )
 
-print(
-    f"- Desvio em relaÃ§Ã£o ao Estado: "
-    f"{registro['desvio']:.2f}%"
-)
+print("\n=== ANALISE EXECUTIVA ===\n")
 
-print(
-    f"- Evento identificado: "
-    f"{registro['evento']}"
-)
+for frase in texto:
 
-print(
-    f"- SituaÃ§Ã£o de anomalia: "
-    f"{registro['situacao']}"
-)
-
-print(
-    f"- MÃ©dia histÃ³rica: "
-    f"{registro['media_historica']:.2f}"
-)
-
-print(
-    f"- Valor observado em 2025: "
-    f"{registro['valor_2025']}"
-)
-
-print("\nRECOMENDAÃ‡ÃƒO:")
-
-print(
-    registro["recomendacao"]
-)
-
-texto = f"""
-CÃ¢ncer: {registro['tipo_cancer']}
-
-Prioridade: {registro['nivel_prioridade']}
-
-PontuaÃ§Ã£o Final:
-{registro['pontuacao_final']:.2f}
-
-Motivos:
-
-Score epidemiolÃ³gico:
-{registro['score']:.2f}
-
-Desvio estadual:
-{registro['desvio']:.2f}%
-
-Evento:
-{registro['evento']}
-
-Anomalia:
-{registro['situacao']}
-
-RecomendaÃ§Ã£o:
-
-{registro['recomendacao']}
-"""
-
-print("\n=== RESUMO EXECUTIVO ===\n")
-print(texto)
+    print(frase)
+    print()
 
 conn.close()
