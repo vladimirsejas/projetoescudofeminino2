@@ -17,3 +17,7 @@ jobs:
       - name: Teste territorial
         working-directory: algoritimos
         run: python teste_territorial.py
+
+      - name: Teste da carga territorial
+        working-directory: etl
+        run: python teste_carga_territorial.py
