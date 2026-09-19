@@ -1,6 +1,8 @@
 import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio
+
 # =====================================
 # CONEXÃO
 # =====================================
@@ -8,6 +10,8 @@ import pandas as pd
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+MUNICIPIO = obter_municipio()
 
 # =====================================
 # DADOS ANUAIS
@@ -19,9 +23,10 @@ SELECT
     ano,
     COUNT(*) AS internacoes
 FROM internacoes
+WHERE origem = ?
 GROUP BY tipo_cancer, ano
 ORDER BY tipo_cancer, ano
-""", conn)
+""", conn, params=(MUNICIPIO,))
 
 # =====================================
 # DETECÇÃO DE ANOMALIAS
@@ -139,7 +144,7 @@ anomalias = anomalias.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== ANOMALIAS DETECTADAS ===\n")
+print(f"\n=== ANOMALIAS DETECTADAS ({MUNICIPIO}) ===\n")
 
 print(anomalias.to_string(index=False))
 
