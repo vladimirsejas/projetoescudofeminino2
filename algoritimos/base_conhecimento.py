@@ -2,7 +2,7 @@ import re
 import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import obter_municipio, obter_nome_municipio
 
 # =====================================
 # CONEXÃO
@@ -24,6 +24,7 @@ conn = sqlite3.connect(BANCO)
 # =====================================
 
 MUNICIPIO = obter_municipio()
+NOME_MUNICIPIO = obter_nome_municipio()
 
 if not re.fullmatch(r"[A-Z0-9_]+", MUNICIPIO):
     raise ValueError(f"Identificador de município inválido: {MUNICIPIO!r}")
@@ -149,21 +150,21 @@ def gerar_motivo(row):
 
     if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
         partes.append(
-            f"o número de internações em Rio Claro cresceu "
+            f"o número de internações em {NOME_MUNICIPIO} cresceu "
             f"{row['desvio']:.1f} pontos percentuais a mais "
             f"que o Estado de São Paulo no mesmo período"
         )
 
     elif row["evento"] == "ABAIXO_DA_TENDENCIA_ESTADUAL":
         partes.append(
-            f"o número de internações em Rio Claro cresceu "
+            f"o número de internações em {NOME_MUNICIPIO} cresceu "
             f"{abs(row['desvio']):.1f} pontos percentuais a menos "
             f"que o Estado de São Paulo no mesmo período"
         )
 
     else:
         partes.append(
-            "o comportamento de Rio Claro acompanha de perto "
+            f"o comportamento de {NOME_MUNICIPIO} acompanha de perto "
             "o comportamento observado no Estado de São Paulo"
         )
 
@@ -239,7 +240,7 @@ def gerar_impacto(row):
             "para a gestão pública, este câncer está hoje entre os "
             "de maior risco relativo entre os monitorados, o que "
             "sugere priorizá-lo na alocação de atenção à saúde "
-            "da mulher em Rio Claro"
+            "da mulher {NOME_MUNICIPIO}"
         )
 
     if pd.notna(row.get("taxa_mortalidade")) and row["taxa_mortalidade"] >= 10:
