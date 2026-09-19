@@ -230,7 +230,6 @@ def tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
     print(resposta_ia)
     return True
 
-
 # =====================================
 # REGISTRO DE USO (Missão nº 9)
 # =====================================
