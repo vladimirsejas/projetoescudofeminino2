@@ -6,14 +6,26 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "algoritimos"))
 
 from ia_linguagem import responder_com_ia
-from motor_raciocinio import contexto_geral_raciocinado, contexto_para_ia
+from motor_raciocinio import contexto_inteligente, contexto_para_ia
 
 
 CASOS = [
-    {"pergunta": "Qual câncer merece mais atenção?", "tipo": "geral"},
-    {"pergunta": "Qual câncer mais mata?", "tipo": "geral"},
-    {"pergunta": "Qual câncer está acima da tendência estadual?", "tipo": "geral"},
-    {"pergunta": "Existem comportamentos anormais?", "tipo": "geral"},
+    {
+        "pergunta": "Qual câncer merece mais atenção?",
+        "tipo": "PRIORIDADE_MAXIMA",
+    },
+    {
+        "pergunta": "Qual câncer mais mata?",
+        "tipo": "MORTALIDADE",
+    },
+    {
+        "pergunta": "Qual câncer está acima da tendência estadual?",
+        "tipo": "TENDENCIA_ESTADUAL",
+    },
+    {
+        "pergunta": "Existem comportamentos anormais?",
+        "tipo": "ANOMALIAS",
+    },
     {"pergunta": "Fale sobre MAMA.", "tipo": "MAMA"},
     {"pergunta": "Por que a MAMA é uma prioridade?", "tipo": "MAMA"},
     {"pergunta": "Qual é o impacto da situação da MAMA?", "tipo": "MAMA"},
@@ -22,9 +34,14 @@ CASOS = [
 
 
 def obter_contexto(tipo):
-    if tipo == "geral":
-        return contexto_geral_raciocinado()
-    return contexto_para_ia(tipo)
+    if tipo == "MAMA":
+        return contexto_para_ia(tipo)
+
+    return contexto_inteligente(
+        "",
+        tipo,
+        None,
+    )
 
 
 def gerar_relatorio():
