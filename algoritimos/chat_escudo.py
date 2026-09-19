@@ -7,6 +7,7 @@ import os
 
 from motor_raciocinio import raciocinar_cancer, contexto_para_ia, contexto_geral_raciocinado, contexto_inteligente
 from ia_linguagem import responder_com_ia
+from configuracao_geografica import obter_municipio
 
 # =====================================
 # CONEXÃO
@@ -456,10 +457,10 @@ def responder(intencao, pergunta_norm):
                 SUM(obito) AS obitos,
                 SUM(valor_total) AS custo_total
             FROM internacoes
-            WHERE tipo_cancer = ? AND origem = 'RIO_CLARO' AND ano = 2025
+            WHERE tipo_cancer = ? AND origem = ? AND ano = 2025
             """,
             conn,
-            params=(cancer_encontrado,)
+            params=(cancer_encontrado, obter_municipio())
         )
 
         internacoes_atual = int(dados_sim.iloc[0]["internacoes"] or 0)
