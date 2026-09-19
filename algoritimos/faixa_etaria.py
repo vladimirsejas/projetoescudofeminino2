@@ -1,16 +1,21 @@
 ﻿import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio
+
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+MUNICIPIO = obter_municipio()
 
 df = pd.read_sql("""
 SELECT
     tipo_cancer,
     idade
 FROM internacoes
-""", conn)
+WHERE origem = ?
+""", conn, params=(MUNICIPIO,))
 
 # =====================================
 # FAIXAS ETÃRIAS
@@ -54,7 +59,7 @@ resultado = resultado.sort_values(
     ascending=[True, False]
 )
 
-print("\n=== FAIXA ETÃRIA ===\n")
+print(f"\n=== FAIXA ETÃRIA ({MUNICIPIO}) ===\n")
 
 print(resultado)
 
