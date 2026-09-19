@@ -13,6 +13,7 @@ from configuracao_geografica import (
     listar_municipios_disponiveis,
     UF_REFERENCIA
 )
+from executar_cadeia import executar
 
 # ==================================================
 # CONFIGURAÇÃO
@@ -62,6 +63,17 @@ municipio_escolhido = next(
 ORIGEM = municipio_escolhido["origem"]
 NOME_MUNICIPIO = municipio_escolhido["nome"]
 
+if st.session_state.get("municipio_processado") != ORIGEM:
+    conexao.close()
+    with st.spinner(f"Calculando indicadores para {NOME_MUNICIPIO}..."):
+        try:
+            executar(ORIGEM)
+            st.session_state["municipio_processado"] = ORIGEM
+        except Exception as erro:
+            st.error(f"Não foi possível calcular {NOME_MUNICIPIO}: {erro}")
+            st.stop()
+    conexao = sqlite3.connect(BANCO)
+
 # ==================================================
 # KPIs PRINCIPAIS
 #
@@ -77,8 +89,10 @@ total = pd.read_sql(
     """
     SELECT COUNT(*) AS total
     FROM internacoes
+    WHERE origem = ?
     """,
-    conexao
+    conexao,
+    params=(UF_REFERENCIA,)
 ).iloc[0]["total"]
 
 ranking = pd.read_sql(
@@ -87,7 +101,7 @@ ranking = pd.read_sql(
         tipo_cancer,
         COUNT(*) AS total
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     GROUP BY tipo_cancer
     ORDER BY total DESC
     """,
@@ -108,12 +122,13 @@ origens = pd.read_sql(
 
 lider = ranking.iloc[0]["tipo_cancer"] if not ranking.empty else "—"
 
-municipio_vals = origens.loc[
-    origens["origem"] == ORIGEM,
-    "total"
-].values
-
-total_municipio = int(municipio_vals[0]) if len(municipio_vals) > 0 else 0
+total_municipio = int(
+    pd.read_sql(
+        "SELECT COUNT(*) AS total FROM internacoes WHERE municipio = ?",
+        conexao,
+        params=(ORIGEM,)
+    ).iloc[0]["total"]
+)
 
 sp_vals = origens.loc[
     origens["origem"] == UF_REFERENCIA,
@@ -130,7 +145,7 @@ valor_total = pd.read_sql(
     """
     SELECT SUM(valor_total) AS valor
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     """,
     conexao,
     params=(ORIGEM,)
@@ -201,10 +216,8 @@ st.divider()
 st.subheader("🎯 Priorização e Recomendações")
 
 st.caption(
-    "Esta seção reflete o município configurado quando a cadeia "
-    "determinística (algoritimos/*.py) foi executada pela última "
-    "vez -- trocar o município aqui no seletor não reprocessa essas "
-    "tabelas automaticamente."
+    f"Indicadores calculados automaticamente para {NOME_MUNICIPIO}. "
+    "A comparação estadual usa o conjunto de dados do Estado de São Paulo."
 )
 
 try:
@@ -329,17 +342,22 @@ st.plotly_chart(
 
 comparativo = pd.read_sql(
     """
-    SELECT
-        tipo_cancer,
-        origem,
-        COUNT(*) AS total
+    SELECT tipo_cancer, ? AS origem, COUNT(*) AS total
     FROM internacoes
-    WHERE origem IN (?, ?)
-    GROUP BY tipo_cancer, origem
+    WHERE municipio = ?
+    GROUP BY tipo_cancer
+
+    UNION ALL
+
+    SELECT tipo_cancer, ? AS origem, COUNT(*) AS total
+    FROM internacoes
+    WHERE origem = ?
+    GROUP BY tipo_cancer
+
     ORDER BY tipo_cancer
     """,
     conexao,
-    params=(ORIGEM, UF_REFERENCIA)
+    params=(NOME_MUNICIPIO, ORIGEM, UF_REFERENCIA, UF_REFERENCIA)
 )
 
 st.subheader(f"🏥 {NOME_MUNICIPIO} x {UF_REFERENCIA}")
@@ -374,7 +392,7 @@ evolucao = pd.read_sql(
         ano,
         COUNT(*) AS internacoes
     FROM internacoes
-    WHERE tipo_cancer = ? AND origem = ?
+    WHERE tipo_cancer = ? AND municipio = ?
     GROUP BY ano
     ORDER BY ano
     """,
@@ -406,9 +424,8 @@ st.plotly_chart(
 st.subheader("🚨 Alertas Analíticos")
 
 st.caption(
-    "Assim como a priorização acima, esta seção vem de "
-    "tendencia_estadual, calculada para o município configurado na "
-    "última execução da cadeia determinística."
+    f"Tendência calculada para {NOME_MUNICIPIO} em comparação com "
+    "o Estado de São Paulo."
 )
 
 eventos = pd.read_sql(
