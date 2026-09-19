@@ -55,6 +55,7 @@ def _montar_banco_sintetico(caminho, incluir_limeira):
     conexao.execute("""
         CREATE TABLE internacoes (
             tipo_cancer TEXT, origem TEXT, ano INTEGER, idade INTEGER,
+            municipio TEXT, codigo_ibge INTEGER,
             dias_permanencia INTEGER, obito INTEGER, valor_total REAL
         )
     """)
@@ -69,6 +70,9 @@ def _montar_banco_sintetico(caminho, incluir_limeira):
     """)
     conexao.execute(
         "INSERT INTO municipios VALUES (3543907, 'RIO_CLARO', 'Rio Claro', 'SP')"
+    )
+    conexao.execute(
+        "INSERT INTO municipios VALUES (3526902, 'LIMEIRA', 'Limeira', 'SP')"
     )
 
     linhas = []
@@ -110,8 +114,25 @@ def _montar_banco_sintetico(caminho, incluir_limeira):
             linhas += _linhas("PULMAO", "LIMEIRA", ano, total=2, obitos=0)
             linhas += _linhas("COLORRETAL", "LIMEIRA", ano, total=3, obitos=0)
 
+    linhas_com_territorio = []
+    for linha in linhas:
+        cancer, origem, ano, idade, dias, obito, valor = linha
+        if origem == "RIO_CLARO":
+            municipio = "RIO_CLARO"
+            codigo_ibge = 3543907
+        elif origem == "LIMEIRA":
+            municipio = "LIMEIRA"
+            codigo_ibge = 3526902
+        else:
+            municipio = "ESTADO_SP"
+            codigo_ibge = None
+        linhas_com_territorio.append(
+            (cancer, origem, municipio, codigo_ibge, ano, idade, dias, obito, valor)
+        )
+
     conexao.executemany(
-        "INSERT INTO internacoes VALUES (?,?,?,?,?,?,?)", linhas
+        "INSERT INTO internacoes VALUES (?,?,?,?,?,?,?,?,?)",
+        linhas_com_territorio
     )
     conexao.commit()
     conexao.close()
