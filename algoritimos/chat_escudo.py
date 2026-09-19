@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 import os
 
-from motor_raciocinio import raciocinar_cancer, contexto_para_ia
+from motor_raciocinio import raciocinar_cancer, contexto_para_ia, contexto_geral
 from ia_linguagem import responder_com_ia
 
 # =====================================
@@ -196,12 +196,24 @@ def detectar_cancer(pergunta_norm):
     return None
 
 
-def tentar_resposta_com_ia(pergunta, pergunta_norm):
+def tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
     if not IA_ATIVA:
         return False
 
-    cancer = detectar_cancer(pergunta_norm)
-    contexto = contexto_para_ia(pergunta, cancer)
+    # perguntas que o motor de intenções não reconheceu não têm contexto
+    # estruturado confiável — nesse caso a IA não deve ser chamada, para
+    # não correr o risco de responder sem base nos dados do Escudo.
+    if intencao == "DESCONHECIDA":
+        return False
+
+    if intencao == "CANCER_ESPECIFICO":
+        cancer = detectar_cancer(pergunta_norm)
+        contexto = contexto_para_ia(cancer) if cancer else None
+    else:
+        contexto = contexto_geral()
+
+    if not contexto:
+        return False
 
     try:
         resposta_ia = responder_com_ia(
@@ -772,7 +784,7 @@ while True:
 
     intencao = classificar_intencao(pergunta_norm)
 
-    if not tentar_resposta_com_ia(pergunta, pergunta_norm):
+    if not tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
         responder(intencao, pergunta_norm)
 
     registrar_pergunta(
