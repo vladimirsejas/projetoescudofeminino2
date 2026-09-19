@@ -7,7 +7,11 @@ import os
 
 from motor_raciocinio import raciocinar_cancer, contexto_para_ia, contexto_geral_raciocinado, contexto_inteligente
 from ia_linguagem import responder_com_ia
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import (
+    obter_municipio,
+    obter_nome_municipio,
+    ler_tabela_municipio
+)
 
 # =====================================
 # CONEXÃO
@@ -93,22 +97,35 @@ conn.commit()
 # (só leitura — nada é recalculado aqui)
 # =====================================
 
-priorizacao = pd.read_sql("SELECT * FROM priorizacao_executiva", conn)
-tendencia = pd.read_sql("SELECT * FROM tendencia_estadual", conn)
-anomalias_df = pd.read_sql("SELECT * FROM anomalias", conn)
-mortalidade_df = pd.read_sql("SELECT * FROM mortalidade", conn)
-custos_df = pd.read_sql("SELECT * FROM custos_hospitalares", conn)
-permanencia_df = pd.read_sql("SELECT * FROM permanencia_hospitalar", conn)
-faixa_df = pd.read_sql("SELECT * FROM faixa_etaria", conn)
-base_df = pd.read_sql("SELECT * FROM base_conhecimento", conn)
-memoria = pd.read_sql("SELECT * FROM memoria_ia", conn)
+MUNICIPIO = obter_municipio()
+NOME_MUNICIPIO = obter_nome_municipio()
+
+# Todas essas tabelas agora são multi-município -- ler sem filtrar
+# misturaria o município selecionado com qualquer outro já
+# processado (o mesmo problema já corrigido na cadeia determinística,
+# só que aqui na camada de leitura do chat).
+priorizacao = ler_tabela_municipio(
+    "priorizacao_executiva", conn, municipio=MUNICIPIO
+)
+tendencia = ler_tabela_municipio("tendencia_estadual", conn, municipio=MUNICIPIO)
+anomalias_df = ler_tabela_municipio("anomalias", conn, municipio=MUNICIPIO)
+mortalidade_df = ler_tabela_municipio("mortalidade", conn, municipio=MUNICIPIO)
+custos_df = ler_tabela_municipio("custos_hospitalares", conn, municipio=MUNICIPIO)
+permanencia_df = ler_tabela_municipio(
+    "permanencia_hospitalar", conn, municipio=MUNICIPIO
+)
+faixa_df = ler_tabela_municipio("faixa_etaria", conn, municipio=MUNICIPIO)
+base_df = ler_tabela_municipio("base_conhecimento", conn, municipio=MUNICIPIO)
+memoria = ler_tabela_municipio("memoria_ia", conn, municipio=MUNICIPIO)
 
 # vulnerabilidade é opcional — se ainda não foi gerada
-# (algoritimos\vulnerabilidade.py), o chat continua funcionando
-# normalmente, só essa categoria de pergunta fica indisponível
-try:
-    vulnerabilidade_df = pd.read_sql("SELECT * FROM vulnerabilidade", conn)
-except Exception:
+# (algoritimos\vulnerabilidade.py) ou não existe para o município
+# selecionado, o chat continua funcionando normalmente, só essa
+# categoria de pergunta fica indisponível
+vulnerabilidade_df = ler_tabela_municipio(
+    "vulnerabilidade", conn, municipio=MUNICIPIO
+)
+if vulnerabilidade_df.empty:
     vulnerabilidade_df = None
 
 canceres = priorizacao["tipo_cancer"].tolist()
@@ -136,23 +153,23 @@ def gerar_resposta_simples(row):
 
     texto = (
         f"{row['tipo_cancer']} está com nível de atenção "
-        f"{row['nivel_prioridade']} em Rio Claro.\n"
+        f"{row['nivel_prioridade']} em {NOME_MUNICIPIO}.\n"
     )
 
     if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
         texto += (
-            "\nO número de casos está crescendo mais rápido em "
-            "Rio Claro do que na média do Estado de São Paulo."
+            f"\nO número de casos está crescendo mais rápido em "
+            f"{NOME_MUNICIPIO} do que na média do Estado de São Paulo."
         )
     elif row["evento"] == "ABAIXO_DA_TENDENCIA_ESTADUAL":
         texto += (
-            "\nO número de casos está crescendo mais devagar em "
-            "Rio Claro do que na média do Estado de São Paulo."
+            f"\nO número de casos está crescendo mais devagar em "
+            f"{NOME_MUNICIPIO} do que na média do Estado de São Paulo."
         )
     else:
         texto += (
-            "\nO número de casos em Rio Claro segue no mesmo ritmo "
-            "do Estado de São Paulo."
+            f"\nO número de casos em {NOME_MUNICIPIO} segue no mesmo "
+            f"ritmo do Estado de São Paulo."
         )
 
     if row["situacao"] == "ANOMALIA_POSITIVA":
@@ -476,13 +493,13 @@ def responder(intencao, pergunta_norm):
 
         print(
             f"\nSimulação: {cancer_encontrado}, redução de "
-            f"{reducao_pct}% nas internações de 2025 em Rio Claro.\n"
+            f"{reducao_pct}% nas internações de 2025 em {NOME_MUNICIPIO}.\n"
         )
 
         if internacoes_atual == 0:
             print(
                 f"Não há internações registradas para "
-                f"{cancer_encontrado} em Rio Claro em 2025 — "
+                f"{cancer_encontrado} em {NOME_MUNICIPIO} em 2025 — "
                 f"sem base para simular."
             )
             return
@@ -555,7 +572,7 @@ def responder(intencao, pergunta_norm):
 
         acima_tendencia = tendencia[tendencia["desvio"] > 0]
 
-        print("\nPanorama geral de Rio Claro:\n")
+        print(f"\nPanorama geral de {NOME_MUNICIPIO}:\n")
 
         print(
             f"De {total} cânceres monitorados, "
@@ -571,7 +588,7 @@ def responder(intencao, pergunta_norm):
 
         print(
             f"{len(acima_tendencia)} estão crescendo mais rápido "
-            f"em Rio Claro do que no Estado de São Paulo."
+            f"em {NOME_MUNICIPIO} do que no Estado de São Paulo."
         )
 
         top3 = priorizacao.sort_values(

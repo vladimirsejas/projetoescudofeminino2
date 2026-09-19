@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio, nome_coluna_municipio
+from configuracao_geografica import obter_municipio, obter_nome_municipio
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -11,9 +11,19 @@ def conectar():
 
 
 def _ler_tabela(nome):
+    """
+    Lê `nome` filtrando pelo município selecionado. `internacoes` é
+    a única tabela crua (usa `origem`); todas as demais são tabelas
+    derivadas multi-município (usam `municipio`).
+    """
     conn = conectar()
     try:
-        return pd.read_sql(f"SELECT * FROM {nome}", conn)
+        coluna_filtro = "origem" if nome == "internacoes" else "municipio"
+        return pd.read_sql(
+            f"SELECT * FROM {nome} WHERE {coluna_filtro} = ?",
+            conn,
+            params=(obter_municipio(),)
+        )
     except Exception:
         return pd.DataFrame()
     finally:
@@ -24,8 +34,8 @@ def buscar_cancer(nome_cancer):
     conn = conectar()
     df = pd.read_sql("""
         SELECT * FROM base_conhecimento
-        WHERE UPPER(tipo_cancer) = UPPER(?)
-    """, conn, params=[nome_cancer])
+        WHERE UPPER(tipo_cancer) = UPPER(?) AND municipio = ?
+    """, conn, params=[nome_cancer, obter_municipio()])
     conn.close()
     if df.empty:
         return None
@@ -37,8 +47,8 @@ def buscar_memoria(nome_cancer):
     try:
         df = pd.read_sql("""
             SELECT * FROM memoria_ia
-            WHERE UPPER(tipo_cancer) = UPPER(?)
-        """, conn, params=[nome_cancer])
+            WHERE UPPER(tipo_cancer) = UPPER(?) AND municipio = ?
+        """, conn, params=[nome_cancer, obter_municipio()])
     except Exception:
         df = pd.DataFrame()
     conn.close()
@@ -180,9 +190,11 @@ def contexto_geral_raciocinado():
     else:
         mortalidade_texto = "Indicador de mortalidade não disponível."
 
+    nome_municipio = obter_nome_municipio()
+
     contexto = f"""
 SISTEMA: ESCUDO FEMININO
-ESCOPO: PANORAMA GERAL DE RIO CLARO
+ESCOPO: PANORAMA GERAL DE {nome_municipio.upper()}
 
 O QUE FOI OBSERVADO:
 - {len(criticos_altos)} de {len(priorizacao)} cânceres estão classificados
@@ -195,7 +207,7 @@ O QUE FOI OBSERVADO:
 
 EVIDÊNCIAS DISPONÍVEIS:
 - Priorização executiva: classificação e pontuação final.
-- Tendência estadual: comparação entre Rio Claro e São Paulo.
+- Tendência estadual: comparação entre {nome_municipio} e São Paulo.
 - Anomalias: identificação de desvios em relação ao histórico.
 - Mortalidade: taxa de mortalidade por câncer.
 
@@ -250,7 +262,7 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
         ),
         "MUDANCA_TEMPORAL": (
             "tendencia_estadual",
-            ["tipo_cancer", "RIO_CLARO", "SP", "desvio", "evento"],
+            ["tipo_cancer", "variacao_municipio", "variacao_sp", "desvio", "evento"],
             "MUDANÇA TEMPORAL / TENDÊNCIA"
         ),
         "TOP_PRIORIDADES": (
@@ -280,7 +292,7 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
         ),
         "TENDENCIA_ESTADUAL": (
             "tendencia_estadual",
-            ["tipo_cancer", "RIO_CLARO", "SP", "desvio", "evento"],
+            ["tipo_cancer", "variacao_municipio", "variacao_sp", "desvio", "evento"],
             "TENDÊNCIA ESTADUAL"
         ),
         "ANOMALIAS": (
@@ -305,16 +317,10 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
     if df.empty:
         return base
 
-    coluna_municipio = nome_coluna_municipio(df)
-
     if intencao in ("TENDENCIA_ESTADUAL", "MUDANCA_TEMPORAL"):
-        colunas = [
-            coluna_municipio if c == "RIO_CLARO" else c
-            for c in colunas
-        ]
         titulo = (
             f"{titulo} — MUNICÍPIO ANALISADO: "
-            f"{obter_municipio()}"
+            f"{obter_nome_municipio()}"
         )
 
     colunas_validas = [c for c in colunas if c in df.columns]
