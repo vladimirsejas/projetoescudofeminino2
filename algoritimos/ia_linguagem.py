@@ -1,61 +1,67 @@
 import os
-from openai import OpenAI
+from pathlib import Path
+
+from dotenv import load_dotenv
+from google import genai
+
+
+# Carrega o .env da raiz do projeto, independentemente
+# da pasta a partir da qual o script for executado.
+ROOT_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(ROOT_DIR / ".env")
 
 
 def obter_cliente():
-    chave = os.getenv("OPENAI_API_KEY")
+    chave = os.getenv("GEMINI_API_KEY")
 
     if not chave:
         return None
 
-    return OpenAI(api_key=chave)
-
-
-INSTRUCOES_BASE = """
-Você é a IA de linguagem do Escudo Feminino.
-
-Sua função é explicar os dados fornecidos pelo sistema
-de forma clara, objetiva e responsável.
-
-REGRAS:
-
-1. Use somente as informações presentes no contexto fornecido.
-2. Não invente números.
-3. Não invente diagnósticos.
-4. Não transforme associação em causalidade.
-5. Quando os dados forem insuficientes, diga claramente.
-6. Diferencie dado observado de recomendação.
-7. Responda em português do Brasil.
-8. Seja clara e direta.
-9. O banco e os algoritmos do Escudo Feminino são a fonte dos fatos.
-"""
-
-INSTRUCOES_PERFIL = {
-    "SIMPLES": (
-        "\n10. O público é a população em geral: não use jargão técnico, "
-        "não cite pontuação ou termos estatísticos, foque na conclusão "
-        "e na ação recomendada."
-    ),
-    "TECNICO": (
-        "\n10. O público é técnico (gestor, secretário, pesquisador): "
-        "pode usar termos técnicos e citar números com precisão."
-    ),
-}
+    return genai.Client(api_key=chave)
 
 
 def responder_com_ia(pergunta, contexto, perfil="TECNICO"):
     cliente = obter_cliente()
 
     if cliente is None:
-        return (
-            "A IA de linguagem ainda não está configurada. "
-            "A chave OPENAI_API_KEY não foi encontrada."
+        raise RuntimeError(
+            "A chave GEMINI_API_KEY não foi encontrada."
         )
 
-    resposta = cliente.responses.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-5.6-luna"),
-        instructions=INSTRUCOES_BASE + INSTRUCOES_PERFIL.get(perfil, ""),
+    if perfil == "SIMPLES":
+        orientacao_linguagem = (
+            "Use linguagem simples, clara e acessível, evitando "
+            "jargões técnicos desnecessários."
+        )
+    else:
+        orientacao_linguagem = (
+            "Use linguagem técnica, objetiva e adequada a gestores, "
+            "pesquisadores e profissionais de saúde pública."
+        )
+
+    interaction = cliente.interactions.create(
+        model="gemini-3.8-flash",
         input=f"""
+Você é a IA de linguagem do Escudo Feminino.
+
+Sua função é EXPLICAR o conhecimento produzido pelo sistema.
+Você não é a fonte dos dados. O banco de dados e os algoritmos
+do Escudo Feminino são a fonte dos fatos.
+
+REGRAS:
+
+1. Use somente as informações presentes no contexto fornecido.
+2. Não invente números, fatos ou indicadores.
+3. Não invente diagnósticos.
+4. Não transforme associação, diferença ou tendência em causalidade.
+5. Se o contexto não tiver informação suficiente para responder,
+   diga claramente que os dados disponíveis não permitem concluir.
+6. Diferencie claramente dado observado, interpretação e recomendação.
+7. Não altere os valores fornecidos pelo sistema.
+8. Responda em português do Brasil.
+9. Seja clara, objetiva e direta.
+10. {orientacao_linguagem}
+
 CONTEXTO DO ESCUDO FEMININO:
 
 {contexto}
@@ -68,4 +74,12 @@ Responda à pergunta usando o contexto acima.
 """
     )
 
-    return resposta.output_text
+    return interaction.output_text
+
+
+def gerar_resposta(pergunta, contexto):
+    return responder_com_ia(
+        pergunta,
+        contexto,
+        "TECNICO"
+    )
