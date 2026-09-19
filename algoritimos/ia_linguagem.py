@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 from google import genai
 
 
-# Carrega o .env da raiz do projeto, independentemente
-# da pasta a partir da qual o script for executado.
 ROOT_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT_DIR / ".env")
 
@@ -39,9 +37,9 @@ def responder_com_ia(pergunta, contexto, perfil="TECNICO"):
             "pesquisadores e profissionais de saúde pública."
         )
 
-    interaction = cliente.interactions.create(
+    response = cliente.models.generate_content(
         model="gemini-3.8-flash",
-        input=f"""
+        contents=f"""
 Você é a IA de linguagem do Escudo Feminino.
 
 Sua função é EXPLICAR o conhecimento produzido pelo sistema.
@@ -74,7 +72,7 @@ Responda à pergunta usando o contexto acima.
 """
     )
 
-    return interaction.output_text
+    return response.text
 
 
 def gerar_resposta(pergunta, contexto):
