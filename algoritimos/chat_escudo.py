@@ -7,7 +7,7 @@ import os
 
 from motor_raciocinio import raciocinar_cancer, contexto_para_ia, contexto_geral_raciocinado, contexto_inteligente
 from ia_linguagem import responder_com_ia
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import obter_municipio, obter_nome_municipio
 
 # =====================================
 # CONEXÃO
@@ -16,6 +16,7 @@ from configuracao_geografica import obter_municipio
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+NOME_MUNICIPIO = obter_nome_municipio()
 
 # =====================================
 # VERIFICAÇÃO DE PRÉ-REQUISITOS
@@ -136,22 +137,22 @@ def gerar_resposta_simples(row):
 
     texto = (
         f"{row['tipo_cancer']} está com nível de atenção "
-        f"{row['nivel_prioridade']} em Rio Claro.\n"
+        f"{row['nivel_prioridade']} em {NOME_MUNICIPIO}.\n"
     )
 
     if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
         texto += (
             "\nO número de casos está crescendo mais rápido em "
-            "Rio Claro do que na média do Estado de São Paulo."
+            "{NOME_MUNICIPIO} do que na média do Estado de São Paulo."
         )
     elif row["evento"] == "ABAIXO_DA_TENDENCIA_ESTADUAL":
         texto += (
             "\nO número de casos está crescendo mais devagar em "
-            "Rio Claro do que na média do Estado de São Paulo."
+            "{NOME_MUNICIPIO} do que na média do Estado de São Paulo."
         )
     else:
         texto += (
-            "\nO número de casos em Rio Claro segue no mesmo ritmo "
+            "\nO número de casos em {NOME_MUNICIPIO} segue no mesmo ritmo "
             "do Estado de São Paulo."
         )
 
@@ -321,7 +322,7 @@ def classificar_intencao(pergunta_norm):
         return "MUDANCA_TEMPORAL"
 
     # perguntas panorâmicas — precisam vir antes de PRIORIDADE_MAXIMA,
-    # senão "como está Rio Claro" nunca seria alcançada
+    # senão "como está {NOME_MUNICIPIO}" nunca seria alcançada
     if any(p in pergunta_norm for p in (
         "COMO ESTA", "SITUACAO GERAL", "VISAO GERAL", "PANORAMA",
         "MELHORANDO", "PIORANDO"
@@ -464,7 +465,7 @@ def responder(intencao, pergunta_norm):
                 SUM(obito) AS obitos,
                 SUM(valor_total) AS custo_total
             FROM internacoes
-            WHERE tipo_cancer = ? AND origem = ? AND ano = 2025
+            WHERE tipo_cancer = ? AND municipio = ? AND ano = 2025
             """,
             conn,
             params=(cancer_encontrado, obter_municipio())
@@ -476,13 +477,13 @@ def responder(intencao, pergunta_norm):
 
         print(
             f"\nSimulação: {cancer_encontrado}, redução de "
-            f"{reducao_pct}% nas internações de 2025 em Rio Claro.\n"
+            f"{reducao_pct}% nas internações de 2025 em {NOME_MUNICIPIO}.\n"
         )
 
         if internacoes_atual == 0:
             print(
                 f"Não há internações registradas para "
-                f"{cancer_encontrado} em Rio Claro em 2025 — "
+                f"{cancer_encontrado} em {NOME_MUNICIPIO} em 2025 — "
                 f"sem base para simular."
             )
             return
@@ -555,7 +556,7 @@ def responder(intencao, pergunta_norm):
 
         acima_tendencia = tendencia[tendencia["desvio"] > 0]
 
-        print("\nPanorama geral de Rio Claro:\n")
+        print(f"\nPanorama geral de {NOME_MUNICIPIO}:\n")
 
         print(
             f"De {total} cânceres monitorados, "
@@ -571,7 +572,7 @@ def responder(intencao, pergunta_norm):
 
         print(
             f"{len(acima_tendencia)} estão crescendo mais rápido "
-            f"em Rio Claro do que no Estado de São Paulo."
+            f"em {NOME_MUNICIPIO} do que no Estado de São Paulo."
         )
 
         top3 = priorizacao.sort_values(
@@ -745,10 +746,11 @@ def responder(intencao, pergunta_norm):
         df = pd.read_sql("""
         SELECT tipo_cancer, COUNT(*) AS total
         FROM internacoes
+        WHERE municipio = ?
         GROUP BY tipo_cancer
         ORDER BY total DESC
         LIMIT 1
-        """, conn)
+        """, conn, params=(obter_municipio(),))
 
         r = df.iloc[0]
 

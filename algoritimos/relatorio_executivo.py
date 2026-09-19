@@ -1,6 +1,8 @@
 import sqlite3
 import pandas as pd
 from datetime import datetime
+
+from configuracao_geografica import obter_nome_municipio
 from io import StringIO
 
 # =====================================
@@ -10,6 +12,7 @@ from io import StringIO
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+NOME_MUNICIPIO = obter_nome_municipio()
 
 # =====================================
 # LEITURA DAS FONTES
@@ -81,13 +84,13 @@ verbo_apresentam = "apresenta" if len(anomalias_ativas) == 1 else "apresentam"
 verbo_crescem = "cresce" if len(acima_tendencia) == 1 else "crescem"
 
 escrever(
-    f"Rio Claro monitora atualmente {total} tipos de câncer feminino "
+    f"{NOME_MUNICIPIO} monitora atualmente {total} tipos de câncer feminino "
     f"a partir de internações hospitalares do SUS. Desse total, "
     f"{len(criticos_altos)} {verbo_estao} classificados em nível "
     f"CRÍTICO ou ALTA de prioridade, {len(anomalias_ativas)} "
     f"{verbo_apresentam} anomalia em relação ao padrão histórico, "
     f"e {len(acima_tendencia)} {verbo_crescem} mais rápido em "
-    f"Rio Claro do que no Estado de São Paulo no mesmo período."
+    f"{NOME_MUNICIPIO} do que no Estado de São Paulo no mesmo período."
 )
 
 # =====================================
@@ -137,7 +140,7 @@ for _, row in priorizacao.iterrows():
 # 4. TENDÊNCIAS (Rio Claro x Estado de SP)
 # =====================================
 
-escrever("\n4. TENDÊNCIAS (Rio Claro em relação ao Estado de SP)\n")
+escrever(f"\n4. TENDÊNCIAS ({NOME_MUNICIPIO} em relação ao Estado de SP)\n")
 
 for _, row in tendencia_df.sort_values(
     "desvio", ascending=False

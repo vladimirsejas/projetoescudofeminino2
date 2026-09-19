@@ -14,116 +14,73 @@ def _conectar():
 
 
 def _buscar_origem_por_codigo_ibge(codigo_ibge):
-
     conexao = _conectar()
-
     try:
         linha = conexao.execute(
             "SELECT origem FROM municipios WHERE codigo_ibge = ?",
             (codigo_ibge,)
         ).fetchone()
-
         return linha[0] if linha else None
-
     except sqlite3.OperationalError:
-        # tabela municipios ainda não existe -- bancos criados antes
-        # dessa camada territorial continuam funcionando normalmente
         return None
-
     finally:
         conexao.close()
 
 
 def obter_municipio():
-    """
-    Retorna o identificador interno do município selecionado -- o
-    mesmo valor usado na coluna internacoes.origem (ex.: 'RIO_CLARO').
-
-    Configurável via variável de ambiente ESCUDO_MUNICIPIO com esse
-    identificador OU com o código IBGE do município (ex.: '3543907'),
-    resolvido automaticamente pela tabela municipios. Se o código
-    IBGE não for encontrado no catálogo, cai no município padrão.
-    """
-
     valor = os.getenv("ESCUDO_MUNICIPIO", MUNICIPIO_PADRAO).strip()
-
     if valor.isdigit():
         origem = _buscar_origem_por_codigo_ibge(int(valor))
         return (origem or MUNICIPIO_PADRAO).upper()
-
     return valor.upper()
 
 
 def _buscar_metadados_municipio(origem=None):
-
     origem = origem or obter_municipio()
-
     conexao = _conectar()
-
     try:
         return conexao.execute(
             "SELECT codigo_ibge, nome, uf FROM municipios WHERE origem = ?",
             (origem,)
         ).fetchone()
-
     except sqlite3.OperationalError:
         return None
-
     finally:
         conexao.close()
 
 
 def obter_codigo_ibge():
-    """Código IBGE do município selecionado, ou None se não cadastrado."""
-
     linha = _buscar_metadados_municipio()
-
     return linha[0] if linha else None
 
 
 def obter_nome_municipio():
-    """
-    Nome do município para apresentação (ex.: 'Rio Claro'). Se ainda
-    não estiver cadastrado em `municipios`, deriva um nome legível a
-    partir do identificador interno como fallback.
-    """
-
     linha = _buscar_metadados_municipio()
-
     if linha:
         return linha[1]
-
     return obter_municipio().replace("_", " ").title()
 
 
 def obter_uf():
-    """UF do município selecionado, ou UF_REFERENCIA como fallback."""
-
     linha = _buscar_metadados_municipio()
-
     return linha[2] if linha else UF_REFERENCIA
 
 
 def listar_municipios_disponiveis():
-    """
-    Municípios que existem tanto no catálogo `municipios` quanto com
-    dados já carregados em `internacoes` -- ou seja, os que podem
-    realmente ser selecionados hoje. Vem do banco, nunca de uma lista
-    fixa no código.
-    """
-
     conexao = _conectar()
-
     try:
         linhas = conexao.execute("""
-            SELECT m.codigo_ibge, m.origem, m.nome, m.uf
+            SELECT DISTINCT
+                m.codigo_ibge,
+                m.origem,
+                m.nome,
+                m.uf
             FROM municipios AS m
-            WHERE m.origem IN (
-                SELECT DISTINCT origem FROM internacoes
-            )
+            INNER JOIN internacoes AS i
+                ON i.municipio = m.origem
+            WHERE m.uf = ?
             ORDER BY m.nome
-        """).fetchall()
-
+        """, (UF_REFERENCIA,)).fetchall()
         return [
             {
                 "codigo_ibge": linha[0],
@@ -133,10 +90,8 @@ def listar_municipios_disponiveis():
             }
             for linha in linhas
         ]
-
     except sqlite3.OperationalError:
         return []
-
     finally:
         conexao.close()
 
@@ -151,64 +106,30 @@ def nome_coluna_municipio(df):
 
 
 def salvar_tabela_municipio(df, nome_tabela, conexao, municipio=None):
-    """
-    Salva `df` em `nome_tabela`, marcado com uma coluna `municipio`,
-    substituindo só as linhas desse município -- nunca a tabela
-    inteira. Isso permite que os resultados de vários municípios já
-    processados coexistam na mesma tabela (ex.: rodar a cadeia
-    determinística para RIO_CLARO e depois para outro município não
-    apaga o que já foi calculado para o primeiro).
-
-    Antes disso, cada script fazia to_sql(..., if_exists="replace"),
-    que sempre apagava a tabela inteira -- por isso trocar o
-    município no dashboard não "reprocessava": as tabelas derivadas
-    só existiam para o último município que rodou a cadeia.
-    """
-
     municipio = municipio or obter_municipio()
-
     df = df.copy()
     df["municipio"] = municipio
-
     cursor = conexao.cursor()
-
     tabela_existe = cursor.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
         (nome_tabela,)
     ).fetchone()
-
     if tabela_existe:
         colunas_existentes = [
-            linha[1] for linha in
-            cursor.execute(f"PRAGMA table_info({nome_tabela})")
+            linha[1] for linha in cursor.execute(f"PRAGMA table_info({nome_tabela})")
         ]
-
         if "municipio" not in colunas_existentes:
-            cursor.execute(
-                f"ALTER TABLE {nome_tabela} ADD COLUMN municipio TEXT"
-            )
-
-        # remove tanto as linhas antigas deste município quanto
-        # linhas órfãs sem município (sobra de antes desta migração)
+            cursor.execute(f"ALTER TABLE {nome_tabela} ADD COLUMN municipio TEXT")
         cursor.execute(
-            f"DELETE FROM {nome_tabela} "
-            f"WHERE municipio = ? OR municipio IS NULL",
+            f"DELETE FROM {nome_tabela} WHERE municipio = ? OR municipio IS NULL",
             (municipio,)
         )
         conexao.commit()
-
     df.to_sql(nome_tabela, conexao, if_exists="append", index=False)
 
 
 def ler_tabela_municipio(nome_tabela, conexao, municipio=None, colunas="*"):
-    """
-    Lê `nome_tabela` filtrando pelo município (nunca lê todas as
-    linhas de todos os municípios de uma vez -- isso duplicaria
-    resultados em qualquer merge posterior por tipo_cancer).
-    """
-
     municipio = municipio or obter_municipio()
-
     try:
         return pd.read_sql(
             f"SELECT {colunas} FROM {nome_tabela} WHERE municipio = ?",
