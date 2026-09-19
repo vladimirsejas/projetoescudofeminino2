@@ -77,13 +77,15 @@ def carregar_catalogo(conexao):
 
 
 def resolver_municipios(df, origem, catalogo):
-    coluna = encontrar_coluna_codigo(df)
-
-    if origem == "RIO_CLARO" and coluna is None:
+    # A pasta de Rio Claro já representa o recorte municipal original.
+    # Não reclassificamos esses registros pelo código do CSV.
+    if origem == "RIO_CLARO":
         return (
             pd.Series(["RIO_CLARO"] * len(df), index=df.index),
             pd.Series([3543907] * len(df), index=df.index),
         )
+
+    coluna = encontrar_coluna_codigo(df)
 
     if origem == "SP" and coluna is None:
         raise RuntimeError(
