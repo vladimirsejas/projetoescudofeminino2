@@ -1,7 +1,7 @@
 ﻿import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import obter_municipio, salvar_tabela_municipio
 
 # =====================================
 # CONEXÃƒO
@@ -152,20 +152,20 @@ print(
 # GRAVAR NO SQLITE
 # =====================================
 
-df[
-    [
-        "tipo_cancer",
-        "internacoes",
-        "obitos",
-        "crescimento",
-        "score",
-        "prioridade"
-    ]
-].to_sql(
+salvar_tabela_municipio(
+    df[
+        [
+            "tipo_cancer",
+            "internacoes",
+            "obitos",
+            "crescimento",
+            "score",
+            "prioridade"
+        ]
+    ],
     "indicadores_epidemiologicos",
     conn,
-    if_exists="replace",
-    index=False
+    municipio=MUNICIPIO
 )
 
 print("\nTabela indicadores_epidemiologicos criada com sucesso.")

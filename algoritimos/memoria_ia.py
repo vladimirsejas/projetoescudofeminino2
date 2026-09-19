@@ -1,15 +1,20 @@
 import sqlite3
 import pandas as pd
 
+from configuracao_geografica import (
+    obter_municipio,
+    ler_tabela_municipio,
+    salvar_tabela_municipio
+)
+
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
-df = pd.read_sql("""
-SELECT *
-FROM base_conhecimento
-ORDER BY pontuacao_final DESC
-""", conn)
+MUNICIPIO = obter_municipio()
+
+df = ler_tabela_municipio("base_conhecimento", conn, municipio=MUNICIPIO)
+df = df.sort_values("pontuacao_final", ascending=False)
 
 memorias = []
 
@@ -76,12 +81,7 @@ for _, row in resultado.iterrows():
     print("\n-------------------\n")
     print(row["memoria"])
 
-resultado.to_sql(
-    "memoria_ia",
-    conn,
-    if_exists="replace",
-    index=False
-)
+salvar_tabela_municipio(resultado, "memoria_ia", conn, municipio=MUNICIPIO)
 
 print("\nTabela memoria_ia atualizada com sucesso.")
 

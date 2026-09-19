@@ -1,7 +1,7 @@
 ﻿import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import obter_municipio, salvar_tabela_municipio
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -63,12 +63,7 @@ print(f"\n=== FAIXA ETÃRIA ({MUNICIPIO}) ===\n")
 
 print(resultado)
 
-resultado.to_sql(
-    "faixa_etaria",
-    conn,
-    if_exists="replace",
-    index=False
-)
+salvar_tabela_municipio(resultado, "faixa_etaria", conn, municipio=MUNICIPIO)
 
 print(
     "\nTabela faixa_etaria criada com sucesso."

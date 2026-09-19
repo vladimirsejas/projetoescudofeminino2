@@ -1,8 +1,12 @@
-import re
 import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import (
+    obter_municipio,
+    obter_nome_municipio,
+    ler_tabela_municipio,
+    salvar_tabela_municipio
+)
 
 # =====================================
 # CONEXÃO
@@ -12,105 +16,52 @@ BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
-# =====================================
-# MUNICÍPIO SELECIONADO
-#
-# A tabela tendencia_estadual guarda a variação do município como
-# uma coluna nomeada dinamicamente (ex.: "RIO_CLARO"), então o nome
-# dela só é conhecido em tempo de execução -- SQLite não permite
-# parametrizar nome de coluna com "?", então validamos o formato
-# antes de montar a query (evita SQL injection via variável de
-# ambiente ESCUDO_MUNICIPIO).
-# =====================================
-
 MUNICIPIO = obter_municipio()
-
-if not re.fullmatch(r"[A-Z0-9_]+", MUNICIPIO):
-    raise ValueError(f"Identificador de município inválido: {MUNICIPIO!r}")
+NOME_MUNICIPIO = obter_nome_municipio()
 
 # =====================================
 # LEITURA DAS TABELAS JÁ EXISTENTES
 # (nenhuma tabela nova é criada aqui)
+#
+# Todas as tabelas de origem já são multi-município -- ler sem
+# filtrar por município duplicaria linhas nos merges abaixo assim
+# que outro município for processado.
 # =====================================
 
-priorizacao = pd.read_sql(
-    """
-    SELECT
-        tipo_cancer,
-        score,
-        pontuacao_final,
-        nivel_prioridade
-    FROM priorizacao_executiva
-    """,
-    conn
+priorizacao = ler_tabela_municipio(
+    "priorizacao_executiva", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, score, pontuacao_final, nivel_prioridade"
 )
 
-tendencia = pd.read_sql(
-    f"""
-    SELECT
-        tipo_cancer,
-        {MUNICIPIO} AS variacao_municipio,
-        SP AS variacao_sp,
-        desvio,
-        evento,
-        confiabilidade
-    FROM tendencia_estadual
-    """,
-    conn
+tendencia = ler_tabela_municipio(
+    "tendencia_estadual", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, variacao_municipio, variacao_sp, desvio, "
+            "evento, confiabilidade"
 )
 
-anomalias = pd.read_sql(
-    """
-    SELECT
-        tipo_cancer,
-        media_historica,
-        valor_2025,
-        desvio_percentual,
-        situacao,
-        confiabilidade AS confiabilidade_anomalia
-    FROM anomalias
-    """,
-    conn
+anomalias = ler_tabela_municipio(
+    "anomalias", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, media_historica, valor_2025, "
+            "desvio_percentual, situacao, "
+            "confiabilidade AS confiabilidade_anomalia"
 )
 
-mortalidade = pd.read_sql(
-    """
-    SELECT
-        tipo_cancer,
-        taxa_mortalidade
-    FROM mortalidade
-    """,
-    conn
+mortalidade = ler_tabela_municipio(
+    "mortalidade", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, taxa_mortalidade"
 )
 
-custos = pd.read_sql(
-    """
-    SELECT
-        tipo_cancer,
-        valor_total,
-        ranking_custo
-    FROM custos_hospitalares
-    """,
-    conn
+custos = ler_tabela_municipio(
+    "custos_hospitalares", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, valor_total, ranking_custo"
 )
 
-permanencia = pd.read_sql(
-    """
-    SELECT
-        tipo_cancer,
-        permanencia_media
-    FROM permanencia_hospitalar
-    """,
-    conn
+permanencia = ler_tabela_municipio(
+    "permanencia_hospitalar", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, permanencia_media"
 )
 
-faixa = pd.read_sql(
-    """
-    SELECT *
-    FROM faixa_etaria
-    """,
-    conn
-)
+faixa = ler_tabela_municipio("faixa_etaria", conn, municipio=MUNICIPIO)
 
 # faixa etária predominante de cada câncer
 # (mesma lógica já usada em perfil_epidemiologico.py)
@@ -149,21 +100,21 @@ def gerar_motivo(row):
 
     if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
         partes.append(
-            f"o número de internações em Rio Claro cresceu "
+            f"o número de internações em {NOME_MUNICIPIO} cresceu "
             f"{row['desvio']:.1f} pontos percentuais a mais "
             f"que o Estado de São Paulo no mesmo período"
         )
 
     elif row["evento"] == "ABAIXO_DA_TENDENCIA_ESTADUAL":
         partes.append(
-            f"o número de internações em Rio Claro cresceu "
+            f"o número de internações em {NOME_MUNICIPIO} cresceu "
             f"{abs(row['desvio']):.1f} pontos percentuais a menos "
             f"que o Estado de São Paulo no mesmo período"
         )
 
     else:
         partes.append(
-            "o comportamento de Rio Claro acompanha de perto "
+            f"o comportamento de {NOME_MUNICIPIO} acompanha de perto "
             "o comportamento observado no Estado de São Paulo"
         )
 
@@ -239,7 +190,7 @@ def gerar_impacto(row):
             "para a gestão pública, este câncer está hoje entre os "
             "de maior risco relativo entre os monitorados, o que "
             "sugere priorizá-lo na alocação de atenção à saúde "
-            "da mulher em Rio Claro"
+            f"da mulher em {NOME_MUNICIPIO}"
         )
 
     if pd.notna(row.get("taxa_mortalidade")) and row["taxa_mortalidade"] >= 10:
@@ -354,12 +305,7 @@ for _, row in base.iterrows():
 # SALVAR
 # =====================================
 
-base.to_sql(
-    "base_conhecimento",
-    conn,
-    if_exists="replace",
-    index=False
-)
+salvar_tabela_municipio(base, "base_conhecimento", conn, municipio=MUNICIPIO)
 
 print("\nTabela base_conhecimento atualizada com sucesso.")
 

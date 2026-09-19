@@ -1,7 +1,7 @@
 ﻿import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import obter_municipio, salvar_tabela_municipio
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -29,12 +29,7 @@ print(f"\n=== PERMANÃŠNCIA HOSPITALAR ({MUNICIPIO}) ===\n")
 
 print(df)
 
-df.to_sql(
-    "permanencia_hospitalar",
-    conn,
-    if_exists="replace",
-    index=False
-)
+salvar_tabela_municipio(df, "permanencia_hospitalar", conn, municipio=MUNICIPIO)
 
 print(
     "\nTabela permanencia_hospitalar criada com sucesso."

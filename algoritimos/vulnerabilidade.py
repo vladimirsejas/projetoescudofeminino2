@@ -1,6 +1,8 @@
 import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio, salvar_tabela_municipio
+
 # =====================================
 # CONEXÃO
 # =====================================
@@ -8,6 +10,8 @@ import pandas as pd
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+MUNICIPIO = obter_municipio()
 
 # =====================================
 # DADOS BASE
@@ -19,7 +23,8 @@ SELECT
     idade,
     obito
 FROM internacoes
-""", conn)
+WHERE origem = ?
+""", conn, params=(MUNICIPIO,))
 
 # =====================================
 # FAIXA ETÁRIA
@@ -139,7 +144,7 @@ vulnerabilidade = vulnerabilidade.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== VULNERABILIDADE POR FAIXA ETÁRIA ===\n")
+print(f"\n=== VULNERABILIDADE POR FAIXA ETÁRIA ({MUNICIPIO}) ===\n")
 
 print(vulnerabilidade.to_string(index=False))
 
@@ -147,11 +152,8 @@ print(vulnerabilidade.to_string(index=False))
 # SALVAR
 # =====================================
 
-vulnerabilidade.to_sql(
-    "vulnerabilidade",
-    conn,
-    if_exists="replace",
-    index=False
+salvar_tabela_municipio(
+    vulnerabilidade, "vulnerabilidade", conn, municipio=MUNICIPIO
 )
 
 print("\nTabela vulnerabilidade criada com sucesso.")

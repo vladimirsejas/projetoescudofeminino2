@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio
+from configuracao_geografica import obter_municipio, salvar_tabela_municipio
 
 # =====================================
 # CONEXÃO
@@ -152,12 +152,7 @@ print(anomalias.to_string(index=False))
 # GRAVAR SQLITE
 # =====================================
 
-anomalias.to_sql(
-    "anomalias",
-    conn,
-    if_exists="replace",
-    index=False
-)
+salvar_tabela_municipio(anomalias, "anomalias", conn, municipio=MUNICIPIO)
 
 print("\nTabela anomalias atualizada com sucesso.")
 

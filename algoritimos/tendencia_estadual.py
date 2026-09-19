@@ -1,7 +1,11 @@
 import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio, UF_REFERENCIA
+from configuracao_geografica import (
+    obter_municipio,
+    salvar_tabela_municipio,
+    UF_REFERENCIA
+)
 
 # =====================================
 # CONEXÃO
@@ -56,6 +60,16 @@ pivot = df.pivot_table(
 
 pivot.columns.name = None
 
+# Renomeia para nomes fixos (não o nome do município) logo após o
+# pivot: a tabela agora é multi-tenant (várias linhas de municípios
+# diferentes, marcadas por uma coluna `municipio`), então o nome da
+# coluna de valor não pode variar conforme quem gerou a linha --
+# senão salvar_tabela_municipio() falharia ao tentar concatenar
+# dataframes com esquemas diferentes.
+pivot = pivot.rename(
+    columns={MUNICIPIO: "variacao_municipio", "SP": "variacao_sp"}
+)
+
 # =====================================
 # PIVOT DA BASE (ano_2024)
 #
@@ -73,12 +87,10 @@ pivot_base = df.pivot_table(
 
 pivot_base.columns.name = None
 
-COLUNA_BASE_MUNICIPIO = f"base_{MUNICIPIO}"
-
 pivot_base = pivot_base.rename(
     columns={
-        MUNICIPIO: COLUNA_BASE_MUNICIPIO,
-        "SP": "base_SP"
+        MUNICIPIO: "base_municipio",
+        "SP": "base_sp"
     }
 )
 
@@ -89,9 +101,9 @@ pivot = pivot.merge(pivot_base, on="tipo_cancer", how="left")
 # =====================================
 
 pivot["desvio"] = (
-    pivot[MUNICIPIO]
+    pivot["variacao_municipio"]
     -
-    pivot["SP"]
+    pivot["variacao_sp"]
 )
 
 # =====================================
@@ -126,15 +138,15 @@ LIMIAR_AMOSTRA_PEQUENA = 10
 
 def classificar_confiabilidade(row):
 
-    if row[COLUNA_BASE_MUNICIPIO] < LIMIAR_AMOSTRA_PEQUENA:
+    if row["base_municipio"] < LIMIAR_AMOSTRA_PEQUENA:
         return (
-            f"BAIXA (apenas {int(row[COLUNA_BASE_MUNICIPIO])} internações "
+            f"BAIXA (apenas {int(row['base_municipio'])} internações "
             f"em {MUNICIPIO} em 2024 — percentual pode enganar)"
         )
 
-    if row["base_SP"] < LIMIAR_AMOSTRA_PEQUENA:
+    if row["base_sp"] < LIMIAR_AMOSTRA_PEQUENA:
         return (
-            f"BAIXA (apenas {int(row['base_SP'])} internações "
+            f"BAIXA (apenas {int(row['base_sp'])} internações "
             f"no Estado em 2024 — percentual pode enganar)"
         )
 
@@ -163,8 +175,8 @@ print(
     pivot[
         [
             "tipo_cancer",
-            MUNICIPIO,
-            "SP",
+            "variacao_municipio",
+            "variacao_sp",
             "desvio",
             "evento",
             "confiabilidade"
@@ -176,12 +188,7 @@ print(
 # SALVAR
 # =====================================
 
-pivot.to_sql(
-    "tendencia_estadual",
-    conn,
-    if_exists="replace",
-    index=False
-)
+salvar_tabela_municipio(pivot, "tendencia_estadual", conn, municipio=MUNICIPIO)
 
 print("\nTabela tendencia_estadual atualizada com sucesso.")
 

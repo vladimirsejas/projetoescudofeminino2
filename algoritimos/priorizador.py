@@ -1,32 +1,35 @@
 ﻿import sqlite3
 import pandas as pd
 
+from configuracao_geografica import (
+    obter_municipio,
+    ler_tabela_municipio,
+    salvar_tabela_municipio
+)
+
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
-score = pd.read_sql(
-    """
-    SELECT *
-    FROM indicadores_epidemiologicos
-    """,
-    conn
+MUNICIPIO = obter_municipio()
+
+# Filtra por município em cada leitura -- essas tabelas agora podem
+# conter linhas de vários municípios já processados; sem o filtro,
+# os merges abaixo duplicariam linhas (produto cruzado por
+# tipo_cancer entre municípios diferentes).
+
+score = ler_tabela_municipio(
+    "indicadores_epidemiologicos", conn, municipio=MUNICIPIO
 )
 
-tendencia = pd.read_sql(
-    """
-    SELECT *
-    FROM tendencia_estadual
-    """,
-    conn
+tendencia = ler_tabela_municipio(
+    "tendencia_estadual", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, desvio"
 )
 
-anomalias = pd.read_sql(
-    """
-    SELECT *
-    FROM anomalias
-    """,
-    conn
+anomalias = ler_tabela_municipio(
+    "anomalias", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, situacao"
 )
 
 df = score.merge(
@@ -101,12 +104,7 @@ for _, row in top3.iterrows():
         f"Score Final: {row['pontuacao_final']:.2f}"
     )
 
-df.to_sql(
-    "priorizacao_executiva",
-    conn,
-    if_exists="replace",
-    index=False
-)
+salvar_tabela_municipio(df, "priorizacao_executiva", conn, municipio=MUNICIPIO)
 
 print("\nTabela priorizacao_executiva criada com sucesso.")
 

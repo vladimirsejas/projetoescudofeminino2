@@ -1,6 +1,12 @@
 ﻿import sqlite3
 import pandas as pd
 
+from configuracao_geografica import (
+    obter_municipio,
+    ler_tabela_municipio,
+    salvar_tabela_municipio
+)
+
 # =====================================
 # CONEXÃƒO
 # =====================================
@@ -9,44 +15,35 @@ BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
+MUNICIPIO = obter_municipio()
+
 # =====================================
 # LEITURA DAS TABELAS
+# (todas multi-município -- filtrar é obrigatório, senão os merges
+# abaixo duplicam linhas assim que outro município for processado)
 # =====================================
 
-priorizacao = pd.read_sql("""
-SELECT
-    tipo_cancer,
-    pontuacao_final,
-    nivel_prioridade
-FROM priorizacao_executiva
-""", conn)
+priorizacao = ler_tabela_municipio(
+    "priorizacao_executiva", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, pontuacao_final, nivel_prioridade"
+)
 
-mortalidade = pd.read_sql("""
-SELECT
-    tipo_cancer,
-    taxa_mortalidade
-FROM mortalidade
-""", conn)
+mortalidade = ler_tabela_municipio(
+    "mortalidade", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, taxa_mortalidade"
+)
 
-custos = pd.read_sql("""
-SELECT
-    tipo_cancer,
-    valor_total,
-    ranking_custo
-FROM custos_hospitalares
-""", conn)
+custos = ler_tabela_municipio(
+    "custos_hospitalares", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, valor_total, ranking_custo"
+)
 
-permanencia = pd.read_sql("""
-SELECT
-    tipo_cancer,
-    permanencia_media
-FROM permanencia_hospitalar
-""", conn)
+permanencia = ler_tabela_municipio(
+    "permanencia_hospitalar", conn, municipio=MUNICIPIO,
+    colunas="tipo_cancer, permanencia_media"
+)
 
-faixa = pd.read_sql("""
-SELECT *
-FROM faixa_etaria
-""", conn)
+faixa = ler_tabela_municipio("faixa_etaria", conn, municipio=MUNICIPIO)
 
 # =====================================
 # FAIXA ETÃRIA DOMINANTE
@@ -130,11 +127,8 @@ print(
 # GRAVA SQLITE
 # =====================================
 
-perfil.to_sql(
-    "perfil_epidemiologico",
-    conn,
-    if_exists="replace",
-    index=False
+salvar_tabela_municipio(
+    perfil, "perfil_epidemiologico", conn, municipio=MUNICIPIO
 )
 
 print(
