@@ -1,5 +1,8 @@
+import re
 import sqlite3
 import pandas as pd
+
+from configuracao_geografica import obter_municipio
 
 # =====================================
 # CONEXÃO
@@ -8,6 +11,22 @@ import pandas as pd
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+# =====================================
+# MUNICÍPIO SELECIONADO
+#
+# A tabela tendencia_estadual guarda a variação do município como
+# uma coluna nomeada dinamicamente (ex.: "RIO_CLARO"), então o nome
+# dela só é conhecido em tempo de execução -- SQLite não permite
+# parametrizar nome de coluna com "?", então validamos o formato
+# antes de montar a query (evita SQL injection via variável de
+# ambiente ESCUDO_MUNICIPIO).
+# =====================================
+
+MUNICIPIO = obter_municipio()
+
+if not re.fullmatch(r"[A-Z0-9_]+", MUNICIPIO):
+    raise ValueError(f"Identificador de município inválido: {MUNICIPIO!r}")
 
 # =====================================
 # LEITURA DAS TABELAS JÁ EXISTENTES
@@ -27,11 +46,11 @@ priorizacao = pd.read_sql(
 )
 
 tendencia = pd.read_sql(
-    """
+    f"""
     SELECT
         tipo_cancer,
-        RIO_CLARO,
-        SP,
+        {MUNICIPIO} AS variacao_municipio,
+        SP AS variacao_sp,
         desvio,
         evento,
         confiabilidade
