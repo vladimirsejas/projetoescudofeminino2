@@ -1,6 +1,8 @@
 import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio, UF_REFERENCIA
+
 # =====================================
 # CONEXÃO
 # =====================================
@@ -9,8 +11,14 @@ BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
+MUNICIPIO = obter_municipio()
+
 # =====================================
-# CRESCIMENTO RIO CLARO X SP
+# CRESCIMENTO MUNICÍPIO X SP
+#
+# Compara sempre o município selecionado com a referência
+# estadual (SP) -- nunca entre dois municípios diretamente, e
+# nunca mistura outros municípios que existam em internacoes.
 # =====================================
 
 query = """
@@ -20,10 +28,11 @@ SELECT
     SUM(CASE WHEN ano = 2024 THEN 1 ELSE 0 END) AS ano_2024,
     SUM(CASE WHEN ano = 2025 THEN 1 ELSE 0 END) AS ano_2025
 FROM internacoes
+WHERE origem IN (?, ?)
 GROUP BY tipo_cancer, origem
 """
 
-df = pd.read_sql(query, conn)
+df = pd.read_sql(query, conn, params=(MUNICIPIO, UF_REFERENCIA))
 
 # =====================================
 # VARIAÇÃO %
@@ -64,9 +73,11 @@ pivot_base = df.pivot_table(
 
 pivot_base.columns.name = None
 
+COLUNA_BASE_MUNICIPIO = f"base_{MUNICIPIO}"
+
 pivot_base = pivot_base.rename(
     columns={
-        "RIO_CLARO": "base_RIO_CLARO",
+        MUNICIPIO: COLUNA_BASE_MUNICIPIO,
         "SP": "base_SP"
     }
 )
@@ -78,7 +89,7 @@ pivot = pivot.merge(pivot_base, on="tipo_cancer", how="left")
 # =====================================
 
 pivot["desvio"] = (
-    pivot["RIO_CLARO"]
+    pivot[MUNICIPIO]
     -
     pivot["SP"]
 )
@@ -115,10 +126,10 @@ LIMIAR_AMOSTRA_PEQUENA = 10
 
 def classificar_confiabilidade(row):
 
-    if row["base_RIO_CLARO"] < LIMIAR_AMOSTRA_PEQUENA:
+    if row[COLUNA_BASE_MUNICIPIO] < LIMIAR_AMOSTRA_PEQUENA:
         return (
-            f"BAIXA (apenas {int(row['base_RIO_CLARO'])} internações "
-            f"em Rio Claro em 2024 — percentual pode enganar)"
+            f"BAIXA (apenas {int(row[COLUNA_BASE_MUNICIPIO])} internações "
+            f"em {MUNICIPIO} em 2024 — percentual pode enganar)"
         )
 
     if row["base_SP"] < LIMIAR_AMOSTRA_PEQUENA:
@@ -146,13 +157,13 @@ pivot = pivot.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== TENDÊNCIA ESTADUAL ===\n")
+print(f"\n=== TENDÊNCIA ESTADUAL ({MUNICIPIO} x {UF_REFERENCIA}) ===\n")
 
 print(
     pivot[
         [
             "tipo_cancer",
-            "RIO_CLARO",
+            MUNICIPIO,
             "SP",
             "desvio",
             "evento",
