@@ -200,8 +200,9 @@ def tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
     if not IA_ATIVA:
         return False
 
-    # Perguntas desconhecidas não têm contexto estruturado confiável.
-    # Nesse caso, a IA não é chamada.
+    # perguntas que o motor de intenções não reconheceu não têm contexto
+    # estruturado confiável — nesse caso a IA não deve ser chamada, para
+    # não correr o risco de responder sem base nos dados do Escudo.
     if intencao == "DESCONHECIDA":
         return False
 
@@ -782,7 +783,7 @@ while True:
 
     intencao = classificar_intencao(pergunta_norm)
 
-    if not tentar_resposta_com_ia(pergunta, pergunta_norm):
+    if not tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
         responder(intencao, pergunta_norm)
 
     registrar_pergunta(
