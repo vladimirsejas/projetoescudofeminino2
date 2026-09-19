@@ -1,9 +1,13 @@
 ﻿import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio
+
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+MUNICIPIO = obter_municipio()
 
 df = pd.read_sql("""
 SELECT
@@ -11,8 +15,9 @@ SELECT
     COUNT(*) AS internacoes,
     SUM(obito) AS obitos
 FROM internacoes
+WHERE origem = ?
 GROUP BY tipo_cancer
-""", conn)
+""", conn, params=(MUNICIPIO,))
 
 df["taxa_mortalidade"] = (
     df["obitos"]
@@ -25,7 +30,7 @@ df = df.sort_values(
     ascending=False
 )
 
-print("\n=== MORTALIDADE ===\n")
+print(f"\n=== MORTALIDADE ({MUNICIPIO}) ===\n")
 
 print(df)
 
