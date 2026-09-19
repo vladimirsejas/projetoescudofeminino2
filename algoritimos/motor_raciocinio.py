@@ -223,6 +223,113 @@ aos dados fornecidos pelo Escudo.
     return contexto.strip()
 
 
+
+def contexto_inteligente(pergunta, intencao, cancer=None):
+    """
+    Seleciona o contexto já calculado de acordo com a intenção.
+    Não recalcula indicadores; apenas escolhe os dados necessários
+    para responder à pergunta.
+    """
+    base = contexto_geral_raciocinado()
+
+    if intencao == "CANCER_ESPECIFICO" and cancer:
+        return contexto_para_ia(cancer)
+
+    tabelas = {
+        "PRIORIDADE_MAXIMA": (
+            "priorizacao_executiva",
+            ["tipo_cancer", "nivel_prioridade", "pontuacao_final"],
+            "PRIORIDADES"
+        ),
+        "TOP_PRIORIDADES": (
+            "priorizacao_executiva",
+            ["tipo_cancer", "nivel_prioridade", "pontuacao_final"],
+            "PRIORIDADES"
+        ),
+        "MORTALIDADE": (
+            "mortalidade",
+            ["tipo_cancer", "taxa_mortalidade"],
+            "MORTALIDADE"
+        ),
+        "CUSTO": (
+            "custos_hospitalares",
+            ["tipo_cancer", "valor_total", "ranking_custo"],
+            "CUSTOS HOSPITALARES"
+        ),
+        "PERMANENCIA": (
+            "permanencia_hospitalar",
+            ["tipo_cancer", "permanencia_media"],
+            "PERMANÊNCIA HOSPITALAR"
+        ),
+        "FAIXA_ETARIA": (
+            "faixa_etaria",
+            ["tipo_cancer", "faixa_etaria", "internacoes"],
+            "FAIXA ETÁRIA"
+        ),
+        "TENDENCIA_ESTADUAL": (
+            "tendencia_estadual",
+            ["tipo_cancer", "RIO_CLARO", "SP", "desvio", "evento"],
+            "TENDÊNCIA ESTADUAL"
+        ),
+        "ANOMALIAS": (
+            "anomalias",
+            ["tipo_cancer", "media_historica", "valor_2025",
+             "desvio_percentual", "situacao"],
+            "ANOMALIAS"
+        ),
+        "INCIDENCIA": (
+            "internacoes",
+            ["tipo_cancer"],
+            "INCIDÊNCIA HOSPITALAR"
+        ),
+    }
+
+    if intencao not in tabelas:
+        return base
+
+    nome_tabela, colunas, titulo = tabelas[intencao]
+    df = _ler_tabela(nome_tabela)
+
+    if df.empty:
+        return base
+
+    colunas_validas = [c for c in colunas if c in df.columns]
+    if not colunas_validas:
+        return base
+
+    if intencao == "TENDENCIA_ESTADUAL" and "desvio" in df.columns:
+        df = df.sort_values("desvio", ascending=False)
+    elif intencao == "MORTALIDADE" and "taxa_mortalidade" in df.columns:
+        df = df.sort_values("taxa_mortalidade", ascending=False)
+    elif intencao == "CUSTO" and "valor_total" in df.columns:
+        df = df.sort_values("valor_total", ascending=False)
+    elif intencao == "PERMANENCIA" and "permanencia_media" in df.columns:
+        df = df.sort_values("permanencia_media", ascending=False)
+    elif intencao in ("PRIORIDADE_MAXIMA", "TOP_PRIORIDADES"):
+        df = df.sort_values("pontuacao_final", ascending=False)
+    elif intencao == "ANOMALIAS" and "situacao" in df.columns:
+        df = df[df["situacao"] != "NORMAL"]
+    elif intencao == "INCIDENCIA":
+        df = (
+            df.groupby("tipo_cancer")
+            .size()
+            .reset_index(name="total_internacoes")
+            .sort_values("total_internacoes", ascending=False)
+        )
+        colunas_validas = ["tipo_cancer", "total_internacoes"]
+
+    detalhe = df[colunas_validas].to_string(index=False)
+
+    return (
+        f"{base}\\n\\n"
+        f"DADOS ESPECÍFICOS PARA A PERGUNTA:\\n"
+        f"{titulo}\\n"
+        f"{detalhe}\\n\\n"
+        f"REGRA: estes dados já foram calculados pelo Escudo Feminino. "
+        f"Use-os para responder à pergunta sem recalcular os indicadores."
+    )
+
+
 def contexto_geral():
     """Cria um contexto compacto para o modelo de linguagem."""
     partes = []
