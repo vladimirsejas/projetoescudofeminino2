@@ -1,6 +1,8 @@
 import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio, nome_coluna_municipio
+
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 
@@ -302,6 +304,18 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
 
     if df.empty:
         return base
+
+    coluna_municipio = nome_coluna_municipio(df)
+
+    if intencao in ("TENDENCIA_ESTADUAL", "MUDANCA_TEMPORAL"):
+        colunas = [
+            coluna_municipio if c == "RIO_CLARO" else c
+            for c in colunas
+        ]
+        titulo = (
+            f"{titulo} — MUNICÍPIO ANALISADO: "
+            f"{obter_municipio()}"
+        )
 
     colunas_validas = [c for c in colunas if c in df.columns]
     if not colunas_validas:
