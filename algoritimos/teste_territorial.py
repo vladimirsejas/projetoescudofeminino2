@@ -54,9 +54,9 @@ def _montar_banco_sintetico(caminho, incluir_limeira):
 
     conexao.execute("""
         CREATE TABLE internacoes (
-            tipo_cancer TEXT, origem TEXT, ano INTEGER, idade INTEGER,
-            municipio TEXT, codigo_ibge INTEGER,
-            dias_permanencia INTEGER, obito INTEGER, valor_total REAL
+            tipo_cancer TEXT, origem TEXT, municipio TEXT, codigo_ibge INTEGER,
+            ano INTEGER, idade INTEGER, dias_permanencia INTEGER,
+            obito INTEGER, valor_total REAL
         )
     """)
 
