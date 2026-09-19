@@ -2,6 +2,17 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import plotly.express as px
+import sys
+import os
+
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "algoritimos")
+)
+
+from configuracao_geografica import (
+    listar_municipios_disponiveis,
+    UF_REFERENCIA
+)
 
 # ==================================================
 # CONFIGURAÇÃO
@@ -22,7 +33,44 @@ BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 conexao = sqlite3.connect(BANCO)
 
 # ==================================================
+# SELEÇÃO DE MUNICÍPIO
+#
+# A lista vem do banco (municipios ∩ internacoes), nunca de uma
+# lista fixa no código -- assim que outro município tiver dados
+# carregados, ele aparece aqui automaticamente.
+# ==================================================
+
+municipios_disponiveis = listar_municipios_disponiveis()
+
+if not municipios_disponiveis:
+    st.error(
+        "Nenhum município cadastrado em `municipios` com dados "
+        "carregados em `internacoes`. Rode "
+        "etl\\criar_tabela_municipios.py e confira o ETL antes de "
+        "abrir o dashboard."
+    )
+    st.stop()
+
+nomes_disponiveis = [m["nome"] for m in municipios_disponiveis]
+
+nome_escolhido = st.sidebar.selectbox("Município", nomes_disponiveis)
+
+municipio_escolhido = next(
+    m for m in municipios_disponiveis if m["nome"] == nome_escolhido
+)
+
+ORIGEM = municipio_escolhido["origem"]
+NOME_MUNICIPIO = municipio_escolhido["nome"]
+
+# ==================================================
 # KPIs PRINCIPAIS
+#
+# Total de Registros continua sendo a soma geral (município +
+# referência estadual), como visão de conjunto. As demais métricas
+# nomeadas pelo município (Câncer Líder, custos, permanência,
+# óbitos) são filtradas por origem -- sem isso, ficam diluídas pelo
+# volume do Estado (o mesmo problema já corrigido nos indicadores
+# em algoritimos/).
 # ==================================================
 
 total = pd.read_sql(
@@ -39,10 +87,12 @@ ranking = pd.read_sql(
         tipo_cancer,
         COUNT(*) AS total
     FROM internacoes
+    WHERE origem = ?
     GROUP BY tipo_cancer
     ORDER BY total DESC
     """,
-    conexao
+    conexao,
+    params=(ORIGEM,)
 )
 
 origens = pd.read_sql(
@@ -56,48 +106,54 @@ origens = pd.read_sql(
     conexao
 )
 
-lider = ranking.iloc[0]["tipo_cancer"]
+lider = ranking.iloc[0]["tipo_cancer"] if not ranking.empty else "—"
 
-rio_claro_vals = origens.loc[
-    origens["origem"] == "RIO_CLARO",
+municipio_vals = origens.loc[
+    origens["origem"] == ORIGEM,
     "total"
 ].values
 
-rio_claro = int(rio_claro_vals[0]) if len(rio_claro_vals) > 0 else 0
+total_municipio = int(municipio_vals[0]) if len(municipio_vals) > 0 else 0
 
 sp_vals = origens.loc[
-    origens["origem"] == "SP",
+    origens["origem"] == UF_REFERENCIA,
     "total"
 ].values
 
 sp = int(sp_vals[0]) if len(sp_vals) > 0 else 0
 
 # ==================================================
-# KPIs AVANÇADOS
+# KPIs AVANÇADOS (filtrados pelo município selecionado)
 # ==================================================
 
 valor_total = pd.read_sql(
     """
     SELECT SUM(valor_total) AS valor
     FROM internacoes
+    WHERE origem = ?
     """,
-    conexao
+    conexao,
+    params=(ORIGEM,)
 ).iloc[0]["valor"] or 0
 
 permanencia_media = pd.read_sql(
     """
     SELECT AVG(dias_permanencia) AS media
     FROM internacoes
+    WHERE origem = ?
     """,
-    conexao
+    conexao,
+    params=(ORIGEM,)
 ).iloc[0]["media"] or 0
 
 obitos = pd.read_sql(
     """
     SELECT SUM(obito) AS total
     FROM internacoes
+    WHERE origem = ?
     """,
-    conexao
+    conexao,
+    params=(ORIGEM,)
 ).iloc[0]["total"] or 0
 
 # ==================================================
@@ -106,10 +162,10 @@ obitos = pd.read_sql(
 
 st.title("🎗️ Escudo Feminino")
 
-st.markdown("""
+st.markdown(f"""
 ### Sistema de Apoio à Decisão para Saúde Pública
 
-**Rio Claro x Estado de São Paulo**
+**{NOME_MUNICIPIO} x Estado de {UF_REFERENCIA}**
 """)
 
 # ==================================================
@@ -119,8 +175,8 @@ st.markdown("""
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Total de Registros", f"{int(total):,}")
-col2.metric("Rio Claro", f"{rio_claro:,}")
-col3.metric("São Paulo", f"{sp:,}")
+col2.metric(NOME_MUNICIPIO, f"{total_municipio:,}")
+col3.metric(f"Estado ({UF_REFERENCIA})", f"{sp:,}")
 col4.metric("Câncer Líder", lider)
 
 st.divider()
@@ -143,6 +199,13 @@ st.divider()
 # ==================================================
 
 st.subheader("🎯 Priorização e Recomendações")
+
+st.caption(
+    "Esta seção reflete o município configurado quando a cadeia "
+    "determinística (algoritimos/*.py) foi executada pela última "
+    "vez -- trocar o município aqui no seletor não reprocessa essas "
+    "tabelas automaticamente."
+)
 
 try:
     base = pd.read_sql(
@@ -261,7 +324,7 @@ st.plotly_chart(
 )
 
 # ==================================================
-# RIO CLARO X SP
+# MUNICÍPIO X SP
 # ==================================================
 
 comparativo = pd.read_sql(
@@ -271,13 +334,15 @@ comparativo = pd.read_sql(
         origem,
         COUNT(*) AS total
     FROM internacoes
+    WHERE origem IN (?, ?)
     GROUP BY tipo_cancer, origem
     ORDER BY tipo_cancer
     """,
-    conexao
+    conexao,
+    params=(ORIGEM, UF_REFERENCIA)
 )
 
-st.subheader("🏥 Rio Claro x São Paulo")
+st.subheader(f"🏥 {NOME_MUNICIPIO} x {UF_REFERENCIA}")
 
 fig_comparativo = px.bar(
     comparativo,
@@ -309,12 +374,12 @@ evolucao = pd.read_sql(
         ano,
         COUNT(*) AS internacoes
     FROM internacoes
-    WHERE tipo_cancer = ?
+    WHERE tipo_cancer = ? AND origem = ?
     GROUP BY ano
     ORDER BY ano
     """,
     conexao,
-    params=(cancer_escolhido,)
+    params=(cancer_escolhido, ORIGEM)
 )
 
 fig_evolucao = px.line(
@@ -322,7 +387,7 @@ fig_evolucao = px.line(
     x="ano",
     y="internacoes",
     markers=True,
-    title=f"Evolução Temporal - {cancer_escolhido}"
+    title=f"Evolução Temporal - {cancer_escolhido} ({NOME_MUNICIPIO})"
 )
 
 st.plotly_chart(
@@ -339,6 +404,12 @@ st.plotly_chart(
 # ==================================================
 
 st.subheader("🚨 Alertas Analíticos")
+
+st.caption(
+    "Assim como a priorização acima, esta seção vem de "
+    "tendencia_estadual, calculada para o município configurado na "
+    "última execução da cadeia determinística."
+)
 
 eventos = pd.read_sql(
     """
