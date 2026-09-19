@@ -224,9 +224,11 @@ def testar():
     conexao.close()
 
     checar(
-        "B) tendencia_estadual mantém a coluna SP como referência "
-        f"estadual (colunas: {colunas_tendencia})",
-        "SP" in colunas_tendencia and "RIO_CLARO" in colunas_tendencia
+        "B) tendencia_estadual guarda a variação do município e do "
+        f"Estado (SP) em colunas fixas (colunas: {colunas_tendencia})",
+        "variacao_municipio" in colunas_tendencia
+        and "variacao_sp" in colunas_tendencia
+        and "municipio" in colunas_tendencia
     )
 
     os.remove(banco_rc)
@@ -275,30 +277,68 @@ def testar():
     # I) A execução completa da cadeia determinística continua
     #    funcionando (agora para um município sintético, não só
     #    Rio Claro)
+    # J) COEXISTÊNCIA: processar um segundo município NÃO apaga nem
+    #    altera o que já foi calculado para o primeiro -- esta é a
+    #    pendência crítica levantada na revisão (trocar o município
+    #    no dashboard "não reprocessava" porque as tabelas eram
+    #    sobrescritas por inteiro a cada execução).
     # -------------------------------------------------
 
     fd, banco_multi = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     _montar_banco_sintetico(banco_multi, incluir_limeira=True)
 
+    # 1) roda a cadeia completa para RIO_CLARO primeiro
+    _rodar_cadeia(banco_multi, "RIO_CLARO")
+
+    def _snapshot(caminho, tabela, municipio):
+        conexao = sqlite3.connect(caminho)
+        try:
+            linhas = conexao.execute(
+                f"SELECT * FROM {tabela} WHERE municipio = ? "
+                f"ORDER BY tipo_cancer",
+                (municipio,)
+            ).fetchall()
+        finally:
+            conexao.close()
+        return linhas
+
+    tabelas_finais = [
+        "base_conhecimento", "priorizacao_executiva", "tendencia_estadual"
+    ]
+
+    snapshot_rc_antes = {
+        tabela: _snapshot(banco_multi, tabela, "RIO_CLARO")
+        for tabela in tabelas_finais
+    }
+
+    checar(
+        "J-préviu) RIO_CLARO gerou linhas nas 3 tabelas finais antes "
+        f"de processar outro município ({ {t: len(v) for t, v in snapshot_rc_antes.items()} })",
+        all(len(v) > 0 for v in snapshot_rc_antes.values())
+    )
+
+    # 2) roda a cadeia completa para LIMEIRA no MESMO banco
     try:
-        ns_limeira = _rodar_cadeia(banco_multi, "LIMEIRA")
+        _rodar_cadeia(banco_multi, "LIMEIRA")
         checar(
             "I) cadeia determinística completa roda sem erro para um "
             "município sintético diferente de Rio Claro (LIMEIRA)",
             True
         )
+        cadeia_limeira_ok = True
     except Exception as erro:
         checar(
             f"I) cadeia determinística falhou para LIMEIRA: {erro}", False
         )
-        ns_limeira = None
+        cadeia_limeira_ok = False
 
-    if ns_limeira is not None:
+    if cadeia_limeira_ok:
         conexao = sqlite3.connect(banco_multi)
         mortalidade_limeira = dict(
             conexao.execute(
-                "SELECT tipo_cancer, taxa_mortalidade FROM mortalidade"
+                "SELECT tipo_cancer, taxa_mortalidade FROM mortalidade "
+                "WHERE municipio = 'LIMEIRA'"
             ).fetchall()
         )
         conexao.close()
@@ -307,9 +347,36 @@ def testar():
         # nunca contaminada pelos óbitos de Rio Claro
         checar(
             "F) mortalidade calculada para LIMEIRA não herda os óbitos "
-            f"de Rio Claro (esperado 0.0%, obtido {mortalidade_limeira.get('MAMA')}%)",
+            f"de Rio Claro (esperado 0.0%, obtido "
+            f"{mortalidade_limeira.get('MAMA')}%)",
             mortalidade_limeira.get("MAMA") == 0.0
         )
+
+        # 3) a checagem central desta rodada: RIO_CLARO nas 3 tabelas
+        # finais continua EXATAMENTE igual a antes de processar LIMEIRA
+        snapshot_rc_depois = {
+            tabela: _snapshot(banco_multi, tabela, "RIO_CLARO")
+            for tabela in tabelas_finais
+        }
+
+        for tabela in tabelas_finais:
+            checar(
+                f"J) processar LIMEIRA não alterou/apagou os dados de "
+                f"RIO_CLARO em `{tabela}` (coexistência real, não só "
+                f"'não deu erro')",
+                snapshot_rc_depois[tabela] == snapshot_rc_antes[tabela]
+            )
+
+        # 4) e LIMEIRA também deve existir nessas mesmas 3 tabelas,
+        # coexistindo com RIO_CLARO -- é o que faz o seletor do
+        # dashboard realmente funcionar ao trocar de município
+        for tabela in tabelas_finais:
+            linhas_limeira = _snapshot(banco_multi, tabela, "LIMEIRA")
+            checar(
+                f"J) LIMEIRA também existe em `{tabela}`, coexistindo "
+                f"com RIO_CLARO ({len(linhas_limeira)} linha(s))",
+                len(linhas_limeira) > 0
+            )
 
     os.remove(banco_multi)
 
@@ -335,9 +402,9 @@ def testar():
         "Qual a tendência estadual?", "TENDENCIA_ESTADUAL", None
     )
     checar(
-        "H) contexto enviado à IA cita o município correto "
-        f"(RIO_CLARO): {'RIO_CLARO' in contexto!r}",
-        "RIO_CLARO" in contexto
+        "H) contexto enviado à IA cita o nome do município correto "
+        f"(Rio Claro): {'Rio Claro' in contexto!r}",
+        "Rio Claro" in contexto
     )
 
     os.remove(banco_motor)
