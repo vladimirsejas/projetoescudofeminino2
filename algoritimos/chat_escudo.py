@@ -556,7 +556,7 @@ def responder(intencao, pergunta_norm):
 
         acima_tendencia = tendencia[tendencia["desvio"] > 0]
 
-        print("\nPanorama geral de {NOME_MUNICIPIO}:\n")
+        print(f"\nPanorama geral de {NOME_MUNICIPIO}:\n")
 
         print(
             f"De {total} cânceres monitorados, "
