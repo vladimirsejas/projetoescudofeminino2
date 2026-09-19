@@ -307,6 +307,19 @@ def classificar_intencao(pergunta_norm):
         if cancer in pergunta_norm or cancer_norm in pergunta_norm:
             return "CANCER_ESPECIFICO"
 
+    # mudança temporal precisa vir antes de SITUACAO_GERAL: perguntas
+    # como "como estão os números comparados ao ano passado?" contêm
+    # "COMO ESTA" (SITUACAO_GERAL) e também "COMPARADOS AO ANO
+    # PASSADO" (MUDANCA_TEMPORAL) — sem essa ordem, SITUACAO_GERAL
+    # sempre venceria e a intenção temporal nunca seria alcançada
+    if any(p in pergunta_norm for p in (
+        "O QUE MUDOU", "MUDOU DESDE", "MUDANCAS DESDE",
+        "COMPARAR COM O ANO PASSADO", "COMPARADOS AO ANO PASSADO",
+        "COMPARADO AO ANO PASSADO", "COMPARACAO COM O ANO PASSADO",
+        "EM RELACAO AO ANO PASSADO", "ANO ANTERIOR"
+    )):
+        return "MUDANCA_TEMPORAL"
+
     # perguntas panorâmicas — precisam vir antes de PRIORIDADE_MAXIMA,
     # senão "como está Rio Claro" nunca seria alcançada
     if any(p in pergunta_norm for p in (
@@ -364,14 +377,6 @@ def classificar_intencao(pergunta_norm):
         "ACOMPANHA", "COMPARADO AO ESTADO", "COMPARADO A SP"
     )):
         return "TENDENCIA_ESTADUAL"
-
-    if any(p in pergunta_norm for p in (
-        "O QUE MUDOU", "MUDOU DESDE", "MUDANCAS DESDE",
-        "COMPARAR COM O ANO PASSADO", "COMPARADOS AO ANO PASSADO",
-        "COMPARADO AO ANO PASSADO", "COMPARACAO COM O ANO PASSADO",
-        "EM RELACAO AO ANO PASSADO", "ANO ANTERIOR"
-    )):
-        return "MUDANCA_TEMPORAL"
 
     if any(p in pergunta_norm for p in (
         "ANOMALIA", "ANOMALIAS", "PADRAO", "ALERTA", "ALERTAS",
