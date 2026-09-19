@@ -1,9 +1,13 @@
 ﻿import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio
+
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+MUNICIPIO = obter_municipio()
 
 df = pd.read_sql("""
 SELECT
@@ -12,8 +16,9 @@ SELECT
     AVG(valor_total) AS valor_medio,
     COUNT(*) AS internacoes
 FROM internacoes
+WHERE origem = ?
 GROUP BY tipo_cancer
-""", conn)
+""", conn, params=(MUNICIPIO,))
 
 df = df.sort_values(
     "valor_total",
@@ -25,7 +30,7 @@ df["ranking_custo"] = range(
     len(df) + 1
 )
 
-print("\n=== CUSTOS HOSPITALARES ===\n")
+print(f"\n=== CUSTOS HOSPITALARES ({MUNICIPIO}) ===\n")
 
 print(df)
 
