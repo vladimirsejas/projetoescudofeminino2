@@ -367,7 +367,9 @@ def classificar_intencao(pergunta_norm):
 
     if any(p in pergunta_norm for p in (
         "O QUE MUDOU", "MUDOU DESDE", "MUDANCAS DESDE",
-        "COMPARAR COM O ANO PASSADO", "EM RELACAO AO ANO PASSADO"
+        "COMPARAR COM O ANO PASSADO", "COMPARADOS AO ANO PASSADO",
+        "COMPARADO AO ANO PASSADO", "COMPARACAO COM O ANO PASSADO",
+        "EM RELACAO AO ANO PASSADO", "ANO ANTERIOR"
     )):
         return "MUDANCA_TEMPORAL"
 
