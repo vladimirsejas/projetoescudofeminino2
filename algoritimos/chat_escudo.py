@@ -782,7 +782,7 @@ while True:
 
     intencao = classificar_intencao(pergunta_norm)
 
-    if not tentar_resposta_com_ia(pergunta, pergunta_norm):
+    if not tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
         responder(intencao, pergunta_norm)
 
     registrar_pergunta(
