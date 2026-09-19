@@ -155,7 +155,7 @@ permanencia_media = pd.read_sql(
     """
     SELECT AVG(dias_permanencia) AS media
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     """,
     conexao,
     params=(ORIGEM,)
@@ -165,7 +165,7 @@ obitos = pd.read_sql(
     """
     SELECT SUM(obito) AS total
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     """,
     conexao,
     params=(ORIGEM,)
