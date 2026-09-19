@@ -113,87 +113,93 @@ def resolver_municipios(df, origem, catalogo):
     return municipios, codigos
 
 
-conexao = sqlite3.connect(BANCO)
 
-# O catálogo deve existir antes da carga.
-try:
-    catalogo = carregar_catalogo(conexao)
-except sqlite3.OperationalError as erro:
+def carregar():
+    conexao = sqlite3.connect(BANCO)
+
+    # O catálogo deve existir antes da carga.
+    try:
+        catalogo = carregar_catalogo(conexao)
+    except sqlite3.OperationalError as erro:
+        conexao.close()
+        raise RuntimeError(
+            "A tabela municipios não existe. Execute primeiro "
+            "etl\criar_tabela_municipios.py."
+        ) from erro
+
+    total_registros = 0
+    primeira_carga = True
+
+    for pasta in sorted(os.listdir(BASE_DADOS)):
+
+        if pasta not in MAPA:
+            continue
+
+        caminho_pasta = os.path.join(BASE_DADOS, pasta)
+
+        arquivos_csv = sorted(
+            arquivo
+            for arquivo in os.listdir(caminho_pasta)
+            if arquivo.lower().endswith(".csv")
+        )
+
+        if not arquivos_csv:
+            continue
+
+        arquivo_csv = os.path.join(caminho_pasta, arquivos_csv[0])
+        tipo_cancer, origem = MAPA[pasta]
+
+        print("\n" + "=" * 60)
+        print("PASTA:", pasta)
+        print("TIPO:", tipo_cancer)
+        print("ORIGEM:", origem)
+
+        df = pd.read_csv(
+            arquivo_csv,
+            sep=";",
+            encoding="latin1",
+            low_memory=False
+        )
+
+        municipios, codigos = resolver_municipios(
+            df, origem, catalogo
+        )
+
+        dados = pd.DataFrame({
+            "tipo_cancer": [tipo_cancer] * len(df),
+            "origem": [origem] * len(df),
+            "municipio": municipios,
+            "codigo_ibge": codigos,
+            "ano": df["ANO_CMPT"],
+            "idade": df["IDADE"],
+            "dias_permanencia": df["DIAS_PERM"],
+            "obito": df["MORTE"],
+            "valor_total": df["VAL_TOT"]
+        })
+
+        print("Municípios identificados:", dados["municipio"].nunique())
+        print(dados["municipio"].value_counts().head(10))
+        print(dados.head())
+
+        dados.to_sql(
+            "internacoes",
+            conexao,
+            if_exists="replace" if primeira_carga else "append",
+            index=False
+        )
+
+        primeira_carga = False
+        total_registros += len(dados)
+
+        print("OK ->", len(dados), "registros")
+
     conexao.close()
-    raise RuntimeError(
-        "A tabela municipios não existe. Execute primeiro "
-        "etl\criar_tabela_municipios.py."
-    ) from erro
-
-total_registros = 0
-primeira_carga = True
-
-for pasta in sorted(os.listdir(BASE_DADOS)):
-
-    if pasta not in MAPA:
-        continue
-
-    caminho_pasta = os.path.join(BASE_DADOS, pasta)
-
-    arquivos_csv = sorted(
-        arquivo
-        for arquivo in os.listdir(caminho_pasta)
-        if arquivo.lower().endswith(".csv")
-    )
-
-    if not arquivos_csv:
-        continue
-
-    arquivo_csv = os.path.join(caminho_pasta, arquivos_csv[0])
-    tipo_cancer, origem = MAPA[pasta]
 
     print("\n" + "=" * 60)
-    print("PASTA:", pasta)
-    print("TIPO:", tipo_cancer)
-    print("ORIGEM:", origem)
+    print("CARGA TERRITORIAL FINALIZADA")
+    print("TOTAL:", total_registros)
+    print("=" * 60)
 
-    df = pd.read_csv(
-        arquivo_csv,
-        sep=";",
-        encoding="latin1",
-        low_memory=False
-    )
 
-    municipios, codigos = resolver_municipios(
-        df, origem, catalogo
-    )
-
-    dados = pd.DataFrame({
-        "tipo_cancer": [tipo_cancer] * len(df),
-        "origem": [origem] * len(df),
-        "municipio": municipios,
-        "codigo_ibge": codigos,
-        "ano": df["ANO_CMPT"],
-        "idade": df["IDADE"],
-        "dias_permanencia": df["DIAS_PERM"],
-        "obito": df["MORTE"],
-        "valor_total": df["VAL_TOT"]
-    })
-
-    print("Municípios identificados:", dados["municipio"].nunique())
-    print(dados["municipio"].value_counts().head(10))
-    print(dados.head())
-
-    dados.to_sql(
-        "internacoes",
-        conexao,
-        if_exists="replace" if primeira_carga else "append",
-        index=False
-    )
-
-    primeira_carga = False
-    total_registros += len(dados)
-
-    print("OK ->", len(dados), "registros")
-
-conexao.close()
-
-print("\n" + "=" * 60)
-print("CARGA TERRITORIAL FINALIZADA")
-print("TOTAL:", total_registros)
-print("=" * 60)
+if __name__ == "__main__":
+    carregar()
