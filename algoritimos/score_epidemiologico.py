@@ -1,6 +1,8 @@
 ﻿import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio
+
 # =====================================
 # CONEXÃƒO
 # =====================================
@@ -8,6 +10,8 @@ import pandas as pd
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+MUNICIPIO = obter_municipio()
 
 # =====================================
 # INTERNAÃ‡Ã•ES E Ã“BITOS
@@ -19,8 +23,9 @@ SELECT
     COUNT(*) AS internacoes,
     SUM(obito) AS obitos
 FROM internacoes
+WHERE origem = ?
 GROUP BY tipo_cancer
-""", conn)
+""", conn, params=(MUNICIPIO,))
 
 # =====================================
 # CRESCIMENTO 2024 x 2025
@@ -32,8 +37,9 @@ SELECT
     SUM(CASE WHEN ano = 2024 THEN 1 ELSE 0 END) AS ano_2024,
     SUM(CASE WHEN ano = 2025 THEN 1 ELSE 0 END) AS ano_2025
 FROM internacoes
+WHERE origem = ?
 GROUP BY tipo_cancer
-""", conn)
+""", conn, params=(MUNICIPIO,))
 
 crescimento["crescimento"] = (
     (
@@ -127,7 +133,7 @@ df = df.sort_values(
 # RESULTADO
 # =====================================
 
-print("\n=== SCORE EPIDEMIOLÃ“GICO ===\n")
+print(f"\n=== SCORE EPIDEMIOLÃ“GICO ({MUNICIPIO}) ===\n")
 
 print(
     df[
