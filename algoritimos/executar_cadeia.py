@@ -3,6 +3,7 @@ import subprocess
 import sys
 
 DIRETORIO = os.path.dirname(os.path.abspath(__file__))
+PROJETO = os.path.dirname(DIRETORIO)
 
 CADEIA = [
     "mortalidade.py",
@@ -31,7 +32,7 @@ def executar(municipio):
         caminho = os.path.join(DIRETORIO, nome)
         resultado = subprocess.run(
             [sys.executable, caminho],
-            cwd=DIRETORIO,
+            cwd=PROJETO,
             env=ambiente,
             capture_output=True,
             text=True,
