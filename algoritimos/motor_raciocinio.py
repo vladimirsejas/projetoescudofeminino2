@@ -241,6 +241,16 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
             ["tipo_cancer", "nivel_prioridade", "pontuacao_final"],
             "PRIORIDADES"
         ),
+        "APOIO_DECISAO": (
+            "priorizacao_executiva",
+            ["tipo_cancer", "nivel_prioridade", "pontuacao_final"],
+            "APOIO À DECISÃO"
+        ),
+        "MUDANCA_TEMPORAL": (
+            "tendencia_estadual",
+            ["tipo_cancer", "RIO_CLARO", "SP", "desvio", "evento"],
+            "MUDANÇA TEMPORAL / TENDÊNCIA"
+        ),
         "TOP_PRIORIDADES": (
             "priorizacao_executiva",
             ["tipo_cancer", "nivel_prioridade", "pontuacao_final"],
@@ -305,7 +315,7 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
         df = df.sort_values("valor_total", ascending=False)
     elif intencao == "PERMANENCIA" and "permanencia_media" in df.columns:
         df = df.sort_values("permanencia_media", ascending=False)
-    elif intencao in ("PRIORIDADE_MAXIMA", "TOP_PRIORIDADES"):
+    elif intencao in ("PRIORIDADE_MAXIMA", "TOP_PRIORIDADES", "APOIO_DECISAO"):
         df = df.sort_values("pontuacao_final", ascending=False)
     elif intencao == "ANOMALIAS" and "situacao" in df.columns:
         df = df[df["situacao"] != "NORMAL"]
