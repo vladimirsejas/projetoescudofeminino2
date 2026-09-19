@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 import os
 
-from motor_raciocinio import raciocinar_cancer, contexto_para_ia, contexto_geral_raciocinado
+from motor_raciocinio import raciocinar_cancer, contexto_para_ia, contexto_geral_raciocinado, contexto_inteligente
 from ia_linguagem import responder_com_ia
 
 # =====================================
@@ -206,11 +206,12 @@ def tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
     if intencao == "DESCONHECIDA":
         return False
 
-    if intencao == "CANCER_ESPECIFICO":
-        cancer = detectar_cancer(pergunta_norm)
-        contexto = contexto_para_ia(cancer) if cancer else None
-    else:
-        contexto = contexto_geral_raciocinado()
+    cancer = detectar_cancer(pergunta_norm) if intencao == "CANCER_ESPECIFICO" else None
+    contexto = contexto_inteligente(
+        pergunta,
+        intencao,
+        cancer
+    )
 
     if not contexto:
         return False
