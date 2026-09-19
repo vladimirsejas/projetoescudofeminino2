@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio, nome_coluna_municipio
+from configuracao_geografica import obter_municipio, obter_nome_municipio, nome_coluna_municipio
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -182,7 +182,7 @@ def contexto_geral_raciocinado():
 
     contexto = f"""
 SISTEMA: ESCUDO FEMININO
-ESCOPO: PANORAMA GERAL DE RIO CLARO
+ESCOPO: PANORAMA GERAL DE {obter_nome_municipio()}
 
 O QUE FOI OBSERVADO:
 - {len(criticos_altos)} de {len(priorizacao)} cânceres estão classificados
@@ -195,7 +195,7 @@ O QUE FOI OBSERVADO:
 
 EVIDÊNCIAS DISPONÍVEIS:
 - Priorização executiva: classificação e pontuação final.
-- Tendência estadual: comparação entre Rio Claro e São Paulo.
+- Tendência estadual: comparação entre {obter_nome_municipio()} e São Paulo.
 - Anomalias: identificação de desvios em relação ao histórico.
 - Mortalidade: taxa de mortalidade por câncer.
 
