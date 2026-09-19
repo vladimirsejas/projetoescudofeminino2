@@ -1,9 +1,13 @@
 ﻿import sqlite3
 import pandas as pd
 
+from configuracao_geografica import obter_municipio
+
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
+
+MUNICIPIO = obter_municipio()
 
 df = pd.read_sql("""
 SELECT
@@ -12,15 +16,16 @@ SELECT
     MAX(dias_permanencia) AS permanencia_maxima,
     SUM(dias_permanencia) AS dias_totais
 FROM internacoes
+WHERE origem = ?
 GROUP BY tipo_cancer
-""", conn)
+""", conn, params=(MUNICIPIO,))
 
 df = df.sort_values(
     "permanencia_media",
     ascending=False
 )
 
-print("\n=== PERMANÃŠNCIA HOSPITALAR ===\n")
+print(f"\n=== PERMANÃŠNCIA HOSPITALAR ({MUNICIPIO}) ===\n")
 
 print(df)
 
