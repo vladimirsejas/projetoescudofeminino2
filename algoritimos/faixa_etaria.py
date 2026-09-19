@@ -1,77 +1,37 @@
-﻿import sqlite3
+import sqlite3
 import pandas as pd
-
 from configuracao_geografica import obter_municipio
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
-
 conn = sqlite3.connect(BANCO)
-
 MUNICIPIO = obter_municipio()
 
 df = pd.read_sql("""
-SELECT
-    tipo_cancer,
-    idade
+SELECT tipo_cancer, idade
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 """, conn, params=(MUNICIPIO,))
 
-# =====================================
-# FAIXAS ETÃRIAS
-# =====================================
-
 def faixa(idade):
-
     if idade < 20:
         return "0-19"
-
     elif idade < 40:
         return "20-39"
-
     elif idade < 60:
         return "40-59"
-
     elif idade < 80:
         return "60-79"
-
-    else:
-        return "80+"
+    return "80+"
 
 df["faixa_etaria"] = df["idade"].apply(faixa)
-
 resultado = (
-    df.groupby(
-        [
-            "tipo_cancer",
-            "faixa_etaria"
-        ]
-    )
-    .size()
-    .reset_index(name="internacoes")
+    df.groupby(["tipo_cancer", "faixa_etaria"])
+    .size().reset_index(name="internacoes")
+    .sort_values(["tipo_cancer", "internacoes"], ascending=[True, False])
 )
 
-resultado = resultado.sort_values(
-    [
-        "tipo_cancer",
-        "internacoes"
-    ],
-    ascending=[True, False]
-)
-
-print(f"\n=== FAIXA ETÃRIA ({MUNICIPIO}) ===\n")
-
+print(f"\n=== FAIXA ETÁRIA ({MUNICIPIO}) ===\n")
 print(resultado)
-
-resultado.to_sql(
-    "faixa_etaria",
-    conn,
-    if_exists="replace",
-    index=False
-)
-
-print(
-    "\nTabela faixa_etaria criada com sucesso."
-)
-
+resultado.to_sql("faixa_etaria", conn, if_exists="replace", index=False)
+print("\nTabela faixa_etaria criada com sucesso.")
 conn.close()
