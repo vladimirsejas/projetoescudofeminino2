@@ -315,6 +315,14 @@ def classificar_intencao(pergunta_norm):
         return "SITUACAO_GERAL"
 
     if any(p in pergunta_norm for p in (
+        "ESTOU DE ACORDO", "FAZ SENTIDO ESSA PRIORIDADE",
+        "POR QUE ESSA PRIORIDADE", "COMO DECIDIR",
+        "ONDE DEVEMOS INVESTIR", "SE EU PUDESSE AGIR",
+        "ESCOLHER APENAS UM", "APOIAR A DECISAO"
+    )):
+        return "APOIO_DECISAO"
+
+    if any(p in pergunta_norm for p in (
         "ATENCAO", "PRIORIDADE", "PRIORITARIO", "RISCO", "GRAVE",
         "GRAVIDADE", "PREOCUPA", "PREOCUPANTE", "URGENTE", "URGENCIA",
         "SERIO", "INVESTIR", "RECURSOS", "ONDE AGIR", "O QUE FAZER",
@@ -357,8 +365,14 @@ def classificar_intencao(pergunta_norm):
         return "TENDENCIA_ESTADUAL"
 
     if any(p in pergunta_norm for p in (
+        "O QUE MUDOU", "MUDOU DESDE", "MUDANCAS DESDE",
+        "COMPARAR COM O ANO PASSADO", "EM RELACAO AO ANO PASSADO"
+    )):
+        return "MUDANCA_TEMPORAL"
+
+    if any(p in pergunta_norm for p in (
         "ANOMALIA", "ANOMALIAS", "PADRAO", "ALERTA", "ALERTAS",
-        "FORA DO NORMAL", "ATIPICO", "ANORMA", "MUDOU"
+        "FORA DO NORMAL", "ATIPICO", "ANORMA"
     )):
         return "ANOMALIAS"
 
