@@ -1,6 +1,6 @@
 @echo off
 
-cd /d C:\projetoescudofeminino
+cd /d C:\projetoescudofeminino2
 
 start "" cmd /k "py -m streamlit run dashboard\app.py"
 
