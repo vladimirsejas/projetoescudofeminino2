@@ -3,6 +3,12 @@ import pandas as pd
 from datetime import datetime
 from io import StringIO
 
+from configuracao_geografica import (
+    obter_municipio,
+    obter_nome_municipio,
+    ler_tabela_municipio
+)
+
 # =====================================
 # CONEXÃO
 # =====================================
@@ -11,28 +17,28 @@ BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 conn = sqlite3.connect(BANCO)
 
+MUNICIPIO = obter_municipio()
+NOME_MUNICIPIO = obter_nome_municipio()
+
 # =====================================
 # LEITURA DAS FONTES
-# (as mesmas quatro definidas na Memória Técnica
-# como fontes prioritárias do relatório)
+# (as mesmas quatro definidas na Memória Técnica como fontes
+# prioritárias do relatório -- todas multi-município, por isso o
+# filtro é obrigatório aqui também)
 # =====================================
 
-base = pd.read_sql(
-    "SELECT * FROM base_conhecimento ORDER BY pontuacao_final DESC",
-    conn
-)
+base = ler_tabela_municipio(
+    "base_conhecimento", conn, municipio=MUNICIPIO
+).sort_values("pontuacao_final", ascending=False)
 
-priorizacao = pd.read_sql(
-    "SELECT * FROM priorizacao_executiva ORDER BY pontuacao_final DESC",
-    conn
-)
+priorizacao = ler_tabela_municipio(
+    "priorizacao_executiva", conn, municipio=MUNICIPIO
+).sort_values("pontuacao_final", ascending=False)
 
-anomalias_df = pd.read_sql(
-    "SELECT * FROM anomalias", conn
-)
+anomalias_df = ler_tabela_municipio("anomalias", conn, municipio=MUNICIPIO)
 
-tendencia_df = pd.read_sql(
-    "SELECT * FROM tendencia_estadual", conn
+tendencia_df = ler_tabela_municipio(
+    "tendencia_estadual", conn, municipio=MUNICIPIO
 )
 
 conn.close()
@@ -53,6 +59,7 @@ def escrever(texto=""):
 
 escrever("=" * 70)
 escrever("RELATÓRIO EXECUTIVO — ESCUDO FEMININO")
+escrever(f"Município: {NOME_MUNICIPIO}")
 escrever(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 escrever("Fontes: base_conhecimento, priorizacao_executiva, "
          "anomalias, tendencia_estadual")
@@ -81,13 +88,13 @@ verbo_apresentam = "apresenta" if len(anomalias_ativas) == 1 else "apresentam"
 verbo_crescem = "cresce" if len(acima_tendencia) == 1 else "crescem"
 
 escrever(
-    f"Rio Claro monitora atualmente {total} tipos de câncer feminino "
-    f"a partir de internações hospitalares do SUS. Desse total, "
-    f"{len(criticos_altos)} {verbo_estao} classificados em nível "
-    f"CRÍTICO ou ALTA de prioridade, {len(anomalias_ativas)} "
+    f"{NOME_MUNICIPIO} monitora atualmente {total} tipos de câncer "
+    f"feminino a partir de internações hospitalares do SUS. Desse "
+    f"total, {len(criticos_altos)} {verbo_estao} classificados em "
+    f"nível CRÍTICO ou ALTA de prioridade, {len(anomalias_ativas)} "
     f"{verbo_apresentam} anomalia em relação ao padrão histórico, "
     f"e {len(acima_tendencia)} {verbo_crescem} mais rápido em "
-    f"Rio Claro do que no Estado de São Paulo no mesmo período."
+    f"{NOME_MUNICIPIO} do que no Estado de São Paulo no mesmo período."
 )
 
 # =====================================
@@ -134,10 +141,10 @@ for _, row in priorizacao.iterrows():
     )
 
 # =====================================
-# 4. TENDÊNCIAS (Rio Claro x Estado de SP)
+# 4. TENDÊNCIAS (município x Estado de SP)
 # =====================================
 
-escrever("\n4. TENDÊNCIAS (Rio Claro em relação ao Estado de SP)\n")
+escrever(f"\n4. TENDÊNCIAS ({NOME_MUNICIPIO} em relação ao Estado de SP)\n")
 
 for _, row in tendencia_df.sort_values(
     "desvio", ascending=False
