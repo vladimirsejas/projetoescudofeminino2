@@ -200,23 +200,37 @@ st.divider()
 
 st.subheader("🎯 Priorização e Recomendações")
 
-st.caption(
-    "Esta seção reflete o município configurado quando a cadeia "
-    "determinística (algoritimos/*.py) foi executada pela última "
-    "vez -- trocar o município aqui no seletor não reprocessa essas "
-    "tabelas automaticamente."
-)
+base = None
+erro_base = None
 
 try:
     base = pd.read_sql(
         """
         SELECT *
         FROM base_conhecimento
+        WHERE municipio = ?
         ORDER BY pontuacao_final DESC
         """,
-        conexao
+        conexao,
+        params=(ORIGEM,)
     )
+except Exception as e:
+    erro_base = e
 
+if erro_base is not None:
+    st.warning(
+        f"Não foi possível carregar 'base_conhecimento': {erro_base}. "
+        f"Rode algoritimos\\base_conhecimento.py antes de abrir o "
+        f"dashboard."
+    )
+elif base.empty:
+    st.info(
+        f"{NOME_MUNICIPIO} ainda não foi processado pela cadeia "
+        f"determinística. Rode os scripts em algoritimos\\*.py com "
+        f"ESCUDO_MUNICIPIO={ORIGEM} (ou o código IBGE correspondente) "
+        f"para gerar esta análise."
+    )
+else:
     cores_prioridade = {
         "CRITICA": "🔴",
         "ALTA": "🟠",
@@ -261,13 +275,6 @@ try:
 
             for aviso in avisos:
                 st.warning(aviso)
-
-except Exception as e:
-    st.warning(
-        f"Não foi possível carregar 'base_conhecimento': {e}. "
-        f"Rode algoritimos\\base_conhecimento.py antes de abrir o "
-        f"dashboard."
-    )
 
 st.divider()
 
@@ -405,20 +412,24 @@ st.plotly_chart(
 
 st.subheader("🚨 Alertas Analíticos")
 
-st.caption(
-    "Assim como a priorização acima, esta seção vem de "
-    "tendencia_estadual, calculada para o município configurado na "
-    "última execução da cadeia determinística."
-)
-
 eventos = pd.read_sql(
     """
     SELECT *
     FROM tendencia_estadual
+    WHERE municipio = ?
     ORDER BY desvio DESC
     """,
-    conexao
+    conexao,
+    params=(ORIGEM,)
 )
+
+if eventos.empty:
+    st.info(
+        f"{NOME_MUNICIPIO} ainda não foi processado pela cadeia "
+        f"determinística (tendencia_estadual). Rode "
+        f"algoritimos\\tendencia_estadual.py com "
+        f"ESCUDO_MUNICIPIO={ORIGEM} para gerar esta análise."
+    )
 
 for _, row in eventos.iterrows():
 
