@@ -2,6 +2,7 @@ import sqlite3
 import pandas as pd
 
 from configuracao_geografica import obter_municipio, obter_nome_municipio
+from padroes_analiticos import gerar_padroes_analiticos, formatar_contexto_padroes
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -350,15 +351,28 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
 
     detalhe = df[colunas_validas].to_string(index=False)
 
+    conn = conectar()
+    try:
+        resultado_padroes = gerar_padroes_analiticos(
+            conn,
+            obter_municipio(),
+            obter_nome_municipio(),
+        )
+        contexto_padroes = formatar_contexto_padroes(resultado_padroes)
+    except Exception:
+        contexto_padroes = ""
+    finally:
+        conn.close()
+
     return (
         f"{base}\\n\\n"
         f"DADOS ESPECÍFICOS PARA A PERGUNTA:\\n"
         f"{titulo}\\n"
         f"{detalhe}\\n\\n"
+        f"{contexto_padroes}\\n\\n"
         f"REGRA: estes dados já foram calculados pelo Escudo Feminino. "
         f"Use-os para responder à pergunta sem recalcular os indicadores."
     )
-
 
 def contexto_geral():
     """Cria um contexto compacto para o modelo de linguagem."""
