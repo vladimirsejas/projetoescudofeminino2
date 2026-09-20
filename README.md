@@ -60,6 +60,46 @@ python algoritimos\chat_escudo.py
 exemplo, `base_conhecimento.py`), não precisa refazer os passos 1 a 5 —
 só rode a partir do passo que você mudou em diante.
 
+### Trocando o recorte de anos dos dados brutos (ex.: 2021-2025 → 2013-2025)
+
+`etl/carga_todas_bases.py` lê **um único CSV por pasta** em
+`dados\cancer_X_territorio\`. Se você baixar um CSV novo com um
+recorte de anos maior (ex.: cobrindo 2013-2025) para substituir um
+mais antigo (ex.: só 2021-2025), **apague ou mova o CSV antigo para
+fora da pasta antes de rodar a carga** — não deixe os dois juntos.
+Desde que essa checagem foi adicionada, a carga recusa rodar e avisa
+o nome da pasta e dos arquivos em conflito se encontrar mais de um
+CSV na mesma pasta, em vez de escolher um dos dois silenciosamente
+(o que antes podia carregar o arquivo errado, ou contar o mesmo ano
+duas vezes, sem nenhum aviso).
+
+Depois de trocar os arquivos, rode a carga e a cadeia inteira de novo
+(passos 1 a 7 acima) e confira os testes antes de considerar a troca
+concluída:
+
+```powershell
+python etl\carga_todas_bases.py
+python algoritimos\teste_territorial.py
+python algoritimos\teste_par_real_municipios.py
+```
+
+### Série temporal anual (base para uma futura camada preditiva)
+
+`algoritimos\serie_temporal.py` é um passo **adicional e opcional** —
+não faz parte da ordem obrigatória acima e pode ser rodado a
+qualquer momento depois que `internacoes` estiver carregada. Ele
+agrega internações e óbitos por `tipo_cancer x ano` (todos os anos
+que existirem no banco, não só os dois mais recentes) e grava em
+`serie_temporal_anual`, multi-tenant como as demais tabelas
+derivadas. Nada hoje consome essa tabela ainda — ela existe para
+servir de matéria-prima ao primeiro modelo preditivo (regressão,
+random forest etc.), quando o histórico de anos for suficiente para
+isso fazer sentido metodologicamente.
+
+```powershell
+python algoritimos\serie_temporal.py
+```
+
 ---
 
 ## Estrutura do projeto

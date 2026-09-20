@@ -62,6 +62,38 @@ def encontrar_coluna_codigo(df):
     return None
 
 
+def selecionar_csv_unico(caminho_pasta, pasta):
+    """
+    Exige um único CSV por pasta -- a carga lê só um arquivo (não
+    concatena vários). Se sobrar mais de um (ex.: o CSV antigo
+    2021-2025 ao lado do novo 2013-2025 recém-baixado), a ordem
+    alfabética decidiria sozinha qual entra no banco, sem avisar, e
+    o erro passaria despercebido. Falhar aqui é melhor do que
+    carregar o arquivo errado ou contar o mesmo ano duas vezes.
+    """
+
+    arquivos_csv = sorted(
+        arquivo
+        for arquivo in os.listdir(caminho_pasta)
+        if arquivo.lower().endswith(".csv")
+    )
+
+    if not arquivos_csv:
+        return None
+
+    if len(arquivos_csv) > 1:
+        raise RuntimeError(
+            f"A pasta '{pasta}' tem mais de um CSV: {arquivos_csv}. "
+            "A carga lê um único arquivo por pasta -- deixe só o mais "
+            "atual (ex.: o que cobre 2013-2025) dentro dela e mova os "
+            "arquivos antigos para fora de dados\\, senão a carga pode "
+            "pegar o arquivo errado sem avisar ou duplicar anos que "
+            "existam nos dois arquivos."
+        )
+
+    return os.path.join(caminho_pasta, arquivos_csv[0])
+
+
 def carregar_catalogo(conexao):
     linhas = conexao.execute(
         "SELECT codigo_ibge, origem, nome, uf "
@@ -143,16 +175,11 @@ def carregar():
 
         caminho_pasta = os.path.join(BASE_DADOS, pasta)
 
-        arquivos_csv = sorted(
-            arquivo
-            for arquivo in os.listdir(caminho_pasta)
-            if arquivo.lower().endswith(".csv")
-        )
+        arquivo_csv = selecionar_csv_unico(caminho_pasta, pasta)
 
-        if not arquivos_csv:
+        if arquivo_csv is None:
             continue
 
-        arquivo_csv = os.path.join(caminho_pasta, arquivos_csv[0])
         tipo_cancer, origem = MAPA[pasta]
 
         print("\n" + "=" * 60)
