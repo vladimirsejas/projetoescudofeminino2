@@ -136,10 +136,13 @@ def detectar_separador(caminho_csv, encoding="latin1"):
     with open(caminho_csv, encoding=encoding) as arquivo:
         cabecalho = arquivo.readline()
 
-    if "ANO_CMPT" in cabecalho.split(";"):
+    def colunas(separador):
+        return {coluna.strip().strip('"') for coluna in cabecalho.split(separador)}
+
+    if "ANO_CMPT" in colunas(";"):
         return ";"
 
-    if "ANO_CMPT" in cabecalho.split(","):
+    if "ANO_CMPT" in colunas(","):
         return ","
 
     raise RuntimeError(
@@ -209,7 +212,12 @@ def resolver_municipios(df, origem, catalogo):
     return municipios, codigos
 
 
+VERSAO_CARGA = "carga_todas_bases.py -- com detecção automática de separador (; ou ,)"
+
+
 def carregar():
+    print(VERSAO_CARGA)
+
     conexao = sqlite3.connect(BANCO)
 
     try:
