@@ -67,14 +67,24 @@ O caminho técnico futuro foi documentado separadamente. Não há modelo prediti
 
 - frontend definitivo;
 - comparação entre municípios;
-- expansão territorial;
-- treinamento de modelo preditivo.
+- treinamento de modelo preditivo;
+- comparação direta entre múltiplos municípios em uma mesma análise;
 
 Esses itens ficam para a próxima evolução do projeto.
 
-## Próxima evolução
+## Evolução territorial
 
-A próxima etapa planejada é transformar o Escudo em uma plataforma de **análise comparativa territorial**, permitindo comparar Rio Claro com outros municípios e, posteriormente, comparar múltiplas cidades usando os mesmos indicadores.
+A arquitetura territorial foi implementada como a evolução seguinte da V2.
+
+O sistema agora preserva o município de residência dos registros estaduais,
+associado ao código IBGE, permite selecionar qualquer município com dados
+disponíveis e compara o município escolhido com o Estado de São Paulo.
+
+São Paulo município (3550308) é tratado separadamente de SP, que continua
+sendo a referência estadual.
+
+A comparação direta entre vários municípios simultaneamente permanece como
+próxima etapa.
 
 ## Marco
 
