@@ -78,7 +78,7 @@ pivot.columns.name = None
 # senão salvar_tabela_municipio() falharia ao tentar concatenar
 # dataframes com esquemas diferentes.
 pivot = pivot.rename(
-    columns={MUNICIPIO: "variacao_municipio", "SP": "variacao_sp"}
+    columns={"MUNICIPIO": "variacao_municipio", "SP": "variacao_sp"}
 )
 
 # =====================================
@@ -100,7 +100,7 @@ pivot_base.columns.name = None
 
 pivot_base = pivot_base.rename(
     columns={
-        MUNICIPIO: "base_municipio",
+        "MUNICIPIO": "base_municipio",
         "SP": "base_sp"
     }
 )
