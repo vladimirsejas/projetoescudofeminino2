@@ -1,8 +1,8 @@
 import sqlite3
 import pandas as pd
 
-from configuracao_geografica import obter_municipio, obter_nome_municipio
-from padroes_analiticos import gerar_padroes_analiticos, formatar_contexto_padroes
+from algoritimos.configuracao_geografica import obter_municipio, obter_nome_municipio
+from algoritimos.padroes_analiticos import gerar_padroes_analiticos, formatar_contexto_padroes
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
