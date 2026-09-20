@@ -2,7 +2,8 @@ import json
 import re
 import sqlite3
 import unicodedata
-from urllib.request import urlopen
+import gzip
+from urllib.request import Request, urlopen
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 URL_IBGE = "https://servicodados.ibge.gov.br/api/v1/localidades/estados/35/municipios"
@@ -20,8 +21,15 @@ def normalizar_origem(nome, codigo_ibge):
 
 
 def carregar_municipios_ibge():
-    with urlopen(URL_IBGE, timeout=30) as resposta:
-        dados = json.loads(resposta.read().decode("utf-8"))
+    requisicao = Request(
+        URL_IBGE,
+        headers={"Accept-Encoding": "identity"},
+    )
+    with urlopen(requisicao, timeout=30) as resposta:
+        conteudo = resposta.read()
+        if resposta.headers.get("Content-Encoding", "").lower() == "gzip":
+            conteudo = gzip.decompress(conteudo)
+        dados = json.loads(conteudo.decode("utf-8"))
 
     return [
         {
