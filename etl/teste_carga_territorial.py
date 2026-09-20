@@ -1,9 +1,13 @@
 import pandas as pd
 
 from carga_todas_bases import limpar_codigo, resolver_municipios
+from criar_tabela_municipios import normalizar_origem
 
 
 def main():
+    assert normalizar_origem("São Paulo", 3550308) == "SAO_PAULO"
+    assert normalizar_origem("Águas de Lindóia", 3500501) == "AGUAS_DE_LINDOIA"
+
     catalogo = {
         "3550308": "SAO_PAULO",
         "355030": "SAO_PAULO",
