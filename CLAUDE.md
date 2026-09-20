@@ -39,36 +39,49 @@ configurável", identificado pelo código oficial do IBGE:
   `obter_codigo_ibge()`, `obter_nome_municipio()`, `obter_uf()` e
   `listar_municipios_disponiveis()` (consulta `municipios ∩
   internacoes`, nunca lista fixa no código).
-- Todos os indicadores que leem `internacoes` diretamente
-  (mortalidade, custos, permanência, faixa etária, score,
-  anomalias, tendência estadual) filtram por `obter_municipio()`.
-  `priorizador.py` não precisa filtrar -- só consome tabelas já
-  filtradas. `tendencia_estadual.py` nomeia sua coluna de variação
-  dinamicamente pelo município (SP fica fixo como referência).
-- `dashboard/app.py` tem seletor de município na sidebar, populado
-  por `listar_municipios_disponiveis()`.
+- Todas as 13 tabelas derivadas (mortalidade, custos, permanência,
+  faixa etária, score, tendência estadual, anomalias, priorização,
+  base de conhecimento, perfil epidemiológico, memória, fichas,
+  vulnerabilidade) são **multi-tenant**: gravadas via
+  `salvar_tabela_municipio()` (marca cada linha com uma coluna
+  `municipio` e substitui só as linhas desse município, nunca a
+  tabela inteira) e lidas via `ler_tabela_municipio()` (sempre
+  filtra por município -- ler sem filtrar duplicaria linhas em
+  qualquer merge por `tipo_cancer`). Isso permite que os resultados
+  de vários municípios já processados coexistam na mesma tabela.
+  `tendencia_estadual.py` guarda a variação em colunas fixas
+  (`variacao_municipio`/`variacao_sp`, não mais nomeadas
+  dinamicamente pelo município) exatamente por isso -- nome de
+  coluna dinâmico é incompatível com tabela multi-tenant. SP
+  continua fixo como referência estadual.
+- `dashboard/app.py` tem seletor de município na sidebar (populado
+  por `listar_municipios_disponiveis()`) e agora filtra
+  `base_conhecimento`/`tendencia_estadual` pelo município
+  selecionado de verdade -- se esse município ainda não foi
+  processado pela cadeia determinística, mostra aviso claro em vez
+  de dado errado ou vazio.
+- Textos narrativos (`chat_escudo.py`, `base_conhecimento.py`,
+  `relatorio_executivo.py`, `motor_raciocinio.py`) usam
+  `obter_nome_municipio()` dinamicamente -- não há mais "Rio Claro"
+  fixo nas frases geradas.
 - Municípios disponíveis dependem só dos dados carregados no banco
   -- adicionar uma cidade nova é (1) extrair os CSVs do DATASUS
   seguindo o padrão de pastas de `etl/carga_todas_bases.py`, (2)
   cadastrar o município em `municipios`, (3) rodar a cadeia
-  determinística de novo. Nenhum código precisa mudar para isso.
+  determinística de novo (`ESCUDO_MUNICIPIO=<origem_ou_ibge>`).
+  Nenhum código precisa mudar para isso, e processar um município
+  novo não apaga os já processados (`teste_territorial.py` prova
+  essa coexistência).
 
 **Pendências conhecidas desta etapa** (arquitetura pronta, mas não
-tudo foi migrado -- ver commits para detalhes):
-- Textos gerados em `chat_escudo.py`, `base_conhecimento.py`
-  (`gerar_motivo`/`gerar_impacto`) e `relatorio_executivo.py` ainda
-  escrevem "Rio Claro" fixo nas frases narrativas. Não crasha para
-  outro município, mas a frase erra o nome da cidade.
+tudo foi feito -- ver commits para detalhes):
 - Comparação entre múltiplos municípios (ex.: "Rio Claro x
   Limeira") foi deliberadamente **não implementada** nesta etapa --
-  só a base para isso foi preparada.
-- `dashboard/app.py`: trocar o seletor não reprocessa
-  `base_conhecimento`/`priorizacao_executiva`/`tendencia_estadual`
-  automaticamente -- essas tabelas refletem o município configurado
-  na última execução da cadeia determinística via `ESCUDO_MUNICIPIO`.
+  só a base para isso foi preparada (as tabelas já suportam vários
+  municípios coexistindo).
 - Teste de regressão real (rodar a cadeia contra o banco de verdade
   no Windows do autor) ainda não foi feito -- `teste_territorial.py`
-  valida a lógica com banco sintético.
+  valida a lógica com banco sintético/temporário.
 
 ## Notas de contexto do domínio
 
