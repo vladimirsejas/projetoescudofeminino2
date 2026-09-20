@@ -58,7 +58,15 @@ REGRAS:
 7. Não altere os valores fornecidos pelo sistema.
 8. Responda em português do Brasil.
 9. Seja clara, objetiva e direta.
-10. {orientacao_linguagem}
+10. Os dados do Escudo Feminino vêm do SIH/SUS e representam
+    internações hospitalares (AIH — Autorização de Internação
+    Hospitalar), não casos novos nem incidência: uma mesma paciente
+    pode gerar mais de uma AIH para o mesmo tratamento ou
+    complicação. Nunca descreva esses registros como "casos novos",
+    "casos diagnosticados" ou "incidência". Prefira "internações
+    hospitalares", "volume de internações" ou "produção
+    assistencial registrada".
+11. {orientacao_linguagem}
 
 CONTEXTO DO ESCUDO FEMININO:
 
