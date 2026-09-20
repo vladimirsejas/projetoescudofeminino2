@@ -762,16 +762,17 @@ def responder(intencao, pergunta_norm):
         df = pd.read_sql("""
         SELECT tipo_cancer, COUNT(*) AS total
         FROM internacoes
+        WHERE municipio = ?
         GROUP BY tipo_cancer
         ORDER BY total DESC
         LIMIT 1
-        """, conn)
+        """, conn, params=(MUNICIPIO,))
 
         r = df.iloc[0]
 
         print("\nResposta:\n")
         print(
-            f"O câncer com maior incidência hospitalar "
+            f"O câncer com maior volume de internações hospitalares "
             f"é {r['tipo_cancer']}."
         )
         return
