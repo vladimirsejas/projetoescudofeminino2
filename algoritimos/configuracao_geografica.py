@@ -116,13 +116,14 @@ def listar_municipios_disponiveis():
 
     try:
         linhas = conexao.execute("""
-            SELECT m.codigo_ibge, m.origem, m.nome, m.uf
+            SELECT DISTINCT
+                m.codigo_ibge, m.origem, m.nome, m.uf
             FROM municipios AS m
-            WHERE m.origem IN (
-                SELECT DISTINCT origem FROM internacoes
-            )
+            INNER JOIN internacoes AS i
+                ON i.municipio = m.origem
+            WHERE m.uf = ?
             ORDER BY m.nome
-        """).fetchall()
+        """, (UF_REFERENCIA,)).fetchall()
 
         return [
             {

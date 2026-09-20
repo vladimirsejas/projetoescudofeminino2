@@ -23,7 +23,7 @@ SELECT
     COUNT(*) AS internacoes,
     SUM(obito) AS obitos
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 GROUP BY tipo_cancer
 """, conn, params=(MUNICIPIO,))
 
@@ -37,7 +37,7 @@ SELECT
     SUM(CASE WHEN ano = 2024 THEN 1 ELSE 0 END) AS ano_2024,
     SUM(CASE WHEN ano = 2025 THEN 1 ELSE 0 END) AS ano_2025
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 GROUP BY tipo_cancer
 """, conn, params=(MUNICIPIO,))
 

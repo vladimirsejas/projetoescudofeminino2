@@ -481,7 +481,7 @@ def responder(intencao, pergunta_norm):
                 SUM(obito) AS obitos,
                 SUM(valor_total) AS custo_total
             FROM internacoes
-            WHERE tipo_cancer = ? AND origem = ? AND ano = 2025
+            WHERE tipo_cancer = ? AND municipio = ? AND ano = 2025
             """,
             conn,
             params=(cancer_encontrado, obter_municipio())

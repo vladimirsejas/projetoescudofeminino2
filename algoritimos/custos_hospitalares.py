@@ -16,7 +16,7 @@ SELECT
     AVG(valor_total) AS valor_medio,
     COUNT(*) AS internacoes
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 GROUP BY tipo_cancer
 """, conn, params=(MUNICIPIO,))
 
