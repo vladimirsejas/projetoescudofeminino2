@@ -23,7 +23,7 @@ SELECT
     idade,
     obito
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 """, conn, params=(MUNICIPIO,))
 
 # =====================================
