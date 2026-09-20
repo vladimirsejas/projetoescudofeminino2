@@ -15,7 +15,7 @@ SELECT
     COUNT(*) AS internacoes,
     SUM(obito) AS obitos
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 GROUP BY tipo_cancer
 """, conn, params=(MUNICIPIO,))
 
