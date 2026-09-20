@@ -54,31 +54,35 @@ parecem sessões ativas).
 - Dashboard ganhou uma seção de "comparação direta entre
   municípios" (`e8fec3b`) que já usa essa coluna `municipio` nova.
 
-## A aresta técnica pendente (não resolvida ainda, achado de hoje)
+## A aresta técnica pendente (atualizado — corrigida em parte sem eu perceber na hora)
 
-Minha função `listar_municipios_disponiveis()` ainda filtra pela
-coluna **antiga** `internacoes.origem` (que só tem os valores
-`"RIO_CLARO"` e `"SP"`), mas o novo ETL identifica cada cidade pela
-coluna **nova** `internacoes.municipio`. Na prática, isso quer dizer
-que a lista de municípios disponíveis (usada pelo seletor do
-dashboard e pela nova comparação) provavelmente só mostra Rio Claro
-hoje, mesmo que os dados de outras ~644 cidades já estejam
-carregados na tabela.
+**Correção sobre o que escrevi antes neste mesmo relatório:** ao
+puxar o `main` mais recente para poder commitar este documento, vi
+que o commit `c76dbe2` (do ChatGPT) já corrigiu boa parte do que eu
+tinha apontado como pendente:
 
-**Não é urgente corrigir isso amanhã de manhã** — é isolado, tem
-causa raiz clara, e não compromete nada do que já foi testado para
-Rio Claro. Mas é o primeiro ajuste de backend a fazer antes de
-qualquer interface nova poder mostrar mais de uma cidade de verdade.
+- `listar_municipios_disponiveis()` já faz `INNER JOIN` com
+  `internacoes.municipio` (não mais `origem`) — corrigido.
+- `mortalidade.py`, `custos_hospitalares.py`,
+  `permanencia_hospitalar.py`, `faixa_etaria.py`,
+  `score_epidemiologico.py` e `anomalias.py` já filtram
+  `internacoes` por `municipio` — corrigido.
+- `tendencia_estadual.py` ficou com um `UNION ALL`: a parte do
+  município usa `municipio = ?`, a parte da referência estadual usa
+  `origem = ?` (= `"SP"`) — isso está **certo de propósito**: a
+  referência estadual precisa somar todas as linhas que vieram do
+  arquivo estadual, não só as de um município dentro dele.
 
-Também não resolvido: meus 8 scripts que ainda filtram
-`internacoes` por `origem` (`mortalidade.py`,
-`custos_hospitalares.py`, `permanencia_hospitalar.py`,
-`faixa_etaria.py`, `score_epidemiologico.py`, `anomalias.py`,
-`vulnerabilidade.py`, `tendencia_estadual.py`) precisam passar a
-filtrar por `municipio` para funcionarem com qualquer cidade além de
-Rio Claro. Enquanto isso não acontece, a cadeia determinística
-completa (a que gera `base_conhecimento`, `priorizacao_executiva`
-etc.) só produz resultado correto para Rio Claro.
+Rodei `py_compile` em tudo e `teste_territorial.py` de novo depois
+da mesclagem: **16/16 checagens continuam passando**. As duas
+frentes de trabalho (a minha e a do ChatGPT) se mostraram
+compatíveis, pelo menos no que o teste cobre.
+
+**O que realmente ainda falta corrigir:** só `vulnerabilidade.py`,
+que continua filtrando `internacoes` por `origem = ?` em vez de
+`municipio = ?`. É o único arquivo que ainda vai retornar vazio/errado
+para qualquer cidade que não seja Rio Claro. Pequeno, isolado, mesma
+correção que já foi aplicada nos outros 6.
 
 ## Próximo passo combinado: interface
 
@@ -138,9 +142,9 @@ qual é qual ainda não foi decidido.
 3. O investidor entra mesmo no escopo do projeto (que nasceu como
    apoio à decisão de política pública), ou fica de fora por
    enquanto?
-4. Corrigimos a aresta `origem` x `municipio` antes de desenhar a
-   interface, ou desenhamos pensando já no esquema novo (assumindo
-   que vai ser corrigido)?
+4. Só falta `vulnerabilidade.py` na correção `origem` → `municipio`
+   (o resto já foi corrigido, ver seção acima). Vale corrigir esse
+   último antes de desenhar a interface, já que é rápido e isolado?
 5. O que fazer com os branches soltos (`comparacao-municipios`,
    `territorial-*`) — investigar, mesclar, ou descartar?
 
