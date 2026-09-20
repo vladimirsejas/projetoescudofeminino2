@@ -1,8 +1,10 @@
 # Escudo Feminino
 
 Sistema de inteligência analítica sobre saúde da mulher, construído a partir
-de dados de internações hospitalares do SUS relacionadas a câncer feminino
-no município de Rio Claro (SP), comparado ao Estado de São Paulo.
+de dados de internações hospitalares do SUS relacionadas a câncer feminino,
+com análise municipal e comparação com o Estado de São Paulo. Rio Claro é o
+município padrão, mas o sistema pode analisar qualquer município disponível
+nos dados estaduais.
 
 O projeto é um **Sistema de Apoio à Decisão para Políticas Públicas baseado
 em Inteligência Analítica** — o chat é apenas a interface de acesso; o
@@ -12,6 +14,28 @@ Trabalho acadêmico de graduação em Inteligência Artificial — Fatec Rio
 Claro, 3º semestre.
 
 ---
+
+## Camada territorial estadual
+
+Os arquivos estaduais de SP são carregados preservando o código do município
+de residência quando esse campo existe na fonte. O código é associado ao
+catálogo oficial de municípios do IBGE. São Paulo município (3550308) e o
+Estado de São Paulo (SP) são entidades diferentes.
+
+Antes da cadeia analítica, rode:
+
+```powershell
+python etl\criar_tabela_municipios.py
+python etl\carga_todas_bases.py
+```
+
+A carga estadual não aceita silenciosamente um arquivo sem identificação
+municipal: nesse caso o ETL interrompe para evitar misturar todos os
+municípios em um único recorte.
+
+O dashboard passa a listar automaticamente os municípios que realmente
+possuem dados carregados e reprocessa a cadeia determinística quando o
+município selecionado muda.
 
 ## Como rodar o projeto do zero (ordem obrigatória)
 
