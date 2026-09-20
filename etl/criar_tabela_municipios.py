@@ -1,6 +1,7 @@
 import json
 import re
 import sqlite3
+import unicodedata
 from urllib.request import urlopen
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
@@ -8,7 +9,13 @@ URL_IBGE = "https://servicodados.ibge.gov.br/api/v1/localidades/estados/35/munic
 
 
 def normalizar_origem(nome, codigo_ibge):
-    texto = re.sub(r"[^A-Z0-9]+", "_", nome.upper()).strip("_")
+    texto = unicodedata.normalize("NFKD", nome)
+    texto = "".join(
+        caractere
+        for caractere in texto
+        if not unicodedata.combining(caractere)
+    )
+    texto = re.sub(r"[^A-Z0-9]+", "_", texto.upper()).strip("_")
     if not texto:
         texto = f"MUNICIPIO_{codigo_ibge}"
     return texto
