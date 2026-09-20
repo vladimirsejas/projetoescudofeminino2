@@ -14,7 +14,7 @@ SELECT
     tipo_cancer,
     idade
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 """, conn, params=(MUNICIPIO,))
 
 # =====================================
