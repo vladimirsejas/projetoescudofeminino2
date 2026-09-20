@@ -87,7 +87,7 @@ ranking = pd.read_sql(
         tipo_cancer,
         COUNT(*) AS total
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     GROUP BY tipo_cancer
     ORDER BY total DESC
     """,
@@ -108,12 +108,13 @@ origens = pd.read_sql(
 
 lider = ranking.iloc[0]["tipo_cancer"] if not ranking.empty else "—"
 
-municipio_vals = origens.loc[
-    origens["origem"] == ORIGEM,
-    "total"
-].values
-
-total_municipio = int(municipio_vals[0]) if len(municipio_vals) > 0 else 0
+total_municipio = int(
+    pd.read_sql(
+        "SELECT COUNT(*) AS total FROM internacoes WHERE municipio = ?",
+        conexao,
+        params=(ORIGEM,)
+    ).iloc[0]["total"]
+)
 
 sp_vals = origens.loc[
     origens["origem"] == UF_REFERENCIA,
@@ -130,7 +131,7 @@ valor_total = pd.read_sql(
     """
     SELECT SUM(valor_total) AS valor
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     """,
     conexao,
     params=(ORIGEM,)
@@ -140,7 +141,7 @@ permanencia_media = pd.read_sql(
     """
     SELECT AVG(dias_permanencia) AS media
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     """,
     conexao,
     params=(ORIGEM,)
@@ -150,7 +151,7 @@ obitos = pd.read_sql(
     """
     SELECT SUM(obito) AS total
     FROM internacoes
-    WHERE origem = ?
+    WHERE municipio = ?
     """,
     conexao,
     params=(ORIGEM,)
@@ -336,17 +337,22 @@ st.plotly_chart(
 
 comparativo = pd.read_sql(
     """
-    SELECT
-        tipo_cancer,
-        origem,
-        COUNT(*) AS total
+    SELECT tipo_cancer, ? AS origem, COUNT(*) AS total
     FROM internacoes
-    WHERE origem IN (?, ?)
-    GROUP BY tipo_cancer, origem
+    WHERE municipio = ?
+    GROUP BY tipo_cancer
+
+    UNION ALL
+
+    SELECT tipo_cancer, ? AS origem, COUNT(*) AS total
+    FROM internacoes
+    WHERE origem = ?
+    GROUP BY tipo_cancer
+
     ORDER BY tipo_cancer
     """,
     conexao,
-    params=(ORIGEM, UF_REFERENCIA)
+    params=(NOME_MUNICIPIO, ORIGEM, UF_REFERENCIA, UF_REFERENCIA)
 )
 
 st.subheader(f"🏥 {NOME_MUNICIPIO} x {UF_REFERENCIA}")
@@ -381,7 +387,7 @@ evolucao = pd.read_sql(
         ano,
         COUNT(*) AS internacoes
     FROM internacoes
-    WHERE tipo_cancer = ? AND origem = ?
+    WHERE tipo_cancer = ? AND municipio = ?
     GROUP BY ano
     ORDER BY ano
     """,
