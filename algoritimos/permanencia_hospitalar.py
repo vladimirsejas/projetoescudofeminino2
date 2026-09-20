@@ -16,7 +16,7 @@ SELECT
     MAX(dias_permanencia) AS permanencia_maxima,
     SUM(dias_permanencia) AS dias_totais
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 GROUP BY tipo_cancer
 """, conn, params=(MUNICIPIO,))
 
