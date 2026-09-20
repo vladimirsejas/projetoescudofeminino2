@@ -1,6 +1,7 @@
 import os
 import re
 import sqlite3
+import sys
 import tempfile
 
 # =====================================
@@ -155,6 +156,9 @@ def _rodar_script(nome_arquivo, caminho_banco, municipio_env):
     )
 
     os.environ["ESCUDO_MUNICIPIO"] = municipio_env
+
+    if "configuracao_geografica" in sys.modules:
+        sys.modules["configuracao_geografica"].BANCO = caminho_banco
 
     namespace = {"__name__": f"__teste_{nome_arquivo}__"}
     exec(compile(codigo_fonte, nome_arquivo, "exec"), namespace)
