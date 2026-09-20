@@ -361,34 +361,9 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
 
 
 def contexto_geral():
-    """Cria um contexto compacto para o modelo de linguagem."""
-    partes = []
+    """
+    Mantém a entrada histórica do motor, mas usa o contexto analítico
+    atual. Não mantém a leitura das colunas antigas RIO_CLARO/SP.
+    """
+    return contexto_geral_raciocinado()
 
-    priorizacao = _ler_tabela("priorizacao_executiva")
-    if not priorizacao.empty:
-        colunas = [c for c in ["tipo_cancer", "nivel_prioridade", "pontuacao_final"] if c in priorizacao.columns]
-        if colunas:
-            top = priorizacao.sort_values("pontuacao_final", ascending=False).head(5)
-            partes.append("TOP PRIORIDADES:\n" + top[colunas].to_string(index=False))
-
-    tendencia = _ler_tabela("tendencia_estadual")
-    if not tendencia.empty:
-        colunas = [c for c in ["tipo_cancer", "RIO_CLARO", "SP", "desvio", "evento"] if c in tendencia.columns]
-        if colunas:
-            partes.append("TENDÊNCIA ESTADUAL:\n" + tendencia[colunas].to_string(index=False))
-
-    anomalias = _ler_tabela("anomalias")
-    if not anomalias.empty:
-        if "situacao" in anomalias.columns:
-            ativas = anomalias[anomalias["situacao"] != "NORMAL"]
-        else:
-            ativas = anomalias
-        partes.append("ANOMALIAS:\n" + (ativas.to_string(index=False) if not ativas.empty else "Nenhuma anomalia ativa."))
-
-    mortalidade = _ler_tabela("mortalidade")
-    if not mortalidade.empty:
-        if "taxa_mortalidade" in mortalidade.columns:
-            mortalidade = mortalidade.sort_values("taxa_mortalidade", ascending=False)
-        partes.append("MORTALIDADE:\n" + mortalidade.head(5).to_string(index=False))
-
-    return "\n\n".join(partes)
