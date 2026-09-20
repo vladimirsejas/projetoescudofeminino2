@@ -1,8 +1,8 @@
 import sqlite3
 import pandas as pd
 
-from algoritimos.configuracao_geografica import obter_municipio, obter_nome_municipio
-from algoritimos.padroes_analiticos import gerar_padroes_analiticos, formatar_contexto_padroes
+from configuracao_geografica import obter_municipio, obter_nome_municipio
+from padroes_analiticos import gerar_padroes_analiticos, formatar_contexto_padroes
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -13,15 +13,26 @@ def conectar():
 
 def _ler_tabela(nome):
     """
-    Lê `nome` filtrando pelo município selecionado. `internacoes` é
-    a única tabela crua (usa `origem`); todas as demais são tabelas
-    derivadas multi-município (usam `municipio`).
+    Lê `nome` filtrando pelo município selecionado, sempre pela
+    coluna `municipio`.
+
+    `internacoes` tem tanto `origem` (arquivo-fonte do DATASUS: o
+    lote 'RIO_CLARO' ou o lote estadual 'SP') quanto `municipio`
+    (município real de cada internação, já resolvido linha a linha
+    pela etapa `resolver_municipios()` da ETL -- inclusive para
+    cidades desagregadas de dentro do arquivo estadual, ex.:
+    origem='SP', municipio='LIMEIRA'). Filtrar `internacoes` por
+    `origem` funciona por coincidência para o próprio Rio Claro (onde
+    origem e municipio têm o mesmo valor) mas retorna 0 linhas para
+    qualquer outra cidade -- o mesmo bug já corrigido em
+    chat_escudo.py (commit 461de6a) e vulnerabilidade.py (commit
+    4e3e514). As demais tabelas são derivadas multi-município e só
+    têm `municipio`.
     """
     conn = conectar()
     try:
-        coluna_filtro = "origem" if nome == "internacoes" else "municipio"
         return pd.read_sql(
-            f"SELECT * FROM {nome} WHERE {coluna_filtro} = ?",
+            f"SELECT * FROM {nome} WHERE municipio = ?",
             conn,
             params=(obter_municipio(),)
         )
