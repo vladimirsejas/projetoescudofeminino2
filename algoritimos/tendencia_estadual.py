@@ -28,12 +28,23 @@ MUNICIPIO = obter_municipio()
 query = """
 SELECT
     tipo_cancer,
-    origem,
+    'MUNICIPIO' AS grupo,
     SUM(CASE WHEN ano = 2024 THEN 1 ELSE 0 END) AS ano_2024,
     SUM(CASE WHEN ano = 2025 THEN 1 ELSE 0 END) AS ano_2025
 FROM internacoes
-WHERE origem IN (?, ?)
-GROUP BY tipo_cancer, origem
+WHERE municipio = ?
+GROUP BY tipo_cancer
+
+UNION ALL
+
+SELECT
+    tipo_cancer,
+    'SP' AS grupo,
+    SUM(CASE WHEN ano = 2024 THEN 1 ELSE 0 END) AS ano_2024,
+    SUM(CASE WHEN ano = 2025 THEN 1 ELSE 0 END) AS ano_2025
+FROM internacoes
+WHERE origem = ?
+GROUP BY tipo_cancer
 """
 
 df = pd.read_sql(query, conn, params=(MUNICIPIO, UF_REFERENCIA))
@@ -54,7 +65,7 @@ df["variacao"] = (
 
 pivot = df.pivot_table(
     index="tipo_cancer",
-    columns="origem",
+    columns="grupo",
     values="variacao"
 ).reset_index()
 
@@ -81,7 +92,7 @@ pivot = pivot.rename(
 
 pivot_base = df.pivot_table(
     index="tipo_cancer",
-    columns="origem",
+    columns="grupo",
     values="ano_2024"
 ).reset_index()
 
