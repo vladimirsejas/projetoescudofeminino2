@@ -382,6 +382,32 @@ def testar():
             mortalidade_limeira.get("MAMA") == 0.0
         )
 
+        # 3) O cenário sem óbitos e sem crescimento não pode produzir
+        # NaN no score. A dimensão de mortalidade fica em 0 e as outras
+        # dimensões continuam determinando a prioridade.
+        conexao = sqlite3.connect(banco_multi)
+        score_limeira = conexao.execute(
+            "SELECT tipo_cancer, score, obitos, crescimento "
+            "FROM indicadores_epidemiologicos "
+            "WHERE municipio = 'LIMEIRA' "
+            "ORDER BY tipo_cancer"
+        ).fetchall()
+        conexao.close()
+
+        checar(
+            "F) score de LIMEIRA permanece numerico quando obitos e "
+            "crescimento sao zero",
+            bool(score_limeira)
+            and all(linha[1] == linha[1] for linha in score_limeira)
+        )
+
+        checar(
+            "F) LIMEIRA mantém obitos=0 e crescimento=0 sem transformar "
+            "esses dados em NaN",
+            bool(score_limeira)
+            and all(linha[2] == 0 and linha[3] == 0 for linha in score_limeira)
+        )
+
         # 3) a checagem central desta rodada: RIO_CLARO nas 3 tabelas
         # finais continua EXATAMENTE igual a antes de processar LIMEIRA
         snapshot_rc_depois = {
