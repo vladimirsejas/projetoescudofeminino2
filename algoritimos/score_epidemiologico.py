@@ -80,19 +80,19 @@ df["internacoes_norm"] = (
 # cancer possui obito registrado no municipio, nao existe denominador
 # para normalizar essa dimensao. Nesse caso, ela nao diferencia os
 # canceres e sua contribuicao e 0.
-df["taxa_obito_hospitalar"] = (
+taxa_obito_hospitalar = (
     df["obitos"]
     /
     df["internacoes"]
 ) * 100
 
-if df["taxa_obito_hospitalar"].max() == 0:
+if taxa_obito_hospitalar.max() == 0:
     df["obitos_norm"] = 0
 else:
     df["obitos_norm"] = (
-        df["taxa_obito_hospitalar"]
+        taxa_obito_hospitalar
         /
-        df["taxa_obito_hospitalar"].max()
+        taxa_obito_hospitalar.max()
     ) * 100
 
 # Crescimento: se nao houver crescimento positivo em nenhum cancer,
