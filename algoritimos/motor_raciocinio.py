@@ -1,8 +1,8 @@
 import sqlite3
 import pandas as pd
 
-from algoritimos.configuracao_geografica import obter_municipio, obter_nome_municipio
-from algoritimos.padroes_analiticos import gerar_padroes_analiticos, formatar_contexto_padroes
+from configuracao_geografica import obter_municipio, obter_nome_municipio
+from padroes_analiticos import gerar_padroes_analiticos, formatar_contexto_padroes
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -13,13 +13,11 @@ def conectar():
 
 def _ler_tabela(nome):
     """
-    Lê `nome` filtrando pelo município selecionado. `internacoes` é
-    a única tabela crua (usa `origem`); todas as demais são tabelas
-    derivadas multi-município (usam `municipio`).
+    Lê `nome` filtrando sempre pelo município selecionado.\n\n    Na tabela `internacoes`, `origem` identifica a origem do arquivo\n    ou lote de dados (por exemplo, RIO_CLARO ou SP), enquanto\n    `municipio` identifica o município real de cada registro. Por isso,\n    inclusive para `internacoes`, o filtro territorial correto é\n    `municipio`.
     """
     conn = conectar()
     try:
-        coluna_filtro = "origem" if nome == "internacoes" else "municipio"
+        coluna_filtro = "municipio"
         return pd.read_sql(
             f"SELECT * FROM {nome} WHERE {coluna_filtro} = ?",
             conn,
