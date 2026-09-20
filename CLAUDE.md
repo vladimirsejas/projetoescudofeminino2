@@ -23,52 +23,57 @@ push, e nunca commitar segredos/credenciais).
 
 ## Arquitetura territorial (código IBGE)
 
-O projeto está migrando de "Rio Claro fixo" para "município
-configurável", identificado pelo código oficial do IBGE:
+O Escudo agora trabalha com dois níveis territoriais distintos:
 
-- Tabela `municipios` (codigo_ibge, origem, nome, uf) associa
-  metadados IBGE a cada valor já usado em `internacoes.origem`.
-  `origem` continua sendo o identificador interno usado em todo
-  `WHERE origem = ?` do projeto -- a tabela só adiciona código IBGE
-  e nome de apresentação em cima dele. Criada por
-  `etl/criar_tabela_municipios.py`, hoje só com Rio Claro (IBGE
-  3543907). SP não entra nela: é a referência estadual, não um
-  município.
-- `configuracao_geografica.py` expõe `obter_municipio()` (aceita
-  identificador de texto OU código IBGE via `ESCUDO_MUNICIPIO`),
-  `obter_codigo_ibge()`, `obter_nome_municipio()`, `obter_uf()` e
-  `listar_municipios_disponiveis()` (consulta `municipios ∩
-  internacoes`, nunca lista fixa no código).
-- Todos os indicadores que leem `internacoes` diretamente
-  (mortalidade, custos, permanência, faixa etária, score,
-  anomalias, tendência estadual) filtram por `obter_municipio()`.
-  `priorizador.py` não precisa filtrar -- só consome tabelas já
-  filtradas. `tendencia_estadual.py` nomeia sua coluna de variação
-  dinamicamente pelo município (SP fica fixo como referência).
-- `dashboard/app.py` tem seletor de município na sidebar, populado
-  por `listar_municipios_disponiveis()`.
-- Municípios disponíveis dependem só dos dados carregados no banco
-  -- adicionar uma cidade nova é (1) extrair os CSVs do DATASUS
-  seguindo o padrão de pastas de `etl/carga_todas_bases.py`, (2)
-  cadastrar o município em `municipios`, (3) rodar a cadeia
-  determinística de novo. Nenhum código precisa mudar para isso.
+- `origem = SP`: referência estadual, correspondente ao arquivo estadual completo.
+- `municipio`: identificador interno do município de residência de cada registro.
+- `codigo_ibge`: código oficial do município associado ao registro.
+- `municipios`: catálogo com código IBGE, identificador interno, nome e UF.
 
-**Pendências conhecidas desta etapa** (arquitetura pronta, mas não
-tudo foi migrado -- ver commits para detalhes):
-- Textos gerados em `chat_escudo.py`, `base_conhecimento.py`
-  (`gerar_motivo`/`gerar_impacto`) e `relatorio_executivo.py` ainda
-  escrevem "Rio Claro" fixo nas frases narrativas. Não crasha para
-  outro município, mas a frase erra o nome da cidade.
-- Comparação entre múltiplos municípios (ex.: "Rio Claro x
-  Limeira") foi deliberadamente **não implementada** nesta etapa --
-  só a base para isso foi preparada.
-- `dashboard/app.py`: trocar o seletor não reprocessa
-  `base_conhecimento`/`priorizacao_executiva`/`tendencia_estadual`
-  automaticamente -- essas tabelas refletem o município configurado
-  na última execução da cadeia determinística via `ESCUDO_MUNICIPIO`.
-- Teste de regressão real (rodar a cadeia contra o banco de verdade
-  no Windows do autor) ainda não foi feito -- `teste_territorial.py`
-  valida a lógica com banco sintético.
+O catálogo é preenchido por `etl/criar_tabela_municipios.py` a partir da
+tabela de municípios do IBGE. São Paulo município é o código **3550308**;
+Rio Claro é **3543907**. O Estado de São Paulo continua sendo a referência
+estadual e não é tratado como o município da capital.
+
+O carregador `etl/carga_todas_bases.py` preserva o município nos registros
+estaduais. Ele reconhece campos de código municipal da fonte, converte códigos
+de 6 ou 7 dígitos para o catálogo IBGE e interrompe a carga se os registros
+estaduais não puderem ser identificados territorialmente. O recorte da pasta
+de Rio Claro permanece Rio Claro, sem reclassificação.
+
+`configuracao_geografica.py` aceita identificador ou código IBGE em
+`ESCUDO_MUNICIPIO` e `listar_municipios_disponiveis()` retorna somente
+municípios que possuem dados em `internacoes`.
+
+Os indicadores municipais filtram por `internacoes.municipio`.
+`tendencia_estadual.py` compara o município selecionado com o agregado
+estadual definido por `internacoes.origem = 'SP'`.
+
+O dashboard possui seletor dinâmico de município e chama
+`algoritimos/executar_cadeia.py` quando a seleção muda, garantindo que
+priorização, tendência, anomalias, base de conhecimento e relatório
+correspondam ao município exibido.
+
+### Testes
+
+- `algoritimos/teste_territorial.py`: regressão da cadeia determinística
+  com banco sintético e múltiplos municípios.
+- `etl/teste_carga_territorial.py`: identificação por código IBGE,
+  códigos de 6/7 dígitos, códigos desconhecidos e preservação do recorte
+  de Rio Claro.
+- `.github/workflows/testes-territoriais.yml`: executa os testes no
+  GitHub Actions.
+
+### Limites atuais
+
+- A comparação direta entre dois municípios (ex.: Rio Claro x Limeira) ainda
+  não é o objetivo desta etapa. O foco é município selecionado x Estado de SP.
+- A expansão depende de os arquivos estaduais realmente conterem o código
+  municipal de residência. Se a fonte não trouxer esse campo, o ETL para em
+  vez de fabricar uma classificação.
+- A regressão contra o banco real do Windows do autor ainda depende da
+  execução local da nova carga, porque o banco SQLite real não está
+  versionado no GitHub.
 
 ## Notas de contexto do domínio
 
