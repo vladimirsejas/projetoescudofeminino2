@@ -1,44 +1,47 @@
+======================================================================
+RELATÓRIO EXECUTIVO — ESCUDO FEMININO
+Gerado em: 19/09/2026 20:00
+Fontes: base_conhecimento, priorizacao_executiva, anomalias, tendencia_estadual
+======================================================================
 
-RELATÓRIO EXECUTIVO - ESCUDO FEMININO
+1. RESUMO DA SITUAÇÃO
 
-Principal prioridade epidemiológica:
+Rio Claro monitora atualmente 7 tipos de câncer feminino a partir de internações hospitalares do SUS. Desse total, 2 estão classificados em nível CRÍTICO ou ALTA de prioridade, 3 apresentam anomalia em relação ao padrão histórico, e 4 crescem mais rápido em Rio Claro do que no Estado de São Paulo no mesmo período.
 
-COLO_UTERO
+2. PRINCIPAIS RISCOS
 
-Pontuação final:
-102.15
+- COLO_UTERO: ANOMALIA_POSITIVA (desvio de 250.0% em relação à média histórica de 16.0 internações/ano; valor observado em 2025: 56).
+- TIREOIDE: ANOMALIA_POSITIVA (desvio de 150.0% em relação à média histórica de 4.0 internações/ano; valor observado em 2025: 10). [BAIXA (média histórica de apenas 4.0 internações/ano — percentual pode enganar)]
+- PELE_NAO_MELANOMA: ANOMALIA_POSITIVA (desvio de 96.1% em relação à média histórica de 51.0 internações/ano; valor observado em 2025: 100).
 
-Classificação:
-CRITICA
+3. PRIORIDADES
 
-----------------------------------------
+- COLO_UTERO: CRITICA (pontuação final 136.85)
+- MAMA: ALTA (pontuação final 80.11)
+- PELE_NAO_MELANOMA: MEDIA (pontuação final 67.23)
+- COLORRETAL: BAIXA (pontuação final 43.98)
+- TIREOIDE: BAIXA (pontuação final 33.03)
+- PULMAO: BAIXA (pontuação final 11.92)
+- OVARIO: BAIXA (pontuação final 2.88)
 
-TOP 3 PRIORIDADES
+4. TENDÊNCIAS (Rio Claro em relação ao Estado de SP)
 
-1º COLO_UTERO
-   Score: 102.15
+- COLO_UTERO: 320.9% acima da tendência estadual (ACIMA_DA_TENDENCIA_ESTADUAL).
+- PELE_NAO_MELANOMA: 79.5% acima da tendência estadual (ACIMA_DA_TENDENCIA_ESTADUAL).
+- TIREOIDE: 30.3% acima da tendência estadual (ACIMA_DA_TENDENCIA_ESTADUAL). [BAIXA (apenas 6 internações em Rio Claro em 2024 — percentual pode enganar)]
+- MAMA: 19.7% acima da tendência estadual (ACIMA_DA_TENDENCIA_ESTADUAL).
+- OVARIO: 41.1% abaixo da tendência estadual (ABAIXO_DA_TENDENCIA_ESTADUAL).
+- COLORRETAL: 51.4% abaixo da tendência estadual (ABAIXO_DA_TENDENCIA_ESTADUAL).
+- PULMAO: 96.8% abaixo da tendência estadual (ABAIXO_DA_TENDENCIA_ESTADUAL).
 
-2º MAMA
-   Score: 97.63
+5. RECOMENDAÇÕES
 
-3º PELE_NAO_MELANOMA
-   Score: 80.67
+[COLO_UTERO]
+Recomenda-se monitoramento prioritário e acompanhamento contínuo, com avaliação imediata das causas do desvio identificado. Além disso, sugere-se investigar a causa do crescimento atípico em 2025 antes de decidir sobre alocação adicional de recursos e comparar o comportamento local com campanhas ou mudanças regionais que possam explicar o descolamento em relação ao Estado. Esta é uma sugestão de apoio à decisão; a definição final cabe ao gestor responsável, considerando orçamento e capacidade operacional.
 
-----------------------------------------
+[MAMA]
+Recomenda-se acompanhamento frequente e inclusão entre as prioridades de curto prazo da gestão. Além disso, sugere-se comparar o comportamento local com campanhas ou mudanças regionais que possam explicar o descolamento em relação ao Estado. Esta é uma sugestão de apoio à decisão; a definição final cabe ao gestor responsável, considerando orçamento e capacidade operacional.
 
-ANÁLISE AUTOMÁTICA
-
-O câncer de maior prioridade atualmente é
-COLO_UTERO.
-
-Este resultado foi obtido pela combinação
-dos indicadores epidemiológicos,
-desvios em relação à tendência estadual
-e análise de anomalias.
-
-A classificação final foi
-CRITICA.
-
-Recomenda-se acompanhamento contínuo
-dos grupos classificados com maior
-prioridade epidemiológica.
+======================================================================
+Este relatório é gerado automaticamente a partir do conhecimento estruturado do Escudo Feminino. É uma ferramenta de apoio à decisão; a responsabilidade pela decisão administrativa permanece com o gestor e as instituições competentes.
+======================================================================
