@@ -131,7 +131,7 @@ def carregar():
         conexao.close()
         raise RuntimeError(
             "A tabela municipios não existe. Execute primeiro "
-            "etl\criar_tabela_municipios.py."
+            "etl\\criar_tabela_municipios.py."
         ) from erro
 
     total_registros = 0
