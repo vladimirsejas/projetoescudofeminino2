@@ -23,7 +23,7 @@ SELECT
     ano,
     COUNT(*) AS internacoes
 FROM internacoes
-WHERE origem = ?
+WHERE municipio = ?
 GROUP BY tipo_cancer, ano
 ORDER BY tipo_cancer, ano
 """, conn, params=(MUNICIPIO,))
