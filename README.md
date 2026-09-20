@@ -73,6 +73,13 @@ CSV na mesma pasta, em vez de escolher um dos dois silenciosamente
 (o que antes podia carregar o arquivo errado, ou contar o mesmo ano
 duas vezes, sem nenhum aviso).
 
+A carga também detecta sozinha se o CSV usa `;` (padrão do extrato
+bruto do DATASUS) ou `,` (visto em arquivos consolidados por outra
+ferramenta, ex.: pysus) -- olhando só a coluna `ANO_CMPT` no
+cabeçalho. Se nenhum dos dois separadores encontrar essa coluna, a
+carga avisa e mostra o cabeçalho real do arquivo, em vez de estourar
+um `KeyError` sem explicação.
+
 Depois de trocar os arquivos, rode a carga e a cadeia inteira de novo
 (passos 1 a 7 acima) e confira os testes antes de considerar a troca
 concluída:

@@ -123,6 +123,32 @@ def encontrar_pastas_validas(base_dados):
     return pastas
 
 
+def detectar_separador(caminho_csv, encoding="latin1"):
+    """
+    Descobre se o CSV usa ';' (padrão do extrato bruto do DATASUS) ou
+    ',' (visto em arquivos consolidados por outra ferramenta, ex.:
+    pysus) -- olhando só a linha de cabeçalho, sem carregar o arquivo
+    inteiro. Sem isso, um CSV separado por vírgula lido com sep=';'
+    vira uma única coluna gigante e a carga falha com KeyError em
+    ANO_CMPT sem dizer por quê.
+    """
+
+    with open(caminho_csv, encoding=encoding) as arquivo:
+        cabecalho = arquivo.readline()
+
+    if "ANO_CMPT" in cabecalho.split(";"):
+        return ";"
+
+    if "ANO_CMPT" in cabecalho.split(","):
+        return ","
+
+    raise RuntimeError(
+        f"Não encontrei a coluna ANO_CMPT no cabeçalho de '{caminho_csv}' "
+        "nem separando por ';' nem por ','. Cabeçalho encontrado: "
+        f"{cabecalho.strip()!r}"
+    )
+
+
 def carregar_catalogo(conexao):
     linhas = conexao.execute(
         "SELECT codigo_ibge, origem, nome, uf "
@@ -214,9 +240,11 @@ def carregar():
         print("TIPO:", tipo_cancer)
         print("ORIGEM:", origem)
 
+        separador = detectar_separador(arquivo_csv)
+
         df = pd.read_csv(
             arquivo_csv,
-            sep=";",
+            sep=separador,
             encoding="latin1",
             low_memory=False
         )
