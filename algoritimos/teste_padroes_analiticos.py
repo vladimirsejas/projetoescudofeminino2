@@ -118,7 +118,7 @@ def main():
     assert "CAMADA DE PADRÕES ANALÍTICOS" in contexto
     assert "Rio Claro" in contexto
     assert "mortalidade hospitalar" in contexto
-    assert "não representam causalidade" in contexto
+    assert "Não representam causalidade" in contexto
 
     conn.close()
     print("TESTE PADROES ANALITICOS: TODAS AS CHECAGENS PASSARAM.")
