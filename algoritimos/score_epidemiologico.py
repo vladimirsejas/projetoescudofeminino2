@@ -75,17 +75,36 @@ df["internacoes_norm"] = (
     df["internacoes"].max()
 ) * 100
 
-df["obitos_norm"] = (
+# Mortalidade hospitalar: usa a taxa de obitos por internacoes.
+# O SIH/SUS registra obitos ocorridos nas internacoes; quando nenhum
+# cancer possui obito registrado no municipio, nao existe denominador
+# para normalizar essa dimensao. Nesse caso, ela nao diferencia os
+# canceres e sua contribuicao e 0.
+df["taxa_obito_hospitalar"] = (
     df["obitos"]
     /
-    df["obitos"].max()
+    df["internacoes"]
 ) * 100
 
-df["crescimento_norm"] = (
-    df["crescimento"]
-    /
-    df["crescimento"].max()
-) * 100
+if df["taxa_obito_hospitalar"].max() == 0:
+    df["obitos_norm"] = 0
+else:
+    df["obitos_norm"] = (
+        df["taxa_obito_hospitalar"]
+        /
+        df["taxa_obito_hospitalar"].max()
+    ) * 100
+
+# Crescimento: se nao houver crescimento positivo em nenhum cancer,
+# a dimensao nao acrescenta prioridade e nao produz divisao por zero.
+if df["crescimento"].max() <= 0:
+    df["crescimento_norm"] = 0
+else:
+    df["crescimento_norm"] = (
+        df["crescimento"]
+        /
+        df["crescimento"].max()
+    ) * 100
 
 # =====================================
 # SCORE EPIDEMIOLÃ“GICO
