@@ -1,10 +1,45 @@
 import os
 import tempfile
 
-from carga_todas_bases import selecionar_csv_unico
+from carga_todas_bases import encontrar_pastas_validas, selecionar_csv_unico
+
+
+def testar_encontrar_pastas_validas():
+    with tempfile.TemporaryDirectory() as base_dados:
+
+        # cenário das capturas de tela: CSVs/parquets soltos direto na
+        # raiz de dados\, sem as subpastas por câncer x território --
+        # nenhum nome bate com MAPA, então isso tem que falhar alto,
+        # não silenciar e carregar zero linhas.
+        open(
+            os.path.join(
+                base_dados, "cancer_mama_mulheres_rio_claro_2013_2025.csv"
+            ),
+            "w"
+        ).close()
+
+        try:
+            encontrar_pastas_validas(base_dados)
+        except RuntimeError as erro:
+            assert "Nenhuma subpasta reconhecida" in str(erro)
+        else:
+            raise AssertionError(
+                "Arquivos soltos na raiz de dados\\ (sem subpasta) "
+                "deveriam falhar, não retornar lista vazia em silêncio"
+            )
+
+        # criando a subpasta esperada, a carga volta a reconhecer o
+        # território -- prova que o guard não é permanente, só reage
+        # à ausência da estrutura correta.
+        os.mkdir(os.path.join(base_dados, "cancer_mama_rio_claro"))
+        assert encontrar_pastas_validas(base_dados) == ["cancer_mama_rio_claro"]
+
+    print("Todas as checagens de pastas válidas passaram.")
 
 
 def main():
+    testar_encontrar_pastas_validas()
+
     with tempfile.TemporaryDirectory() as pasta:
         assert selecionar_csv_unico(pasta, "cancer_mama_rio_claro") is None
 

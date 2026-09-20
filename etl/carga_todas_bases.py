@@ -94,6 +94,35 @@ def selecionar_csv_unico(caminho_pasta, pasta):
     return os.path.join(caminho_pasta, arquivos_csv[0])
 
 
+def encontrar_pastas_validas(base_dados):
+    """
+    Lista as subpastas de `base_dados` que a carga reconhece (as
+    chaves de MAPA). Falha alto se nenhuma bater -- por exemplo, se
+    os CSVs foram deixados soltos direto em dados\\ em vez de dentro
+    de dados\\cancer_mama_rio_claro\\ etc. Sem essa checagem, esse
+    engano não gera erro nenhum: o laço da carga simplesmente ignora
+    todo mundo que não bate com MAPA e termina com TOTAL: 0, fácil de
+    passar despercebido.
+    """
+
+    pastas = [
+        entrada
+        for entrada in sorted(os.listdir(base_dados))
+        if entrada in MAPA
+    ]
+
+    if not pastas:
+        raise RuntimeError(
+            f"Nenhuma subpasta reconhecida foi encontrada em '{base_dados}'. "
+            "A carga espera uma subpasta por câncer x território (ex.: "
+            "dados\\cancer_mama_rio_claro\\, com um único CSV dentro dela) "
+            "-- não arquivos soltos direto em dados\\. Pastas esperadas: "
+            + ", ".join(sorted(MAPA))
+        )
+
+    return pastas
+
+
 def carregar_catalogo(conexao):
     linhas = conexao.execute(
         "SELECT codigo_ibge, origem, nome, uf "
@@ -169,9 +198,7 @@ def carregar():
     total_registros = 0
     primeira_carga = True
 
-    for pasta in sorted(os.listdir(BASE_DADOS)):
-        if pasta not in MAPA:
-            continue
+    for pasta in encontrar_pastas_validas(BASE_DADOS):
 
         caminho_pasta = os.path.join(BASE_DADOS, pasta)
 
@@ -226,6 +253,14 @@ def carregar():
         print("OK ->", len(dados), "registros")
 
     conexao.close()
+
+    if total_registros == 0:
+        raise RuntimeError(
+            "A carga encontrou pastas reconhecidas, mas nenhuma continha "
+            "um CSV -- confira se os arquivos foram mesmo colocados "
+            "dentro das subpastas de dados\\ (uma por câncer x "
+            "território), e não deixados soltos na raiz."
+        )
 
     print("\n" + "=" * 60)
     print("CARGA TERRITORIAL FINALIZADA")
