@@ -371,6 +371,139 @@ st.plotly_chart(
 )
 
 # ==================================================
+# COMPARAÇÃO DIRETA ENTRE MUNICÍPIOS
+#
+# Permite comparar o município selecionado com outro
+# município que tenha dados reais carregados no banco.
+# Não substitui a comparação com o Estado (SP).
+# ==================================================
+
+st.subheader("🏙️ Comparação direta entre municípios")
+
+municipios_comparacao = [
+    m for m in municipios_disponiveis
+    if m["origem"] != ORIGEM
+]
+
+if not municipios_comparacao:
+    st.info("Não há outro município com dados carregados para comparação.")
+else:
+    origens_comparacao = [m["origem"] for m in municipios_comparacao]
+
+    origem_padrao = (
+        "SAO_JOSE_DO_RIO_PRETO"
+        if ORIGEM == "RIO_CLARO"
+        and "SAO_JOSE_DO_RIO_PRETO" in origens_comparacao
+        else origens_comparacao[0]
+    )
+
+    indice_padrao = origens_comparacao.index(origem_padrao)
+
+    municipio_comparado_nome = st.selectbox(
+        "Comparar com",
+        [m["nome"] for m in municipios_comparacao],
+        index=indice_padrao,
+        key="municipio_comparacao"
+    )
+
+    municipio_comparado = next(
+        m for m in municipios_comparacao
+        if m["nome"] == municipio_comparado_nome
+    )
+
+    ORIGEM_COMPARADA = municipio_comparado["origem"]
+
+    indicadores_comparacao = pd.read_sql(
+        """
+        SELECT
+            municipio,
+            COUNT(*) AS internacoes,
+            COALESCE(SUM(obito), 0) AS obitos,
+            COALESCE(SUM(valor_total), 0) AS valor_total,
+            COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
+        FROM internacoes
+        WHERE municipio IN (?, ?)
+        GROUP BY municipio
+        """,
+        conexao,
+        params=(ORIGEM, ORIGEM_COMPARADA)
+    )
+
+    nomes_municipios = {
+        ORIGEM: NOME_MUNICIPIO,
+        ORIGEM_COMPARADA: municipio_comparado_nome
+    }
+
+    indicadores_comparacao["municipio"] = (
+        indicadores_comparacao["municipio"].map(nomes_municipios)
+    )
+
+    indicadores_comparacao["taxa_obitos_%"] = (
+        indicadores_comparacao["obitos"]
+        / indicadores_comparacao["internacoes"].replace(0, pd.NA)
+        * 100
+    ).fillna(0)
+
+    indicadores_comparacao = indicadores_comparacao.rename(columns={
+        "municipio": "Município",
+        "internacoes": "Internações",
+        "obitos": "Óbitos",
+        "taxa_obitos_%": "Óbitos / Internações (%)",
+        "valor_total": "Valor Total (R$)",
+        "permanencia_media": "Permanência Média (dias)"
+    })
+
+    st.dataframe(
+        indicadores_comparacao[
+            [
+                "Município",
+                "Internações",
+                "Óbitos",
+                "Óbitos / Internações (%)",
+                "Valor Total (R$)",
+                "Permanência Média (dias)"
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    cancer_comparacao = pd.read_sql(
+        """
+        SELECT
+            municipio,
+            tipo_cancer,
+            COUNT(*) AS total
+        FROM internacoes
+        WHERE municipio IN (?, ?)
+        GROUP BY municipio, tipo_cancer
+        ORDER BY tipo_cancer
+        """,
+        conexao,
+        params=(ORIGEM, ORIGEM_COMPARADA)
+    )
+
+    cancer_comparacao["municipio"] = cancer_comparacao["municipio"].map(
+        nomes_municipios
+    )
+
+    fig_municipios = px.bar(
+        cancer_comparacao,
+        x="tipo_cancer",
+        y="total",
+        color="municipio",
+        barmode="group",
+        title=f"Internações por tipo de câncer — {NOME_MUNICIPIO} x {municipio_comparado_nome}"
+    )
+
+    st.plotly_chart(
+        fig_municipios,
+        use_container_width=True
+    )
+
+st.divider()
+
+# ==================================================
 # EVOLUÇÃO TEMPORAL
 # ==================================================
 
