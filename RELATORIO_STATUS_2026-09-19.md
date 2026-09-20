@@ -134,6 +134,62 @@ qual é qual ainda não foi decidido.
 - Alertas proativos ("estas N cidades entraram em alerta esta
   semana") para quem não sabe o que perguntar.
 
+## Visão de arquitetura para a interface (síntese do ChatGPT, discutida à noite)
+
+Ideia central: **uma inteligência só, várias portas de entrada**, não
+cinco sistemas separados.
+
+```
+INTERFACE (muda conforme quem pergunta) → BIBLIOTECA
+              └──────────┬──────────┘
+                         ↓
+                  DECODIFICADOR (linguagem natural → intenção estruturada)
+                         ↓
+                  MOTOR DE RACIOCÍNIO / MOTOR DETERMINÍSTICO
+                         ↓
+                  BASE DE CONHECIMENTO / DADOS
+                         ↓
+                  RESPOSTA EXPLICADA
+```
+
+**Portas de entrada propostas** (mesma base, linguagem/foco diferente
+cada uma):
+1. Usuária comum — perguntas simples, sem números/estatística
+   aparecendo.
+2. Secretaria de Saúde da Mulher — indicadores + tendência +
+   anomalias + priorização + comparação com outras cidades.
+3. Prefeitura/gestor municipal — visão executiva, "quais problemas
+   estão chamando mais atenção", resposta explicada, não tabela.
+4. Operadora/plano de saúde — outro vocabulário (perfil assistencial:
+   internações, permanência, custo, distribuição etária), mesma
+   base de dados.
+5. Investidor — "mercado/necessidades de saúde" (população atendida,
+   perfil epidemiológico, demanda, infraestrutura) em vez de
+   "prioridade de política pública". *(Lembrete da ressalva que já
+   registramos: dados são só de internações do SUS, não capturam
+   quem já usa rede privada — isso precisa aparecer nessa porta.)*
+
+**Biblioteca**: não é pasta de documento, é uma base de conhecimento
+navegável (Doenças / Indicadores / Territórios / Conceitos como
+tendência, anomalia, risco) — serve tanto pra a pessoa navegar sem
+perguntar nada, quanto de contexto pro decodificador.
+
+**Decodificador**: transforma pergunta solta em algo estruturado, ex.:
+"Como está o câncer de mama aqui comparado com uma cidade maior?"
+vira `INTENÇÃO: COMPARAR, DOENÇA: MAMA, MUNICÍPIO_1: RIO_CLARO,
+MUNICÍPIO_2: ?, INDICADORES: [...]`. A IA nunca inventa o dado, só
+busca nos componentes determinísticos já construídos.
+
+**Gap real entre essa visão e o código de hoje** (ver reação que dei
+na hora, vale reler amanhã antes de desenhar):
+- `classificar_intencao()` hoje escolhe **uma categoria única** por
+  pergunta; a visão acima pede extração de **múltiplos campos**
+  (doença + cidade A + cidade B + indicadores) — é uma evolução de
+  classificador pra extrator de estrutura, não um ajuste pequeno.
+- Só existem 2 portas hoje (perfil técnico/simples no chat), não as
+  5 personas descritas. A "biblioteca" navegável também não existe
+  como estrutura própria — hoje é só tabelas soltas no banco.
+
 ## Perguntas em aberto para amanhã
 
 1. A interface nova é sobre o **dashboard** (Streamlit), o **chat**,
