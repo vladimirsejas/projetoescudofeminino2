@@ -44,11 +44,22 @@ def renderizar():
         marca(f"{cidade} · {PERFIS[perfil]}")
 
         t = TEXTOS[perfil]
+        nomes = {
+            "MAMA": "câncer de mama",
+            "COLORRETAL": "câncer colorretal",
+            "COLO_UTERO": "câncer do colo do útero",
+            "OVARIO": "câncer de ovário",
+            "PELE_NAO_MELANOMA": "pele não melanoma",
+            "PULMAO": "câncer de pulmão",
+            "TIREOIDE": "câncer de tireoide",
+        }
+        doenca = nomes.get(cancer, "doença selecionada")
+
         st.markdown(
             f"""
             <div class="ef-hero">
                 <div class="ef-overline">{t["overline"]}</div>
-                <div class="ef-title">{t["titulo"].format(cidade=cidade)}</div>
+                <div class="ef-title">{t["titulo"].format(cidade=cidade, doenca=doenca)}</div>
                 <div class="ef-subtitle">{t["subtitulo"]}</div>
             </div>
             """,
@@ -96,7 +107,7 @@ def renderizar():
         if perfil == "investidor":
             cards[0] = (
                 "Demanda observada",
-                f"{ctx['internacoes']:,} internações registradas no SUS em {cidade}.",
+                f"{ctx['internacoes']:,} internações de {doenca} registradas no SUS em {cidade}.",
             )
 
         colunas = st.columns(3)
