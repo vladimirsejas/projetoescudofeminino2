@@ -35,14 +35,21 @@ def renderizar():
         unsafe_allow_html=True,
     )
 
-    st.markdown("### 1. Escolha o município")
-    selecionar_municipio(municipios)
+    st.markdown("### 1. Defina o foco da análise")
+
+    col_municipio, col_doenca = st.columns(2)
+
+    with col_municipio:
+        st.markdown("**Município**")
+        selecionar_municipio(municipios)
 
     cancers = listar_cancers_disponiveis(obter("municipio_origem"))
-    st.markdown("### 2. Escolha a doença")
-    selecionar_cancer(cancers)
 
-    st.markdown("### 3. Escolha como você quer enxergar os dados")
+    with col_doenca:
+        st.markdown("**Doença**")
+        selecionar_cancer(cancers)
+
+    st.markdown("### 2. Escolha como você quer enxergar os dados")
     selecionar_perfil()
 
     st.markdown(
