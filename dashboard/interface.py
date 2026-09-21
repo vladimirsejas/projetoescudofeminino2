@@ -101,10 +101,13 @@ def navegar():
 pagina = navegar()
 
 if (
-    not state.obter("onboarding_concluido")
+    (
+        not state.obter("onboarding_concluido")
+        or not state.obter("cancer_selecionado")
+    )
     and pagina.title != "Início"
 ):
-    st.info("Primeiro escolha município e perfil na tela de Início.")
+    st.info("Primeiro escolha município, doença e perfil na tela de Início.")
     if st.button("Ir para Início", type="primary"):
         st.switch_page("views/inicio.py")
     st.stop()
