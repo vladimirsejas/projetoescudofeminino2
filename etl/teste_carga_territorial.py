@@ -21,23 +21,33 @@ def main():
         "MUNIC_RES": ["3550308", "3543907", "352690", "3526902"]
     })
 
-    municipios, codigos = resolver_municipios(df, "SP", catalogo)
+    df_sp = pd.DataFrame({
+        "MUNIC_RES": ["3550308", "3543907", "352690", "3526902", "3304557"]
+    })
+
+    df_sp_filtrado, municipios, codigos = resolver_municipios(
+        df_sp, "SP", catalogo
+    )
 
     assert municipios.tolist() == [
         "SAO_PAULO", "RIO_CLARO", "LIMEIRA", "LIMEIRA"
     ]
     assert codigos.tolist() == [3550308, 3543907, 352690, 3526902]
+    assert df_sp_filtrado["MUNIC_RES"].tolist() == [
+        "3550308", "3543907", "352690", "3526902"
+    ]
 
     df_rc = pd.DataFrame({"MUNIC_RES": ["3550308", "3526902"]})
-    municipios_rc, codigos_rc = resolver_municipios(
+    df_rc_filtrado, municipios_rc, codigos_rc = resolver_municipios(
         df_rc, "RIO_CLARO", catalogo
     )
 
     assert municipios_rc.tolist() == ["RIO_CLARO", "RIO_CLARO"]
     assert codigos_rc.tolist() == [3543907, 3543907]
+    assert len(df_rc_filtrado) == 2
 
     df_6 = pd.DataFrame({"MUNIC_RES": ["355030", "354390"]})
-    municipios_6, _ = resolver_municipios(df_6, "SP", catalogo)
+    _, municipios_6, _ = resolver_municipios(df_6, "SP", catalogo)
     assert municipios_6.tolist() == ["SAO_PAULO", "RIO_CLARO"]
 
     try:
@@ -51,12 +61,12 @@ def main():
 
     try:
         resolver_municipios(
-            pd.DataFrame({"MUNIC_RES": ["9999999"]}), "SP", catalogo
+            pd.DataFrame({"MUNIC_RES": ["3599999"]}), "SP", catalogo
         )
     except RuntimeError as erro:
         assert "sem correspondência no catálogo IBGE" in str(erro)
     else:
-        raise AssertionError("Código IBGE desconhecido deveria falhar")
+        raise AssertionError("Código IBGE paulista desconhecido deveria falhar")
 
     print("Todas as checagens da carga territorial passaram.")
 
