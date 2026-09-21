@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.data_context import construir_contexto, fechar_contexto
-from dashboard.state import definir, obter
+from dashboard.state import obter
 from dashboard.styles import marca
 
 
@@ -57,7 +57,8 @@ def _cartao_ano(ano, valor):
 
 def renderizar():
     cidade = obter("municipio_nome")
-    ctx = construir_contexto(obter("municipio_origem"))
+    cancer = obter("cancer_selecionado")
+    ctx = construir_contexto(obter("municipio_origem"), cancer)
 
     try:
         marca(f"{cidade} · Previsões")
@@ -93,34 +94,13 @@ def renderizar():
             )
             return
 
-        tipos = sorted(horizontes["tipo_cancer"].dropna().unique().tolist())
-
-        atual_cancer = obter("cancer_selecionado")
-        if atual_cancer not in tipos:
-            atual_cancer = tipos[0]
-            definir("cancer_selecionado", atual_cancer)
-
-        cancer_escolhido = st.selectbox(
-            "Escolha o câncer",
-            tipos,
-            index=tipos.index(atual_cancer),
-            format_func=_nome_cancer,
-            key="cancer_previsao_interface",
-            help="Escolha qual câncer deseja acompanhar nas estimativas de 2027 a 2029.",
-        )
-
-        if cancer_escolhido != obter("cancer_selecionado"):
-            definir("cancer_selecionado", cancer_escolhido)
-
         st.markdown(
-            f"### {_nome_cancer(cancer_escolhido)} · projeção 2027–2029"
+            f"### {_nome_cancer(cancer)} · projeção 2027–2029"
         )
 
         df = horizontes[
-            (horizontes["tipo_cancer"] == cancer_escolhido)
-            & (horizontes["ano_previsto"].astype(int).isin(anos))
+            horizontes["ano_previsto"].astype(int).isin(anos)
         ].copy()
-
         df = df.sort_values("ano_previsto")
 
         if df.empty:
