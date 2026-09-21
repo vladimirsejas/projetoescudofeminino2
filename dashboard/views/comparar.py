@@ -62,6 +62,22 @@ def renderizar():
             params=(origem, escolhido["origem"], cancer),
         )
 
+        municipios_selecionados = [origem, escolhido["origem"]]
+        resumo = (
+            resumo
+            .set_index("municipio")
+            .reindex(municipios_selecionados)
+            .reset_index()
+        )
+
+        colunas_numericas = [
+            "internacoes",
+            "obitos",
+            "valor_total",
+            "permanencia_media",
+        ]
+        resumo[colunas_numericas] = resumo[colunas_numericas].fillna(0)
+
         nomes_map = {
             origem: cidade,
             escolhido["origem"]: escolhido_nome,
