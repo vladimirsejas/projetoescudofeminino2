@@ -8,7 +8,8 @@ from dashboard.styles import marca
 
 def renderizar():
     cidade = obter("municipio_nome")
-    ctx = construir_contexto(obter("municipio_origem"))
+    cancer = obter("cancer_selecionado")
+    ctx = construir_contexto(obter("municipio_origem"), cancer)
 
     try:
         marca(f"{cidade} · Explorar")
@@ -26,19 +27,34 @@ def renderizar():
             unsafe_allow_html=True,
         )
 
-        if ctx["ranking"].empty:
-            st.info("Não há dados de internações para este município.")
+        if ctx["internacoes"] == 0:
+            st.info("Não há dados de internações para a doença selecionada neste município.")
             return
 
-        st.markdown("### Internações por tipo de câncer")
-        fig = px.bar(
-            ctx["ranking"],
-            x="tipo_cancer",
-            y="total",
-            text="total",
-            title=f"Internações registradas — {cidade}",
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        nomes = {
+            "MAMA": "Câncer de mama",
+            "COLORRETAL": "Câncer colorretal",
+            "COLO_UTERO": "Câncer do colo do útero",
+            "OVARIO": "Câncer de ovário",
+            "PELE_NAO_MELANOMA": "Pele não melanoma",
+            "PULMAO": "Câncer de pulmão",
+            "TIREOIDE": "Câncer de tireoide",
+        }
+        doenca = nomes.get(cancer, "Doença selecionada")
+
+        st.markdown(f"### Histórico de internações · {doenca}")
+        serie = ctx["serie_temporal"].sort_values("ano")
+        if serie.empty:
+            st.info("A série histórica desta doença ainda não está disponível.")
+        else:
+            fig = px.line(
+                serie,
+                x="ano",
+                y="internacoes",
+                markers=True,
+                title=f"Internações registradas — {doenca} — {cidade}",
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("### Tendências e sinais")
         if ctx["tendencias"].empty:
