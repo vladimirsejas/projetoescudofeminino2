@@ -55,6 +55,8 @@ def calcular_previsao_serie(anos, internacoes):
             "ano_previsto": proximo_ano,
             "internacoes_previstas": None,
             "erro_validacao_pct": None,
+            "erro_baseline_pct": None,
+            "supera_baseline": False,
             "dobras_validacao": 0,
             "confiabilidade": (
                 f"AMOSTRA_INSUFICIENTE ({len(anos)} ano(s) de "
@@ -66,6 +68,7 @@ def calcular_previsao_serie(anos, internacoes):
     internacoes_previstas = max(0.0, inclinacao * proximo_ano + intercepto)
 
     erro_validacao_pct = None
+    erro_baseline_pct = None
     dobras_testadas = 0
 
     if len(anos) >= ANOS_MINIMOS_PARA_VALIDACAO:
@@ -77,6 +80,12 @@ def calcular_previsao_serie(anos, internacoes):
         # um dos últimos anos disponíveis (até MAX_DOBRAS_VALIDACAO),
         # sempre treinando só com anos anteriores ao testado -- nunca
         # embaralhar, isso vazaria dado do "futuro" para o treino.
+        #
+        # Em cada dobra, também mede o baseline ingênuo ("o próximo
+        # ano repete o último valor conhecido") -- é a régua para
+        # responder se a regressão realmente ajuda ou é só maquiagem:
+        # com ~13 pontos por câncer, um modelo que não bate uma regra
+        # trivial não demonstrou capacidade preditiva nenhuma.
         ordem = np.argsort(anos)
         anos_ord = anos[ordem]
         internacoes_ord = internacoes[ordem]
@@ -85,6 +94,7 @@ def calcular_previsao_serie(anos, internacoes):
         num_dobras = min(MAX_DOBRAS_VALIDACAO, n - ANOS_MINIMOS_PARA_PREVISAO)
 
         erros_dobras = []
+        erros_dobras_baseline = []
 
         for corte in range(n - num_dobras, n):
             anos_treino = anos_ord[:corte]
@@ -98,10 +108,15 @@ def calcular_previsao_serie(anos, internacoes):
             previsto_teste = max(
                 0.0, inclinacao_val * ano_teste + intercepto_val
             )
+            previsto_baseline = internacoes_treino[-1]
 
             if internacoes_teste > 0:
                 erros_dobras.append(
                     abs(previsto_teste - internacoes_teste)
+                    / internacoes_teste * 100
+                )
+                erros_dobras_baseline.append(
+                    abs(previsto_baseline - internacoes_teste)
                     / internacoes_teste * 100
                 )
 
@@ -109,6 +124,12 @@ def calcular_previsao_serie(anos, internacoes):
 
         if erros_dobras:
             erro_validacao_pct = float(np.mean(erros_dobras))
+            erro_baseline_pct = float(np.mean(erros_dobras_baseline))
+
+    supera_baseline = (
+        erro_validacao_pct is not None
+        and erro_validacao_pct < erro_baseline_pct
+    )
 
     if erro_validacao_pct is None:
         confiabilidade = (
@@ -116,27 +137,43 @@ def calcular_previsao_serie(anos, internacoes):
             f"{ANOS_MINIMOS_PARA_VALIDACAO} para rodar ao menos uma "
             f"dobra de validação temporal)"
         )
+    elif not supera_baseline:
+        # a regressão não bateu nem a regra "repete o último ano" --
+        # não demonstrou ganho preditivo, então a previsão que vale é
+        # o próprio baseline, não a extrapolação da reta
+        internacoes_previstas = internacoes_ord[-1]
+        confiabilidade = (
+            f"SEM_GANHO_PREDITIVO (regressão errou {erro_validacao_pct:.1f}% "
+            f"em média, baseline simples errou {erro_baseline_pct:.1f}% -- "
+            f"usando o baseline como previsão)"
+        )
     elif erro_validacao_pct > LIMITE_ERRO_BAIXA_CONFIABILIDADE_PCT:
         confiabilidade = (
             f"BAIXA_CONFIABILIDADE (erro médio de "
             f"{erro_validacao_pct:.1f}% em {dobras_testadas} dobra(s) "
-            f"de validação temporal)"
+            f"de validação temporal, contra {erro_baseline_pct:.1f}% "
+            f"do baseline)"
         )
     else:
         # "OK" fica exato (sem detalhe embutido) para se comportar
         # como o mesmo sinalizador usado em tendencia_estadual.py e
         # anomalias.py (checado com "!= OK" nesses outros arquivos) --
-        # o detalhe da validação já está em erro_validacao_pct e
-        # dobras_testadas, como colunas próprias.
+        # o detalhe da validação já está em erro_validacao_pct,
+        # erro_baseline_pct e dobras_testadas, como colunas próprias.
         confiabilidade = "OK"
 
     return {
         "ano_previsto": proximo_ano,
-        "internacoes_previstas": round(internacoes_previstas, 1),
+        "internacoes_previstas": round(float(internacoes_previstas), 1),
         "erro_validacao_pct": (
             round(erro_validacao_pct, 1)
             if erro_validacao_pct is not None else None
         ),
+        "erro_baseline_pct": (
+            round(erro_baseline_pct, 1)
+            if erro_baseline_pct is not None else None
+        ),
+        "supera_baseline": supera_baseline,
         "dobras_validacao": dobras_testadas,
         "confiabilidade": confiabilidade,
     }

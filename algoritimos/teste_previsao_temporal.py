@@ -84,6 +84,25 @@ def testar_calculo_isolado(checar):
         r["internacoes_previstas"] >= 0
     )
 
+    # série com mudança de patamar (estável em 50, cai e estabiliza
+    # em 10) -- a reta ajustada em cima de todo o histórico é puxada
+    # pelo patamar antigo e erra mais que o baseline ingênuo, que
+    # simplesmente repete o valor mais recente (já no patamar novo).
+    # Testei essa hipótese antes de escrever a asserção -- uma
+    # primeira tentativa com ruído puro não reproduzia o efeito, essa
+    # reproduz de verdade.
+    anos = list(range(2018, 2026))
+    internacoes = [50, 50, 50, 50, 50, 10, 10, 10]
+    r = calcular_previsao_serie(anos, internacoes)
+    checar(
+        "mudança de patamar -> reta não supera baseline -> "
+        "SEM_GANHO_PREDITIVO, previsão vira o baseline (último "
+        "valor conhecido)",
+        not r["supera_baseline"]
+        and r["confiabilidade"].startswith("SEM_GANHO_PREDITIVO")
+        and r["internacoes_previstas"] == internacoes[-1]
+    )
+
 
 def testar_agrupamento_por_cancer(checar):
 
@@ -139,11 +158,12 @@ def testar_execucao_real_multi_tenant(checar):
             "CREATE TABLE previsao_temporal ("
             "tipo_cancer TEXT, anos_historico INTEGER, ano_previsto INTEGER, "
             "internacoes_previstas REAL, erro_validacao_pct REAL, "
+            "erro_baseline_pct REAL, supera_baseline INTEGER, "
             "dobras_validacao INTEGER, confiabilidade TEXT, municipio TEXT)"
         )
         conexao.execute(
             "INSERT INTO previsao_temporal VALUES "
-            "('MAMA', 13, 2026, 99.0, 5.0, 4, 'OK', 'LIMEIRA')"
+            "('MAMA', 13, 2026, 99.0, 5.0, 20.0, 1, 4, 'OK', 'LIMEIRA')"
         )
 
         conexao.commit()
@@ -251,15 +271,40 @@ def testar_com_dado_historico_real(checar):
 
     # regressão: com holdout único (versão anterior), Pulmão saía
     # "OK" só porque 2025 por acaso teve erro baixo (19.4%), mesmo
-    # errando 39-49% nos 3 anos anteriores -- a validação rolling-
-    # origin precisa continuar pegando isso, senão a correção
-    # silenciosamente regride
+    # errando 39-49% nos 3 anos anteriores -- com validação rolling
+    # ele empata exatamente com o baseline ingênuo (38.8% == 38.8%),
+    # e um empate não conta como "superar claramente" -> vira
+    # SEM_GANHO_PREDITIVO, categoria ainda mais precisa que
+    # BAIXA_CONFIABILIDADE isolada
     pulmao = resultado[resultado["tipo_cancer"] == "Pulmão"].iloc[0]
     checar(
-        "Pulmão fica BAIXA_CONFIABILIDADE com validação rolling "
-        "(o holdout único escondia isso atrás do acerto de sorte "
-        "em 2025)",
-        pulmao["confiabilidade"].startswith("BAIXA_CONFIABILIDADE")
+        "Pulmão não supera o baseline com validação rolling (o "
+        "holdout único escondia isso atrás do acerto de sorte em "
+        "2025)",
+        not pulmao["supera_baseline"]
+        and pulmao["confiabilidade"].startswith("SEM_GANHO_PREDITIVO")
+    )
+
+    # regressão: Ovário é o caso citado na revisão cruzada (Claude +
+    # ChatGPT) em que a regressão piora bastante frente ao baseline
+    # ingênuo (49.6% vs 24.6%) -- o sistema precisa admitir isso, não
+    # empurrar a extrapolação como se fosse a melhor resposta
+    ovario = resultado[resultado["tipo_cancer"] == "Ovário"].iloc[0]
+    checar(
+        "Ovário não supera o baseline -- regressão claramente pior "
+        "que repetir o último ano",
+        not ovario["supera_baseline"]
+        and ovario["confiabilidade"].startswith("SEM_GANHO_PREDITIVO")
+    )
+
+    # regressão: Mama é o caso onde a regressão demonstra ganho real
+    # (17.9% vs 22.4% do baseline) -- confirma que nem toda previsão
+    # cai em SEM_GANHO_PREDITIVO, só quando realmente não ajuda
+    mama = resultado[resultado["tipo_cancer"] == "Mama"].iloc[0]
+    checar(
+        "Mama supera o baseline e fica OK -- a regressão também "
+        "precisa conseguir vencer quando realmente ajuda",
+        bool(mama["supera_baseline"]) and mama["confiabilidade"] == "OK"
     )
 
     print("\nPrévia da previsão sobre dado histórico real (Rio Claro):\n")
