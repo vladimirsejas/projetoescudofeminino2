@@ -80,6 +80,10 @@ def construir_contexto(origem, tipo_cancer=None):
             conexao, "previsao_temporal_horizontes", origem, tipo_cancer
         )
         serie_temporal = _ler_tabela(conexao, "serie_temporal_anual", origem, tipo_cancer)
+        if "grupo" in serie_temporal.columns:
+            serie_temporal = serie_temporal[
+                serie_temporal["grupo"] == "MUNICIPIO"
+            ].copy()
         tendencias = _ler_tabela(conexao, "tendencia_estadual", origem, tipo_cancer)
         base = _ler_tabela(conexao, "base_conhecimento", origem, tipo_cancer)
 
