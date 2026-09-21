@@ -16,6 +16,25 @@ def listar_municipios():
     return listar_municipios_disponiveis()
 
 
+def listar_cancers_disponiveis(origem):
+    conexao = conectar()
+    try:
+        df = pd.read_sql(
+            """
+            SELECT DISTINCT tipo_cancer
+            FROM internacoes
+            WHERE municipio = ?
+              AND tipo_cancer IS NOT NULL
+            ORDER BY tipo_cancer
+            """,
+            conexao,
+            params=(origem,),
+        )
+        return df["tipo_cancer"].tolist()
+    finally:
+        conexao.close()
+
+
 def construir_contexto(origem):
     conexao = conectar()
     try:
