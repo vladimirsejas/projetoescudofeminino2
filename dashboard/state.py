@@ -55,6 +55,11 @@ def selecionar_perfil(perfil):
 def selecionar_municipio(municipio):
     definir("municipio_origem", municipio["origem"])
     definir("municipio_nome", municipio["nome"])
+    definir("cancer_selecionado", None)
+
+
+def selecionar_cancer(cancer):
+    definir("cancer_selecionado", cancer)
 
 
 def concluir_onboarding():
