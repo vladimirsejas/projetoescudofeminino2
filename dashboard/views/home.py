@@ -13,7 +13,7 @@ TEXTOS = {
     },
     "secretaria": {
         "overline": "Panorama para gestão",
-        "titulo": "O que está acontecendo em {cidade}?",
+        "titulo": "O que está acontecendo com {doenca} em {cidade}?",
         "subtitulo": "Indicadores observados, prioridades analíticas e sinais para acompanhamento.",
     },
     "prefeitura": {
