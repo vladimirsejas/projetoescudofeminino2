@@ -96,32 +96,28 @@ def selecionar_csv_unico(caminho_pasta, pasta):
 
 def encontrar_pastas_validas(base_dados):
     """
-    Lista as subpastas de `base_dados` que a carga reconhece (as
-    chaves de MAPA). Falha alto se nenhuma bater -- por exemplo, se
-    os CSVs foram deixados soltos direto em dados\\ em vez de dentro
-    de dados\\cancer_mama_rio_claro\\ etc. Sem essa checagem, esse
-    engano não gera erro nenhum: o laço da carga simplesmente ignora
-    todo mundo que não bate com MAPA e termina com TOTAL: 0, fácil de
-    passar despercebido.
+    Exige que as 14 subpastas esperadas estejam presentes. Sem isso,
+    a carga poderia terminar com uma base incompleta sem deixar claro
+    que um câncer/território ficou de fora.
     """
 
-    pastas = [
+    pastas_existentes = {
         entrada
-        for entrada in sorted(os.listdir(base_dados))
+        for entrada in os.listdir(base_dados)
         if entrada in MAPA
-    ]
+    }
 
-    if not pastas:
+    esperadas = set(MAPA)
+    ausentes = sorted(esperadas - pastas_existentes)
+
+    if ausentes:
         raise RuntimeError(
-            f"Nenhuma subpasta reconhecida foi encontrada em '{base_dados}'. "
-            "A carga espera uma subpasta por câncer x território (ex.: "
-            "dados\\cancer_mama_rio_claro\\, com um único CSV dentro dela) "
-            "-- não arquivos soltos direto em dados\\. Pastas esperadas: "
-            + ", ".join(sorted(MAPA))
+            f"Faltam {len(ausentes)} subpasta(s) esperada(s) em "
+            f"'{base_dados}': {ausentes}. "
+            "A carga exige as 14 pastas (7 cânceres x 2 recortes)."
         )
 
-    return pastas
-
+    return sorted(pastas_existentes)
 
 def detectar_separador(caminho_csv, encoding="latin1"):
     """
