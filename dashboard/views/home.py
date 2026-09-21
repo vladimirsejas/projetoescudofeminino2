@@ -37,7 +37,8 @@ TEXTOS = {
 def renderizar():
     cidade = obter("municipio_nome")
     perfil = obter("perfil")
-    ctx = construir_contexto(obter("municipio_origem"))
+    cancer = obter("cancer_selecionado")
+    ctx = construir_contexto(obter("municipio_origem"), cancer)
 
     try:
         marca(f"{cidade} · {PERFIS[perfil]}")
@@ -58,27 +59,37 @@ def renderizar():
         col1.metric("Internações", f"{ctx['internacoes']:,}")
         col2.metric("Óbitos", f"{ctx['obitos']:,}")
         col3.metric("Permanência média", f"{ctx['permanencia_media']:.1f} dias")
-        col4.metric("Tipo com mais internações", ctx["lider"])
+        col4.metric("Mortalidade hospitalar", f"{ctx['mortalidade_pct']:.1f}%")
 
         st.markdown("### Três coisas para saber primeiro")
+
+        nomes = {
+            "MAMA": "câncer de mama",
+            "COLORRETAL": "câncer colorretal",
+            "COLO_UTERO": "câncer do colo do útero",
+            "OVARIO": "câncer de ovário",
+            "PELE_NAO_MELANOMA": "pele não melanoma",
+            "PULMAO": "câncer de pulmão",
+            "TIREOIDE": "câncer de tireoide",
+        }
+        doenca = nomes.get(cancer, "doença selecionada")
 
         cards = [
             (
                 "Volume observado",
-                f"{ctx['internacoes']:,} internações estão registradas para {cidade}.",
+                f"{ctx['internacoes']:,} internações de {doenca} estão registradas para {cidade}.",
             ),
             (
-                "Tipo que mais aparece",
+                "Mortalidade hospitalar",
                 (
-                    f"{ctx['lider']} concentra o maior número de internações "
-                    "entre os tipos monitorados."
-                    if ctx["lider"] != "—"
-                    else "Ainda não há dados suficientes para apontar um líder."
+                    f"{ctx['mortalidade_pct']:.1f}% das internações registradas terminaram em óbito."
+                    if ctx["internacoes"] > 0
+                    else "Não há internações suficientes para calcular a taxa."
                 ),
             ),
             (
                 "Próximo passo",
-                "Use Explorar para investigar indicadores ou Perguntar para formular uma pergunta específica.",
+                "Use Explorar, Perguntar ou Previsões para aprofundar esta análise.",
             ),
         ]
 
