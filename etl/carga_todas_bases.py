@@ -96,32 +96,28 @@ def selecionar_csv_unico(caminho_pasta, pasta):
 
 def encontrar_pastas_validas(base_dados):
     """
-    Lista as subpastas de `base_dados` que a carga reconhece (as
-    chaves de MAPA). Falha alto se nenhuma bater -- por exemplo, se
-    os CSVs foram deixados soltos direto em dados\\ em vez de dentro
-    de dados\\cancer_mama_rio_claro\\ etc. Sem essa checagem, esse
-    engano não gera erro nenhum: o laço da carga simplesmente ignora
-    todo mundo que não bate com MAPA e termina com TOTAL: 0, fácil de
-    passar despercebido.
+    Exige que as 14 subpastas esperadas estejam presentes. Sem isso,
+    a carga poderia terminar com uma base incompleta sem deixar claro
+    que um câncer/território ficou de fora.
     """
 
-    pastas = [
+    pastas_existentes = {
         entrada
-        for entrada in sorted(os.listdir(base_dados))
+        for entrada in os.listdir(base_dados)
         if entrada in MAPA
-    ]
+    }
 
-    if not pastas:
+    esperadas = set(MAPA)
+    ausentes = sorted(esperadas - pastas_existentes)
+
+    if ausentes:
         raise RuntimeError(
-            f"Nenhuma subpasta reconhecida foi encontrada em '{base_dados}'. "
-            "A carga espera uma subpasta por câncer x território (ex.: "
-            "dados\\cancer_mama_rio_claro\\, com um único CSV dentro dela) "
-            "-- não arquivos soltos direto em dados\\. Pastas esperadas: "
-            + ", ".join(sorted(MAPA))
+            f"Faltam {len(ausentes)} subpasta(s) esperada(s) em "
+            f"'{base_dados}': {ausentes}. "
+            "A carga exige as 14 pastas (7 cânceres x 2 recortes)."
         )
 
-    return pastas
-
+    return sorted(pastas_existentes)
 
 def detectar_separador(caminho_csv, encoding="latin1"):
     """
@@ -172,6 +168,7 @@ def resolver_municipios(df, origem, catalogo):
     # Não reclassificamos esses registros pelo código do CSV.
     if origem == "RIO_CLARO":
         return (
+            df,
             pd.Series(["RIO_CLARO"] * len(df), index=df.index),
             pd.Series([3543907] * len(df), index=df.index),
         )
@@ -193,6 +190,30 @@ def resolver_municipios(df, origem, catalogo):
         if codigo is not None else None
     )
 
+    if origem == "SP":
+        codigos_texto = codigos.astype("Int64").astype("string")
+        fora_de_sp = ~codigos_texto.str.startswith("35", na=False)
+
+        if fora_de_sp.any():
+            quantidade = int(fora_de_sp.sum())
+            exemplos = (
+                codigos[fora_de_sp]
+                .dropna()
+                .astype(int)
+                .astype(str)
+                .head(10)
+                .tolist()
+            )
+            print(
+                f"ATENÇÃO: {quantidade} registros de {origem} foram "
+                "descartados porque a residência não pertence ao "
+                f"Estado de São Paulo. Exemplos: {exemplos}"
+            )
+
+            df = df.loc[~fora_de_sp].copy().reset_index(drop=True)
+            codigos = codigos.loc[~fora_de_sp].reset_index(drop=True)
+            municipios = municipios.loc[~fora_de_sp].reset_index(drop=True)
+
     desconhecidos = municipios.isna()
 
     if desconhecidos.any():
@@ -200,16 +221,18 @@ def resolver_municipios(df, origem, catalogo):
         exemplos = (
             codigos[desconhecidos]
             .dropna()
+            .astype(int)
             .astype(str)
             .head(10)
             .tolist()
         )
         raise RuntimeError(
             f"{quantidade} registros de {origem} possuem código municipal "
-            "sem correspondência no catálogo IBGE. Exemplos: {exemplos}"
+            "SP sem correspondência no catálogo IBGE depois da filtragem. "
+            f"Exemplos: {exemplos}"
         )
 
-    return municipios, codigos
+    return df, municipios, codigos
 
 
 VERSAO_CARGA = "carga_todas_bases.py -- com detecção automática de separador (; ou ,)"
@@ -219,90 +242,107 @@ def carregar():
     print(VERSAO_CARGA)
 
     conexao = sqlite3.connect(BANCO)
+    tabela_staging = "internacoes_carga_staging"
 
     try:
-        catalogo = carregar_catalogo(conexao)
-    except sqlite3.OperationalError as erro:
+        try:
+            catalogo = carregar_catalogo(conexao)
+        except sqlite3.OperationalError as erro:
+            raise RuntimeError(
+                "A tabela municipios não existe. Execute primeiro "
+                "etl\\criar_tabela_municipios.py."
+            ) from erro
+
+        # Toda a carga acontece em staging. A tabela oficial só é
+        # substituída depois que as 14 pastas passam sem erro.
+        conexao.execute(f"DROP TABLE IF EXISTS {tabela_staging}")
+        conexao.commit()
+
+        total_registros = 0
+        primeira_carga = True
+
+        for pasta in encontrar_pastas_validas(BASE_DADOS):
+            caminho_pasta = os.path.join(BASE_DADOS, pasta)
+            arquivo_csv = selecionar_csv_unico(caminho_pasta, pasta)
+
+            if arquivo_csv is None:
+                raise RuntimeError(
+                    f"A pasta '{pasta}' não contém nenhum CSV. "
+                    "A carga exige um CSV em cada uma das 14 pastas."
+                )
+
+            tipo_cancer, origem = MAPA[pasta]
+
+            print("\n" + "=" * 60)
+            print("PASTA:", pasta)
+            print("TIPO:", tipo_cancer)
+            print("ORIGEM:", origem)
+
+            separador = detectar_separador(arquivo_csv)
+
+            df = pd.read_csv(
+                arquivo_csv,
+                sep=separador,
+                encoding="latin1",
+                low_memory=False
+            )
+
+            df, municipios, codigos = resolver_municipios(
+                df, origem, catalogo
+            )
+
+            dados = pd.DataFrame({
+                "tipo_cancer": [tipo_cancer] * len(df),
+                "origem": [origem] * len(df),
+                "municipio": municipios,
+                "codigo_ibge": codigos,
+                "ano": df["ANO_CMPT"],
+                "idade": df["IDADE"],
+                "dias_permanencia": df["DIAS_PERM"],
+                "obito": df["MORTE"],
+                "valor_total": df["VAL_TOT"]
+            })
+
+            print("Municípios identificados:", dados["municipio"].nunique())
+            print(dados["municipio"].value_counts().head(10))
+
+            dados.to_sql(
+                tabela_staging,
+                conexao,
+                if_exists="replace" if primeira_carga else "append",
+                index=False
+            )
+
+            primeira_carga = False
+            total_registros += len(dados)
+
+            print("OK ->", len(dados), "registros")
+
+        if total_registros == 0:
+            raise RuntimeError(
+                "A carga encontrou as 14 pastas, mas nenhum registro foi carregado."
+            )
+
+        # Commit final: só agora o staging vira internacoes.
+        conexao.execute("BEGIN")
+        conexao.execute("DROP TABLE IF EXISTS internacoes")
+        conexao.execute(
+            f"ALTER TABLE {tabela_staging} RENAME TO internacoes"
+        )
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
         conexao.close()
-        raise RuntimeError(
-            "A tabela municipios não existe. Execute primeiro "
-            "etl\\criar_tabela_municipios.py."
-        ) from erro
-
-    total_registros = 0
-    primeira_carga = True
-
-    for pasta in encontrar_pastas_validas(BASE_DADOS):
-
-        caminho_pasta = os.path.join(BASE_DADOS, pasta)
-
-        arquivo_csv = selecionar_csv_unico(caminho_pasta, pasta)
-
-        if arquivo_csv is None:
-            continue
-
-        tipo_cancer, origem = MAPA[pasta]
-
-        print("\n" + "=" * 60)
-        print("PASTA:", pasta)
-        print("TIPO:", tipo_cancer)
-        print("ORIGEM:", origem)
-
-        separador = detectar_separador(arquivo_csv)
-
-        df = pd.read_csv(
-            arquivo_csv,
-            sep=separador,
-            encoding="latin1",
-            low_memory=False
-        )
-
-        municipios, codigos = resolver_municipios(
-            df, origem, catalogo
-        )
-
-        dados = pd.DataFrame({
-            "tipo_cancer": [tipo_cancer] * len(df),
-            "origem": [origem] * len(df),
-            "municipio": municipios,
-            "codigo_ibge": codigos,
-            "ano": df["ANO_CMPT"],
-            "idade": df["IDADE"],
-            "dias_permanencia": df["DIAS_PERM"],
-            "obito": df["MORTE"],
-            "valor_total": df["VAL_TOT"]
-        })
-
-        print("Municípios identificados:", dados["municipio"].nunique())
-        print(dados["municipio"].value_counts().head(10))
-
-        dados.to_sql(
-            "internacoes",
-            conexao,
-            if_exists="replace" if primeira_carga else "append",
-            index=False
-        )
-
-        primeira_carga = False
-        total_registros += len(dados)
-
-        print("OK ->", len(dados), "registros")
+        raise
 
     conexao.close()
-
-    if total_registros == 0:
-        raise RuntimeError(
-            "A carga encontrou pastas reconhecidas, mas nenhuma continha "
-            "um CSV -- confira se os arquivos foram mesmo colocados "
-            "dentro das subpastas de dados\\ (uma por câncer x "
-            "território), e não deixados soltos na raiz."
-        )
 
     print("\n" + "=" * 60)
     print("CARGA TERRITORIAL FINALIZADA")
     print("TOTAL:", total_registros)
+    print("7 cânceres x 2 recortes validados.")
     print("=" * 60)
-
 
 if __name__ == "__main__":
     carregar()

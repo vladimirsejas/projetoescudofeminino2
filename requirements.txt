@@ -2,5 +2,5 @@ pandas
 numpy
 python-dotenv
 google-genai
-streamlit
+streamlit>=1.46.0
 plotly
