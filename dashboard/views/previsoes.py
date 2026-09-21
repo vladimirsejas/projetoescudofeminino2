@@ -1,6 +1,7 @@
 
 import html
 
+import pandas as pd
 import streamlit as st
 
 from dashboard.data_context import construir_contexto, fechar_contexto
