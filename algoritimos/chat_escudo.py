@@ -128,6 +128,16 @@ vulnerabilidade_df = ler_tabela_municipio(
 if vulnerabilidade_df.empty:
     vulnerabilidade_df = None
 
+# previsão temporal é opcional pelo mesmo motivo -- se ainda não foi
+# gerada (algoritimos\previsao_temporal.py) ou não existe para o
+# município selecionado, o chat continua funcionando normalmente, só
+# essa categoria de pergunta fica indisponível
+previsao_df = ler_tabela_municipio(
+    "previsao_temporal", conn, municipio=MUNICIPIO
+)
+if previsao_df.empty:
+    previsao_df = None
+
 canceres = priorizacao["tipo_cancer"].tolist()
 
 
@@ -319,10 +329,18 @@ def classificar_intencao(pergunta_norm):
     )):
         return "VULNERABILIDADE"
 
-    for cancer in canceres:
-        cancer_norm = normalizar(cancer.replace("_", " "))
-        if cancer in pergunta_norm or cancer_norm in pergunta_norm:
-            return "CANCER_ESPECIFICO"
+    # previsão precisa vir antes de TENDENCIA_ESTADUAL, senão "por que
+    # o sistema não usou a tendência para ovário" cairia em
+    # TENDENCIA_ESTADUAL (contém a palavra "TENDENCIA") em vez de
+    # perguntar sobre a camada preditiva
+    if any(p in pergunta_norm for p in (
+        "PREVISAO", "PREVISOES", "PREVER", "PREVISTO", "PREVISTA",
+        "PROJECAO", "PROJETAR", "ESTIMATIVA", "ESTIMA", "ESTIMAR",
+        "MODELO E CONFIAVEL", "MODELO CONFIAVEL", "NAO USOU A TENDENCIA",
+        "NAO USOU O MODELO", "GANHO EM RELACAO AO METODO SIMPLES",
+        "SUPEROU O BASELINE", "SUPERA O BASELINE"
+    )):
+        return "PREVISAO"
 
     # mudança temporal precisa vir antes de SITUACAO_GERAL: perguntas
     # como "como estão os números comparados ao ano passado?" contêm
@@ -353,6 +371,16 @@ def classificar_intencao(pergunta_norm):
     )):
         return "APOIO_DECISAO"
 
+    # TOP_PRIORIDADES precisa vir antes de PRIORIDADE_MAXIMA: achado
+    # da auditoria (não relacionado às correções da revisão cruzada)
+    # -- "PRIORIDADE" é substring de "PRIORIDADES", então "top 3
+    # prioridades" sempre caiu em PRIORIDADE_MAXIMA e nunca alcançava
+    # esta categoria, mesmo antes de qualquer mudança desta etapa
+    if any(p in pergunta_norm for p in (
+        "TOP", "3 MAIORES", "TRES MAIORES", "RANKING"
+    )):
+        return "TOP_PRIORIDADES"
+
     if any(p in pergunta_norm for p in (
         "ATENCAO", "PRIORIDADE", "PRIORITARIO", "RISCO", "GRAVE",
         "GRAVIDADE", "PREOCUPA", "PREOCUPANTE", "URGENTE", "URGENCIA",
@@ -360,11 +388,6 @@ def classificar_intencao(pergunta_norm):
         "ESCOLHER", "EXIGEM ACAO", "EXIGE ACAO"
     )):
         return "PRIORIDADE_MAXIMA"
-
-    if any(p in pergunta_norm for p in (
-        "TOP", "3 MAIORES", "TRES MAIORES", "RANKING"
-    )):
-        return "TOP_PRIORIDADES"
 
     if any(p in pergunta_norm for p in (
         "MORTALIDADE", "OBITO", "MATA", "MORTE", "MORTAL", "LETAL",
@@ -410,6 +433,20 @@ def classificar_intencao(pergunta_norm):
     if "RELATORIO" in pergunta_norm:
         return "RELATORIO_EXECUTIVO"
 
+    # nome de câncer sozinho (sem nenhum indicador específico
+    # mencionado) vem por último de propósito -- achado da revisão
+    # cruzada (Claude + ChatGPT): antes esta checagem vinha logo no
+    # início, então "qual é a mortalidade do câncer de mama?"
+    # cristalizava como CANCER_ESPECIFICO e nunca chegava em
+    # MORTALIDADE. Com a checagem aqui embaixo, um indicador
+    # específico sempre vence quando mencionado junto do câncer; o
+    # nome do câncer sozinho ("MAMA") continua caindo aqui e virando
+    # CANCER_ESPECIFICO como antes.
+    for cancer in canceres:
+        cancer_norm = normalizar(cancer.replace("_", " "))
+        if cancer in pergunta_norm or cancer_norm in pergunta_norm:
+            return "CANCER_ESPECIFICO"
+
     return "DESCONHECIDA"
 
 
@@ -418,6 +455,121 @@ def classificar_intencao(pergunta_norm):
 # =====================================
 
 def responder(intencao, pergunta_norm):
+
+    if intencao == "PREVISAO":
+
+        if previsao_df is None:
+            print(
+                "\nEsse indicador ainda não foi calculado. Rode "
+                "algoritimos\\previsao_temporal.py antes de perguntar "
+                "sobre previsões."
+            )
+            return
+
+        print(
+            "\nAtenção: isto é extrapolação de internações "
+            "registradas no SUS, não previsão epidemiológica de "
+            "novos casos de câncer.\n"
+        )
+
+        cancer = detectar_cancer(pergunta_norm)
+
+        if any(p in pergunta_norm for p in (
+            "GANHO EM RELACAO AO METODO SIMPLES", "SUPEROU O BASELINE",
+            "SUPERA O BASELINE", "QUAIS PREVISOES"
+        )):
+            # SQLite não tem tipo booleano -- supera_baseline volta
+            # como inteiro 0/1 (ou já True/False, se vier direto de
+            # um DataFrame em memória), nunca uma Series booleana de
+            # verdade, então comparar com 1 é a forma que funciona
+            # nos dois casos
+            superam = previsao_df[previsao_df["supera_baseline"] == 1]
+
+            print("Resposta:\n")
+
+            if superam.empty:
+                print(
+                    "Nenhuma previsão superou o baseline simples "
+                    "(repetir o último ano) neste momento."
+                )
+            else:
+                print(
+                    "Previsões que demonstraram ganho real sobre o "
+                    "baseline simples (repetir o último ano):\n"
+                )
+                for _, row in superam.iterrows():
+                    print(
+                        f"- {row['tipo_cancer']}: erro do modelo "
+                        f"{row['erro_validacao_pct']:.1f}% vs. "
+                        f"{row['erro_baseline_pct']:.1f}% do baseline"
+                    )
+            return
+
+        if cancer is None and any(
+            p in pergunta_norm for p in ("MAIOR PREVISAO", "MAIOR")
+        ):
+            r = previsao_df.sort_values(
+                "internacoes_previstas", ascending=False
+            ).iloc[0]
+            cancer = r["tipo_cancer"]
+
+        if cancer is not None:
+            linha = previsao_df[previsao_df["tipo_cancer"] == cancer]
+
+            if linha.empty:
+                print(
+                    f"\nAinda não há previsão calculada para {cancer}."
+                )
+                return
+
+            r = linha.iloc[0]
+
+        else:
+            r = previsao_df.sort_values(
+                "internacoes_previstas", ascending=False
+            ).iloc[0]
+
+        print("Resposta:\n")
+
+        if str(r["confiabilidade"]).startswith("SEM_GANHO_PREDITIVO"):
+            print(
+                f"{r['tipo_cancer']}: a regressão não demonstrou "
+                f"ganho real sobre o baseline simples (repetir o "
+                f"último ano), então a previsão usada é o próprio "
+                f"último valor conhecido: {r['internacoes_previstas']:.0f} "
+                f"internações registradas em {r['ano_previsto']}."
+            )
+            print(
+                f"\nErro médio da regressão: "
+                f"{r['erro_validacao_pct']:.1f}% | Erro do baseline: "
+                f"{r['erro_baseline_pct']:.1f}%."
+            )
+        else:
+            print(
+                f"{r['tipo_cancer']}: previsão de "
+                f"{r['internacoes_previstas']:.0f} internações "
+                f"registradas no SUS para {r['ano_previsto']}."
+            )
+
+            if r["erro_validacao_pct"] is not None and pd.notna(
+                r["erro_validacao_pct"]
+            ):
+                print(
+                    f"\nErro médio de validação: "
+                    f"{r['erro_validacao_pct']:.1f}% (contra "
+                    f"{r['erro_baseline_pct']:.1f}% de um baseline "
+                    f"simples de repetir o último ano)."
+                )
+
+            if str(r["confiabilidade"]) != "OK":
+                print(f"\nAtenção: {r['confiabilidade']}.")
+
+        print(
+            "\nÉ extrapolação de internações SUS, não previsão de "
+            "novos casos de câncer na população."
+        )
+
+        return
 
     if intencao == "VULNERABILIDADE":
 
@@ -558,6 +710,31 @@ def responder(intencao, pergunta_norm):
         print(linha.iloc[0]["memoria"])
         return
 
+    if intencao == "MUDANCA_TEMPORAL":
+
+        print(f"\nO que mudou em {NOME_MUNICIPIO} desde o ano anterior:\n")
+
+        mudancas = tendencia.reindex(
+            tendencia["desvio"].abs().sort_values(ascending=False).index
+        )
+
+        for _, row in mudancas.iterrows():
+            direcao = "cresceu" if row["desvio"] >= 0 else "caiu"
+            print(
+                f"{row['tipo_cancer']}: {direcao} "
+                f"{abs(row['desvio']):.2f}% em relação à tendência "
+                f"estadual."
+            )
+
+            if row.get("confiabilidade", "OK") != "OK":
+                print(f"  Atenção: {row['confiabilidade']}.")
+
+        print(
+            "\nPergunte pelo nome de um câncer específico para "
+            "ver o motivo, o impacto e a recomendação completos."
+        )
+        return
+
     if intencao == "SITUACAO_GERAL":
 
         total = len(priorizacao)
@@ -607,6 +784,32 @@ def responder(intencao, pergunta_norm):
         print(
             "\nPergunte pelo nome de um câncer específico para "
             "ver o motivo, o impacto e a recomendação completos."
+        )
+        return
+
+    if intencao == "APOIO_DECISAO":
+
+        r = priorizacao.sort_values(
+            "pontuacao_final", ascending=False
+        ).iloc[0]
+
+        print("\nApoio à decisão:\n")
+        print(
+            f"Se fosse necessário escolher apenas uma prioridade "
+            f"agora, seria {r['tipo_cancer']} "
+            f"({r['nivel_prioridade']}, pontuação "
+            f"{r['pontuacao_final']:.2f})."
+        )
+
+        linha = memoria[memoria["tipo_cancer"] == r["tipo_cancer"]]
+
+        if not linha.empty:
+            print("\n")
+            print(linha.iloc[0]["memoria"])
+
+        print(
+            "\nEsta é uma priorização de apoio à decisão -- a "
+            "responsabilidade final é do gestor responsável."
         )
         return
 
@@ -668,6 +871,26 @@ def responder(intencao, pergunta_norm):
 
     if intencao == "MORTALIDADE":
 
+        # se um câncer específico foi mencionado junto ("mortalidade
+        # do câncer de mama"), responde sobre ele -- senão mantém o
+        # comportamento antigo (o câncer com maior mortalidade geral)
+        cancer = detectar_cancer(pergunta_norm)
+
+        if (
+            cancer is not None
+            and cancer in mortalidade_df["tipo_cancer"].values
+        ):
+            r = mortalidade_df[
+                mortalidade_df["tipo_cancer"] == cancer
+            ].iloc[0]
+
+            print("\nResposta:\n")
+            print(
+                f"{r['tipo_cancer']} tem taxa de mortalidade de "
+                f"{r['taxa_mortalidade']:.2f}%."
+            )
+            return
+
         r = mortalidade_df.sort_values(
             "taxa_mortalidade", ascending=False
         ).iloc[0]
@@ -681,6 +904,16 @@ def responder(intencao, pergunta_norm):
 
     if intencao == "CUSTO":
 
+        cancer = detectar_cancer(pergunta_norm)
+
+        if cancer is not None and cancer in custos_df["tipo_cancer"].values:
+            r = custos_df[custos_df["tipo_cancer"] == cancer].iloc[0]
+
+            print("\nResposta:\n")
+            print(f"{r['tipo_cancer']} tem custo hospitalar total de:")
+            print(f"R$ {r['valor_total']:,.2f}")
+            return
+
         r = custos_df.sort_values(
             "valor_total", ascending=False
         ).iloc[0]
@@ -691,6 +924,23 @@ def responder(intencao, pergunta_norm):
         return
 
     if intencao == "PERMANENCIA":
+
+        cancer = detectar_cancer(pergunta_norm)
+
+        if (
+            cancer is not None
+            and cancer in permanencia_df["tipo_cancer"].values
+        ):
+            r = permanencia_df[
+                permanencia_df["tipo_cancer"] == cancer
+            ].iloc[0]
+
+            print("\nResposta:\n")
+            print(
+                f"{r['tipo_cancer']} tem permanência hospitalar "
+                f"média de {r['permanencia_media']:.2f} dias."
+            )
+            return
 
         r = permanencia_df.sort_values(
             "permanencia_media", ascending=False
@@ -721,9 +971,14 @@ def responder(intencao, pergunta_norm):
 
     if intencao == "TENDENCIA_ESTADUAL":
 
-        r = tendencia.sort_values(
-            "desvio", ascending=False
-        ).iloc[0]
+        cancer = detectar_cancer(pergunta_norm)
+
+        if cancer is not None and cancer in tendencia["tipo_cancer"].values:
+            r = tendencia[tendencia["tipo_cancer"] == cancer].iloc[0]
+        else:
+            r = tendencia.sort_values(
+                "desvio", ascending=False
+            ).iloc[0]
 
         print("\nResposta:\n")
 
@@ -744,6 +999,25 @@ def responder(intencao, pergunta_norm):
         return
 
     if intencao == "ANOMALIAS":
+
+        cancer = detectar_cancer(pergunta_norm)
+
+        if (
+            cancer is not None
+            and cancer in anomalias_df["tipo_cancer"].values
+        ):
+            r = anomalias_df[
+                anomalias_df["tipo_cancer"] == cancer
+            ].iloc[0]
+
+            print("\nResposta:\n")
+
+            if r["situacao"] == "NORMAL":
+                print(f"{r['tipo_cancer']} não apresenta anomalia.")
+            else:
+                print(f"{r['tipo_cancer']} - {r['situacao']}")
+
+            return
 
         df = anomalias_df[anomalias_df["situacao"] != "NORMAL"]
 
@@ -796,12 +1070,15 @@ def responder(intencao, pergunta_norm):
 
     print("\nAinda não compreendi essa pergunta.")
     print(
-        "Tente perguntar sobre: panorama geral, prioridade, "
-        "mortalidade, custo, permanência, faixa etária, tendência "
-        "estadual, anomalias, incidência, relatório executivo, "
-        "simular redução de X% (ex.: 'simular reducao de 20% na "
-        "MAMA'), grupos vulneráveis, ou o nome de um câncer "
-        "específico (ex.: MAMA, COLO_UTERO)."
+        "Tente perguntar sobre: panorama geral, o que mudou desde o "
+        "ano passado, apoio à decisão, prioridade, mortalidade, "
+        "custo, permanência, faixa etária, tendência estadual, "
+        "anomalias, incidência, previsão de internações, relatório "
+        "executivo, simular redução de X% (ex.: 'simular reducao de "
+        "20% na MAMA'), grupos vulneráveis, ou o nome de um câncer "
+        "específico (ex.: MAMA, COLO_UTERO) -- pode combinar um "
+        "indicador com o nome do câncer (ex.: 'mortalidade do "
+        "câncer de mama')."
     )
 
 
