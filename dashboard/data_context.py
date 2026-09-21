@@ -48,6 +48,9 @@ def construir_contexto(origem):
         )
 
         previsoes = _ler_tabela(conexao, "previsao_temporal", origem)
+        previsoes_horizontes = _ler_tabela(
+            conexao, "previsao_temporal_horizontes", origem
+        )
         serie_temporal = _ler_tabela(conexao, "serie_temporal_anual", origem)
         tendencias = _ler_tabela(conexao, "tendencia_estadual", origem)
         base = _ler_tabela(conexao, "base_conhecimento", origem)
@@ -66,6 +69,7 @@ def construir_contexto(origem):
                 else "—"
             ),
             "previsoes": previsoes,
+            "previsoes_horizontes": previsoes_horizontes,
             "serie_temporal": serie_temporal,
             "tendencias": tendencias,
             "base": base,
