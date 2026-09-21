@@ -1,24 +1,9 @@
-
-import html
-
 import pandas as pd
 import streamlit as st
 
 from dashboard.data_context import construir_contexto, fechar_contexto
 from dashboard.state import definir, obter
 from dashboard.styles import marca
-
-
-def _anos_disponiveis(previsoes_horizontes):
-    if previsoes_horizontes.empty or "ano_previsto" not in previsoes_horizontes.columns:
-        return []
-
-    anos = sorted(
-        int(ano)
-        for ano in previsoes_horizontes["ano_previsto"].dropna().unique()
-        if int(ano) in (2027, 2028, 2029)
-    )
-    return anos
 
 
 def _nome_cancer(tipo_cancer):
@@ -31,38 +16,41 @@ def _nome_cancer(tipo_cancer):
         "PULMAO": "Câncer de pulmão",
         "TIREOIDE": "Câncer de tireoide",
     }
-    return nomes.get(str(tipo_cancer), str(tipo_cancer).replace("_", " ").title())
+    return nomes.get(
+        str(tipo_cancer),
+        str(tipo_cancer).replace("_", " ").title(),
+    )
 
 
-def _cartoes_previsao(df, ano_escolhido, ultimo_ano):
-    cartoes = []
+def _anos_disponiveis(previsoes_horizontes):
+    if previsoes_horizontes.empty or "ano_previsto" not in previsoes_horizontes.columns:
+        return []
 
-    for _, linha in df.sort_values("tipo_cancer").iterrows():
-        cancer = html.escape(_nome_cancer(linha["tipo_cancer"]))
-        valor = linha.get("internacoes_previstas")
+    return [
+        ano
+        for ano in (2027, 2028, 2029)
+        if ano in set(previsoes_horizontes["ano_previsto"].dropna().astype(int))
+    ]
 
-        if pd.isna(valor):
-            valor_formatado = "—"
-        else:
-            valor_formatado = f"{float(valor):.1f}".replace(".", ",")
 
-        cartoes.append(
-            f"""
-            <div class="ef-forecast-card">
-                <div class="ef-forecast-cancer">{cancer}</div>
-                <div class="ef-forecast-value">{valor_formatado}</div>
-                <div class="ef-forecast-unit">internações estimadas</div>
-                <div class="ef-forecast-meta">
-                    {ano_escolhido} · extrapolação a partir de {ultimo_ano}
-                </div>
-            </div>
-            """
-        )
+def _valor_formatado(valor):
+    if pd.isna(valor):
+        return "—"
+    return f"{float(valor):.1f}".replace(".", ",")
+
+
+def _cartao_ano(ano, valor):
+    valor_texto = _valor_formatado(valor)
 
     st.markdown(
-        '<div class="ef-forecast-grid">'
-        + "".join(cartoes)
-        + "</div>",
+        f"""
+        <div class="ef-card">
+            <div class="ef-card-title">{ano}</div>
+            <div class="ef-forecast-value">{valor_texto}</div>
+            <div class="ef-card-text">internações estimadas</div>
+            <div class="ef-forecast-meta">Extrapolação histórica</div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
@@ -79,7 +67,8 @@ def renderizar():
                 <div class="ef-overline">Camada preditiva</div>
                 <div class="ef-title">Previsões</div>
                 <div class="ef-subtitle">
-                    Estimativas baseadas no comportamento histórico das internações registradas no SUS.
+                    Uma leitura lúdica de 2027 a 2029, baseada no comportamento
+                    histórico das internações registradas no SUS.
                 </div>
             </div>
             """,
@@ -98,70 +87,76 @@ def renderizar():
             return
 
         anos = _anos_disponiveis(horizontes)
-
-        if not anos:
-            st.info(
-                "Não há projeções disponíveis para o triênio 2027–2029."
+        if len(anos) < 3:
+            st.warning(
+                "A base disponível não contém o triênio completo 2027–2029."
             )
             return
 
         tipos = sorted(horizontes["tipo_cancer"].dropna().unique().tolist())
+
         atual_cancer = obter("cancer_selecionado")
         if atual_cancer not in tipos:
             atual_cancer = tipos[0]
             definir("cancer_selecionado", atual_cancer)
 
-        col_doenca, col_ano = st.columns(2)
-
-        with col_doenca:
-            cancer_escolhido = st.selectbox(
-                "Doença monitorada",
-                tipos,
-                index=tipos.index(atual_cancer),
-                format_func=_nome_cancer,
-                key="cancer_previsao_interface",
-                help="Escolha qual tipo de câncer deseja visualizar.",
-            )
+        cancer_escolhido = st.selectbox(
+            "Escolha o câncer",
+            tipos,
+            index=tipos.index(atual_cancer),
+            format_func=_nome_cancer,
+            key="cancer_previsao_interface",
+            help="Escolha qual câncer deseja acompanhar nas estimativas de 2027 a 2029.",
+        )
 
         if cancer_escolhido != obter("cancer_selecionado"):
             definir("cancer_selecionado", cancer_escolhido)
 
-        with col_ano:
-            ano_escolhido = st.selectbox(
-                "Escolha o ano",
-                anos,
-                index=0,
-                key="ano_previsao_interface",
-                help="Selecione uma das três estimativas futuras do Escudo Feminino.",
-            )
+        st.markdown(
+            f"### {_nome_cancer(cancer_escolhido)} · projeção 2027–2029"
+        )
 
         df = horizontes[
             (horizontes["tipo_cancer"] == cancer_escolhido)
-            & (horizontes["ano_previsto"].astype(int) == int(ano_escolhido))
+            & (horizontes["ano_previsto"].astype(int).isin(anos))
         ].copy()
 
+        df = df.sort_values("ano_previsto")
+
         if df.empty:
-            st.info("Não há projeção registrada para essa combinação de doença e ano.")
+            st.info("Não há projeções para o câncer selecionado.")
             return
 
-        ultimo_ano = (
-            int(serie["ano"].max())
-            if not serie.empty and "ano" in serie.columns
-            else 2025
-        )
+        colunas = st.columns(3)
 
-        st.markdown(f"### O que o histórico sugere para {ano_escolhido}?")
+        for coluna, ano in zip(colunas, anos):
+            with coluna:
+                linha = df[df["ano_previsto"].astype(int) == ano]
 
+                if linha.empty:
+                    st.markdown(
+                        f"""
+                        <div class="ef-card">
+                            <div class="ef-card-title">{ano}</div>
+                            <div class="ef-card-text">
+                                Sem projeção disponível.
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    continue
 
-        _cartoes_previsao(df, ano_escolhido, ultimo_ano)
+                _cartao_ano(ano, linha.iloc[0]["internacoes_previstas"])
 
         st.markdown(
             """
             <div class="ef-note">
-                Estas três janelas futuras são <strong>extrapolações lúdicas</strong>
-                da tendência histórica das internações registradas. Não são previsão
-                de novos casos de câncer e não têm validação própria para 2027, 2028 ou
-                2029. O ponto validado do motor fica separado como referência técnica.
+                <strong>Como ler:</strong> 2027, 2028 e 2029 são extrapolações
+                lúdicas da tendência histórica das internações registradas.
+                Não representam novos casos de câncer e não têm validação própria
+                para esses três anos. O ano seguinte ao histórico (2026) permanece
+                separado como referência técnica validada.
             </div>
             """,
             unsafe_allow_html=True,
@@ -179,7 +174,7 @@ def renderizar():
                 if coluna in df.columns
             ]
             st.dataframe(
-                df[tecnicas].sort_values("tipo_cancer"),
+                df[tecnicas].sort_values("ano_previsto"),
                 use_container_width=True,
                 hide_index=True,
             )
