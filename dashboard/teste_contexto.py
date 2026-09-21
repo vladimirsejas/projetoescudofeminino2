@@ -71,6 +71,7 @@ def testar():
                         ("MAMA", "MUNICIPIO", 2024, 1, 0, 0.0, "RIO_CLARO"),
                         ("MAMA", "MUNICIPIO", 2025, 2, 1, 50.0, "RIO_CLARO"),
                         ("COLORRETAL", "MUNICIPIO", 2025, 1, 0, 0.0, "RIO_CLARO"),
+                        ("MAMA", "SP", 2025, 999, 20, 2.0, "RIO_CLARO"),
                         ("MAMA", "MUNICIPIO", 2025, 9, 0, 0.0, "LIMEIRA"),
                     ],
                 )
@@ -128,11 +129,13 @@ def testar():
 
         assert set(ctx["ranking"]["tipo_cancer"]) == {"MAMA"}
         assert set(ctx["serie_temporal"]["tipo_cancer"]) == {"MAMA"}
+        assert set(ctx["serie_temporal"]["grupo"]) == {"MUNICIPIO"}
+        assert ctx["serie_temporal"]["internacoes"].sum() == 3
 
         ctx_limeira = data_context.construir_contexto("LIMEIRA", "MAMA")
         assert ctx_limeira["internacoes"] == 1
 
-        print("9/9 checagens do contexto da interface passaram.")
+        print("11/11 checagens do contexto da interface passaram.")
 
     finally:
         if os.path.exists(banco):
