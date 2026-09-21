@@ -1,3 +1,4 @@
+
 import sqlite3
 
 import pandas as pd
@@ -47,6 +48,7 @@ def construir_contexto(origem):
         )
 
         previsoes = _ler_tabela(conexao, "previsao_temporal", origem)
+        serie_temporal = _ler_tabela(conexao, "serie_temporal_anual", origem)
         tendencias = _ler_tabela(conexao, "tendencia_estadual", origem)
         base = _ler_tabela(conexao, "base_conhecimento", origem)
 
@@ -64,6 +66,7 @@ def construir_contexto(origem):
                 else "—"
             ),
             "previsoes": previsoes,
+            "serie_temporal": serie_temporal,
             "tendencias": tendencias,
             "base": base,
             "uf_referencia": UF_REFERENCIA,
