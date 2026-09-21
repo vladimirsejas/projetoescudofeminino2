@@ -30,6 +30,8 @@ sys.path.insert(0, DIRETORIO_ATUAL)
 from previsao_temporal import (  # noqa: E402
     calcular_previsao_serie,
     gerar_previsao_municipio,
+    calcular_projecoes_futuras,
+    gerar_projecoes_futuras_municipio,
 )
 
 
@@ -311,6 +313,142 @@ def testar_com_dado_historico_real(checar):
     print(resultado.to_string(index=False))
 
 
+def testar_projecoes_futuras(checar):
+
+    # histórico curto demais -> nenhuma projeção (mesma regra mínima
+    # de calcular_previsao_serie)
+    projecoes = calcular_projecoes_futuras([2024, 2025], [10, 12])
+    checar(
+        "menos anos que o mínimo -> nenhuma projeção futura",
+        projecoes == []
+    )
+
+    # tendência linear perfeita e crescente: 2013..2025 = 10..70 em
+    # passos de 5 -> 2026 (validado, fora desta função) seria 75;
+    # 2027/2028/2029 devem continuar a mesma reta exata
+    anos = list(range(2020, 2026))
+    internacoes = [10, 20, 30, 40, 50, 60]
+    projecoes = calcular_projecoes_futuras(anos, internacoes)
+
+    checar(
+        "gera exatamente 3 anos por padrão, começando no ano depois "
+        "do validado (2026 fica de fora, é de previsao_temporal)",
+        [p["ano_previsto"] for p in projecoes] == [2027, 2028, 2029]
+    )
+
+    checar(
+        "tendência linear perfeita -> 2027/2028/2029 seguem a mesma "
+        "reta exata (80, 90, 100)",
+        [p["internacoes_previstas"] for p in projecoes] == [80.0, 90.0, 100.0]
+    )
+
+    checar(
+        "nenhuma chave de confiabilidade/erro nestas linhas -- este "
+        "horizonte nunca foi validado, não pode parecer que foi",
+        all(
+            "confiabilidade" not in p and "erro_validacao_pct" not in p
+            for p in projecoes
+        )
+    )
+
+    # tendência de queda acentuada -> nunca projeta número negativo
+    anos = [2021, 2022, 2023, 2024, 2025]
+    internacoes = [50, 40, 30, 20, 10]
+    projecoes = calcular_projecoes_futuras(anos, internacoes)
+    checar(
+        "queda acentuada -> nenhuma projeção futura fica negativa",
+        all(p["internacoes_previstas"] >= 0 for p in projecoes)
+    )
+
+    # parâmetro horizontes customizado
+    projecoes = calcular_projecoes_futuras(
+        list(range(2020, 2026)), [10, 20, 30, 40, 50, 60], horizontes=1
+    )
+    checar(
+        "horizontes=1 -> só o ano seguinte ao validado (2027), não "
+        "os 3 do padrão",
+        [p["ano_previsto"] for p in projecoes] == [2027]
+    )
+
+
+def testar_agrupamento_projecoes_futuras(checar):
+
+    serie_df = pd.DataFrame([
+        {"tipo_cancer": "MAMA", "grupo": "MUNICIPIO", "ano": ano,
+         "internacoes": 10 + (ano - 2020) * 5}
+        for ano in range(2020, 2026)
+    ] + [
+        {"tipo_cancer": "MAMA", "grupo": "SP", "ano": ano,
+         "internacoes": 1000 + ano}
+        for ano in range(2020, 2026)
+    ])
+
+    resultado = gerar_projecoes_futuras_municipio(serie_df)
+
+    checar(
+        "gera 3 linhas (2027/2028/2029) só para MAMA, ignorando a "
+        "série de SP",
+        set(resultado["tipo_cancer"]) == {"MAMA"} and len(resultado) == 3
+    )
+
+    checar(
+        "anos gerados são exatamente 2027, 2028, 2029, em ordem",
+        resultado.sort_values("ano_previsto")["ano_previsto"].tolist()
+        == [2027, 2028, 2029]
+    )
+
+
+def testar_projecoes_com_dado_historico_real(checar):
+
+    caminho_csv = os.path.join(
+        DIRETORIO_ATUAL, "..", "analises", "base_preditiva_2013_2025.csv"
+    )
+
+    if not os.path.exists(caminho_csv):
+        print(
+            "[PULADO] dado histórico real não encontrado neste "
+            "checkout -- teste de projeções futuras contra "
+            "2013-2025 ignorado"
+        )
+        return
+
+    df = pd.read_csv(caminho_csv, sep=";")
+
+    serie_df = df[df["territorio"] == "Rio Claro"].rename(columns={
+        "cancer": "tipo_cancer",
+    })[["tipo_cancer", "ano", "internacoes"]]
+
+    serie_df["grupo"] = "MUNICIPIO"
+
+    resultado = gerar_projecoes_futuras_municipio(serie_df)
+
+    checar(
+        "gera 3 anos (2027-2029) para cada um dos 7 cânceres reais "
+        "de Rio Claro -- 21 linhas no total",
+        len(resultado) == 21
+    )
+
+    checar(
+        "todos os anos gerados estão em {2027, 2028, 2029}, nunca "
+        "2026 (esse é só de previsao_temporal) nem mais adiante",
+        set(resultado["ano_previsto"]) == {2027, 2028, 2029}
+    )
+
+    checar(
+        "nenhuma projeção futura real fica negativa",
+        (resultado["internacoes_previstas"] >= 0).all()
+    )
+
+    print(
+        "\nPrévia da projeção estendida sobre dado histórico real "
+        "(Rio Claro, 2027-2029):\n"
+    )
+    print(
+        resultado.sort_values(["tipo_cancer", "ano_previsto"])
+        .to_string(index=False)
+    )
+
+
 def testar():
 
     falhas = []
@@ -325,6 +463,9 @@ def testar():
     testar_agrupamento_por_cancer(checar)
     testar_execucao_real_multi_tenant(checar)
     testar_com_dado_historico_real(checar)
+    testar_projecoes_futuras(checar)
+    testar_agrupamento_projecoes_futuras(checar)
+    testar_projecoes_com_dado_historico_real(checar)
 
     if falhas:
         raise SystemExit(f"{len(falhas)} checagem(ns) falharam: {falhas}")

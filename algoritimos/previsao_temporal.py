@@ -179,6 +179,77 @@ def calcular_previsao_serie(anos, internacoes):
     }
 
 
+HORIZONTES_FUTUROS = 3
+
+
+def calcular_projecoes_futuras(anos, internacoes, horizontes=HORIZONTES_FUTUROS):
+    """
+    Estende a MESMA reta usada em calcular_previsao_serie() para os
+    anos SEGUINTES ao já validado -- ex.: histórico até 2025,
+    calcular_previsao_serie() já valida 2026 (guardado em
+    previsao_temporal); esta função cobre 2027, 2028 e 2029 (padrão:
+    3 anos além do validado), nunca repete o ano já validado.
+
+    Diferença importante em relação a calcular_previsao_serie(): a
+    validação rolling-origin que já existe testa só a previsão de UM
+    ano à frente -- não temos evidência real de quão bem o mesmo
+    modelo acerta 2, 3 ou 4 anos à frente, e fingir isso seria o
+    exato overclaim que a comparação com baseline foi construída pra
+    evitar. Por isso esta função não devolve confiabilidade nem erro
+    de validação nenhum -- só o ponto extrapolado. Nenhum ano aqui é
+    validado; o único ano validado vive em previsao_temporal.
+    """
+
+    anos = np.asarray(anos, dtype=float)
+    internacoes = np.asarray(internacoes, dtype=float)
+
+    if len(anos) < ANOS_MINIMOS_PARA_PREVISAO:
+        return []
+
+    ano_validado = int(anos.max()) + 1
+    inclinacao, intercepto = np.polyfit(anos, internacoes, 1)
+
+    projecoes = []
+
+    for passo in range(1, horizontes + 1):
+        ano_alvo = ano_validado + passo
+        valor = max(0.0, inclinacao * ano_alvo + intercepto)
+
+        projecoes.append({
+            "ano_previsto": ano_alvo,
+            "horizonte": passo + 1,
+            "internacoes_previstas": round(float(valor), 1),
+        })
+
+    return projecoes
+
+
+def gerar_projecoes_futuras_municipio(serie_df, horizontes=HORIZONTES_FUTUROS):
+    """
+    Mesma varredura por câncer de gerar_previsao_municipio(), mas
+    devolve formato longo (uma linha por câncer x ano) para alimentar
+    a escolha de ano na interface -- ao contrário de
+    gerar_previsao_municipio(), que devolve só o ano seguinte.
+    """
+
+    linhas = []
+
+    municipio_df = serie_df[serie_df["grupo"] == "MUNICIPIO"]
+
+    for cancer, grupo_df in municipio_df.groupby("tipo_cancer"):
+
+        grupo_df = grupo_df.sort_values("ano")
+
+        for projecao in calcular_projecoes_futuras(
+            grupo_df["ano"].tolist(),
+            grupo_df["internacoes"].tolist(),
+            horizontes=horizontes,
+        ):
+            linhas.append({"tipo_cancer": cancer, **projecao})
+
+    return pd.DataFrame(linhas)
+
+
 def gerar_previsao_municipio(serie_df):
     """
     Recebe serie_temporal_anual já filtrada pelo município e devolve
@@ -245,5 +316,26 @@ if __name__ == "__main__":
     )
 
     print("\nTabela previsao_temporal criada com sucesso.")
+
+    projecoes = gerar_projecoes_futuras_municipio(serie)
+
+    print(
+        f"\n=== PROJEÇÃO ESTENDIDA -- {HORIZONTES_FUTUROS} ANOS "
+        f"({MUNICIPIO}) ===\n"
+    )
+    print(
+        "Nenhum ano aqui tem validação rolling-origin -- o único ano "
+        "validado de verdade é o de previsao_temporal (o seguinte ao "
+        "fim do histórico). Estes anos estendem a mesma reta mais "
+        "adiante; trate como indicação de tendência, não como número "
+        "validado.\n"
+    )
+    print(projecoes.to_string(index=False))
+
+    salvar_tabela_municipio(
+        projecoes, "previsao_temporal_horizontes", conn, municipio=MUNICIPIO
+    )
+
+    print("\nTabela previsao_temporal_horizontes criada com sucesso.")
 
     conn.close()
