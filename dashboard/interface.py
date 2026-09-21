@@ -5,16 +5,20 @@ from pathlib import Path
 import streamlit as st
 
 DASHBOARD_DIR = Path(__file__).resolve().parent
-ALG_DIR = DASHBOARD_DIR.parent / "algoritimos"
-if str(ALG_DIR) not in sys.path:
-    sys.path.insert(0, str(ALG_DIR))
+PROJECT_DIR = DASHBOARD_DIR.parent
+ALG_DIR = PROJECT_DIR / "algoritimos"
+
+for caminho in (PROJECT_DIR, ALG_DIR):
+    if str(caminho) not in sys.path:
+        sys.path.insert(0, str(caminho))
 
 from dashboard import state
 from dashboard.styles import aplicar_estilos
 
+
 st.set_page_config(
     page_title="Escudo Feminino",
-    page_icon="Escudo",
+    page_icon=":material/shield:",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -59,23 +63,46 @@ biblioteca = st.Page(
     icon=":material/local_library:",
 )
 
-pagina = st.navigation(
-    [inicio, home, perguntar, explorar, previsoes, comparar, biblioteca],
-    position="top",
-)
+paginas = [
+    inicio,
+    home,
+    perguntar,
+    explorar,
+    previsoes,
+    comparar,
+    biblioteca,
+]
 
-paginas_sem_onboarding = {
-    "home",
-    "perguntar",
-    "explorar",
-    "previsoes",
-    "comparar",
-    "biblioteca",
-}
+
+def navegar():
+    """
+    Usa a navegação oficial do Streamlit quando disponível.
+
+    Em versões mais antigas que ainda tenham st.navigation, tenta
+    posicionar a navegação no topo; se a assinatura não aceitar
+    position="top", cai para a navegação padrão da sidebar em vez
+    de quebrar a aplicação.
+    """
+    if hasattr(st, "navigation"):
+        try:
+            return st.navigation(paginas, position="top")
+        except TypeError:
+            return st.navigation(paginas, position="sidebar")
+
+    # Compatibilidade de último recurso para versões sem st.navigation.
+    # A interface antiga continua sendo a alternativa executável.
+    st.warning(
+        "Esta interface nova precisa de uma versão recente do Streamlit. "
+        "Atualize o Streamlit para usar a navegação final."
+    )
+    st.stop()
+
+
+pagina = navegar()
 
 if (
     not state.obter("onboarding_concluido")
-    and pagina.title not in {"Início"}
+    and pagina.title != "Início"
 ):
     st.info("Primeiro escolha município e perfil na tela de Início.")
     if st.button("Ir para Início", type="primary"):
