@@ -56,3 +56,6 @@ def renderizar():
     ):
         concluir_onboarding()
         st.switch_page("views/home.py")
+
+
+renderizar()

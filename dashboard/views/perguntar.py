@@ -26,3 +26,6 @@ def renderizar():
         "Integração da conversa com o dashboard fica para a fase específica do chat; "
         "nesta etapa não duplicamos nem reescrevemos o motor."
     )
+
+
+renderizar()

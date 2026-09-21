@@ -61,3 +61,6 @@ def renderizar():
         )
     finally:
         fechar_contexto(ctx)
+
+
+renderizar()

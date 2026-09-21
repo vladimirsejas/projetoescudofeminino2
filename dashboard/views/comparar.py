@@ -82,3 +82,6 @@ def renderizar():
         )
     finally:
         conexao.close()
+
+
+renderizar()

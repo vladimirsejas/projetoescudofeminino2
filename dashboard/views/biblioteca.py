@@ -61,3 +61,6 @@ def renderizar():
         "Primeira versão da Biblioteca: conceitos usados diretamente na interpretação "
         "do motor. O catálogo de doenças e indicadores específicos entra na etapa editorial."
     )
+
+
+renderizar()
