@@ -37,7 +37,19 @@ CONCEITOS = [
 
 
 def renderizar():
-    marca(f"{obter('municipio_nome')} · Biblioteca")
+    cidade = obter("municipio_nome")
+    cancer = obter("cancer_selecionado")
+    nomes = {
+        "MAMA": "Câncer de mama",
+        "COLORRETAL": "Câncer colorretal",
+        "COLO_UTERO": "Câncer do colo do útero",
+        "OVARIO": "Câncer de ovário",
+        "PELE_NAO_MELANOMA": "Pele não melanoma",
+        "PULMAO": "Câncer de pulmão",
+        "TIREOIDE": "Câncer de tireoide",
+    }
+    doenca = nomes.get(cancer, "Doença selecionada")
+    marca(f"{cidade} · {doenca} · Biblioteca")
 
     st.markdown(
         """
