@@ -13,7 +13,7 @@ def _anos_disponiveis(serie_temporal):
         return []
 
     ultimo_ano = int(serie_temporal["ano"].max())
-    return list(range(ultimo_ano + 1, ultimo_ano + 4))
+    # Como o projeto está sendo apresentado em 2026 e o último ano observado é 2025,\n    # a interface começa pelo próximo triênio completo à frente: 2027-2029.\n    return list(range(ultimo_ano + 2, ultimo_ano + 5))
 
 
 def renderizar():
