@@ -13,7 +13,7 @@ def _anos_disponiveis(serie_temporal):
         return []
 
     ultimo_ano = int(serie_temporal["ano"].max())
-    return list(range(ultimo_ano + 1, ultimo_ano + 6))
+    return list(range(ultimo_ano + 1, ultimo_ano + 4))
 
 
 def renderizar():
