@@ -1,26 +1,10 @@
+
 import os
 import sqlite3
 import sys
 import tempfile
 
 import pandas as pd
-
-# =====================================
-# TESTE DA PREVISÃO TEMPORAL SIMPLES
-#
-# Três camadas de checagem:
-#   1. calcular_previsao_serie() isolada, com séries fabricadas --
-#      prova a lógica de validação/confiabilidade em casos que não
-#      aparecem naturalmente no banco (amostra mínima, erro alto).
-#   2. Execução real do script contra um banco sqlite temporário,
-#      provando que ele lê serie_temporal_anual, grava
-#      previsao_temporal e respeita a regra multi-tenant.
-#   3. Sanidade contra dado histórico real (não sintético) --
-#      analises/base_preditiva_2013_2025.csv, 13 anos por câncer em
-#      Rio Claro -- para garantir que a função não quebra nem produz
-#      número absurdo quando alimentada com ruído de verdade, não só
-#      com série fabricada e bem-comportada.
-# =====================================
 
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_ORIGINAL = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
@@ -35,7 +19,6 @@ from previsao_temporal import (  # noqa: E402
 
 def testar_calculo_isolado(checar):
 
-    # menos anos que o mínimo para prever
     r = calcular_previsao_serie([2023, 2024], [10, 12])
     checar(
         "menos anos que o mínimo -> AMOSTRA_INSUFICIENTE, sem previsão",
@@ -43,7 +26,6 @@ def testar_calculo_isolado(checar):
         and r["confiabilidade"].startswith("AMOSTRA_INSUFICIENTE")
     )
 
-    # 3 anos: dá para prever, mas não dá para validar (mínimo é 4)
     r = calcular_previsao_serie([2023, 2024, 2025], [10, 12, 14])
     checar(
         "3 anos -> prevê, mas confiabilidade é NAO_VALIDADO",
@@ -51,8 +33,6 @@ def testar_calculo_isolado(checar):
         and r["confiabilidade"].startswith("NAO_VALIDADO")
     )
 
-    # tendência linear perfeita e crescente -> validação deve acertar
-    # em cheio (erro ~0%) e confiabilidade OK
     anos = [2020, 2021, 2022, 2023, 2024, 2025]
     internacoes = [10, 20, 30, 40, 50, 60]
     r = calcular_previsao_serie(anos, internacoes)
@@ -62,11 +42,18 @@ def testar_calculo_isolado(checar):
     )
     checar(
         "tendência linear perfeita -> previsão 2026 é 70",
-        r["ano_previsto"] == 2026 and abs(r["internacoes_previstas"] - 70) < 0.01
+        r["ano_previsto"] == 2026
+        and abs(r["internacoes_previstas"] - 70) < 0.01
     )
 
-    # série com quebra abrupta no último ano -> a reta ajustada nos
-    # anos anteriores erra feio o holdout -> BAIXA_CONFIABILIDADE
+    r = calcular_previsao_serie(anos, internacoes, ano_alvo=2028)
+    checar(
+        "ano alvo 2028 -> extrapola a mesma reta para 2028 (90)",
+        r["ano_previsto"] == 2028
+        and r["horizonte_anos"] == 3
+        and abs(r["internacoes_previstas"] - 90) < 0.01
+    )
+
     anos = [2020, 2021, 2022, 2023, 2024, 2025]
     internacoes = [10, 12, 11, 13, 12, 80]
     r = calcular_previsao_serie(anos, internacoes)
@@ -75,7 +62,6 @@ def testar_calculo_isolado(checar):
         r["confiabilidade"].startswith("BAIXA_CONFIABILIDADE")
     )
 
-    # previsão nunca é negativa mesmo com tendência de queda acentuada
     anos = [2021, 2022, 2023, 2024, 2025]
     internacoes = [50, 40, 30, 20, 10]
     r = calcular_previsao_serie(anos, internacoes)
@@ -84,48 +70,66 @@ def testar_calculo_isolado(checar):
         r["internacoes_previstas"] >= 0
     )
 
-    # série com mudança de patamar (estável em 50, cai e estabiliza
-    # em 10) -- a reta ajustada em cima de todo o histórico é puxada
-    # pelo patamar antigo e erra mais que o baseline ingênuo, que
-    # simplesmente repete o valor mais recente (já no patamar novo).
-    # Testei essa hipótese antes de escrever a asserção -- uma
-    # primeira tentativa com ruído puro não reproduzia o efeito, essa
-    # reproduz de verdade.
     anos = list(range(2018, 2026))
     internacoes = [50, 50, 50, 50, 50, 10, 10, 10]
     r = calcular_previsao_serie(anos, internacoes)
     checar(
         "mudança de patamar -> reta não supera baseline -> "
-        "SEM_GANHO_PREDITIVO, previsão vira o baseline (último "
-        "valor conhecido)",
+        "SEM_GANHO_PREDITIVO, previsão vira o baseline",
         not r["supera_baseline"]
         and r["confiabilidade"].startswith("SEM_GANHO_PREDITIVO")
         and r["internacoes_previstas"] == internacoes[-1]
+    )
+
+    try:
+        calcular_previsao_serie(anos, internacoes, ano_alvo=2025)
+    except ValueError:
+        erro_rejeitado = True
+    else:
+        erro_rejeitado = False
+
+    checar(
+        "ano alvo no passado/último ano -> rejeitado",
+        erro_rejeitado
     )
 
 
 def testar_agrupamento_por_cancer(checar):
 
     serie_df = pd.DataFrame([
-        {"tipo_cancer": "MAMA", "grupo": "MUNICIPIO", "ano": ano,
-         "internacoes": 10 + ano - 2020}
+        {
+            "tipo_cancer": "MAMA",
+            "grupo": "MUNICIPIO",
+            "ano": ano,
+            "internacoes": 10 + ano - 2020,
+        }
         for ano in range(2020, 2026)
     ] + [
-        {"tipo_cancer": "MAMA", "grupo": "SP", "ano": ano,
-         "internacoes": 1000 + ano}
+        {
+            "tipo_cancer": "MAMA",
+            "grupo": "SP",
+            "ano": ano,
+            "internacoes": 1000 + ano,
+        }
         for ano in range(2020, 2026)
     ] + [
-        {"tipo_cancer": "COLO_UTERO", "grupo": "MUNICIPIO", "ano": ano,
-         "internacoes": 5}
+        {
+            "tipo_cancer": "COLO_UTERO",
+            "grupo": "MUNICIPIO",
+            "ano": ano,
+            "internacoes": 5,
+        }
         for ano in range(2020, 2026)
     ])
 
-    resultado = gerar_previsao_municipio(serie_df)
+    resultado = gerar_previsao_municipio(serie_df, ano_alvo=2028)
 
     checar(
-        "gera uma linha por câncer, ignorando a série de SP",
+        "gera uma linha por câncer no mesmo ano-alvo, ignorando a série de SP",
         set(resultado["tipo_cancer"]) == {"MAMA", "COLO_UTERO"}
         and len(resultado) == 2
+        and set(resultado["ano_previsto"]) == {2028}
+        and set(resultado["horizonte_anos"]) == {3}
     )
 
 
@@ -152,18 +156,17 @@ def testar_execucao_real_multi_tenant(checar):
                 (ano, 30 + (ano - 2013) * 2)
             )
 
-        # linha de outro município já processado -- prova que rodar
-        # para RIO_CLARO não apaga LIMEIRA
         conexao.execute(
             "CREATE TABLE previsao_temporal ("
             "tipo_cancer TEXT, anos_historico INTEGER, ano_previsto INTEGER, "
-            "internacoes_previstas REAL, erro_validacao_pct REAL, "
-            "erro_baseline_pct REAL, supera_baseline INTEGER, "
-            "dobras_validacao INTEGER, confiabilidade TEXT, municipio TEXT)"
+            "horizonte_anos INTEGER, internacoes_previstas REAL, "
+            "erro_validacao_pct REAL, erro_baseline_pct REAL, "
+            "supera_baseline INTEGER, dobras_validacao INTEGER, "
+            "confiabilidade TEXT, municipio TEXT)"
         )
         conexao.execute(
             "INSERT INTO previsao_temporal VALUES "
-            "('MAMA', 13, 2026, 99.0, 5.0, 20.0, 1, 4, 'OK', 'LIMEIRA')"
+            "('MAMA', 13, 2026, 1, 99.0, 5.0, 20.0, 1, 4, 'OK', 'LIMEIRA')"
         )
 
         conexao.commit()
@@ -182,11 +185,6 @@ def testar_execucao_real_multi_tenant(checar):
         if "configuracao_geografica" in sys.modules:
             sys.modules["configuracao_geografica"].BANCO = banco
 
-        # previsao_temporal.py, ao contrário de serie_temporal.py, usa
-        # "if __name__ == '__main__':" para deixar suas funções
-        # importáveis sem efeito colateral -- por isso o exec aqui
-        # precisa simular __main__ de verdade, senão o bloco principal
-        # nunca roda
         exec(
             compile(codigo_fonte, "previsao_temporal.py", "exec"),
             {"__name__": "__main__"}
@@ -205,8 +203,7 @@ def testar_execucao_real_multi_tenant(checar):
         )
 
         checar(
-            "RIO_CLARO/MAMA foi gravado com confiabilidade OK "
-            "(tendência linear limpa e crescente)",
+            "RIO_CLARO/MAMA foi gravado com confiabilidade OK",
             ("MAMA", "RIO_CLARO", "OK") in linhas
         )
 
@@ -238,73 +235,59 @@ def testar_com_dado_historico_real(checar):
     resultado = gerar_previsao_municipio(serie_df)
 
     checar(
-        "roda sem quebrar sobre os 7 cânceres reais de Rio Claro "
-        "2013-2025",
-        len(resultado) == df[df["territorio"] == "Rio Claro"][
-            "cancer"
-        ].nunique()
+        "roda sem quebrar sobre os 7 cânceres reais de Rio Claro 2013-2025",
+        len(resultado) == df[df["territorio"] == "Rio Claro"]["cancer"].nunique()
     )
 
     checar(
-        "com 13 anos reais por câncer, todas as séries têm previsão "
-        "(nunca AMOSTRA_INSUFICIENTE)",
+        "com 13 anos reais por câncer, todas as séries têm previsão",
         resultado["internacoes_previstas"].notna().all()
     )
 
     checar(
-        "nenhuma previsão negativa, mesmo com a variação real de "
-        "internação ano a ano",
+        "nenhuma previsão negativa",
         (resultado["internacoes_previstas"] >= 0).all()
     )
 
     checar(
-        "com 13 anos reais, todas as séries passaram pela validação "
-        "temporal (nenhuma ficou NAO_VALIDADO)",
+        "com 13 anos reais, todas as séries passaram pela validação temporal",
         resultado["erro_validacao_pct"].notna().all()
     )
 
     checar(
-        "todas as dobras usam o máximo disponível (4) com 13 anos "
-        "de histórico",
+        "todas as dobras usam o máximo disponível (4)",
         (resultado["dobras_validacao"] == 4).all()
     )
 
-    # regressão: com holdout único (versão anterior), Pulmão saía
-    # "OK" só porque 2025 por acaso teve erro baixo (19.4%), mesmo
-    # errando 39-49% nos 3 anos anteriores -- com validação rolling
-    # ele empata exatamente com o baseline ingênuo (38.8% == 38.8%),
-    # e um empate não conta como "superar claramente" -> vira
-    # SEM_GANHO_PREDITIVO, categoria ainda mais precisa que
-    # BAIXA_CONFIABILIDADE isolada
     pulmao = resultado[resultado["tipo_cancer"] == "Pulmão"].iloc[0]
     checar(
-        "Pulmão não supera o baseline com validação rolling (o "
-        "holdout único escondia isso atrás do acerto de sorte em "
-        "2025)",
+        "Pulmão não supera o baseline com validação rolling",
         not pulmao["supera_baseline"]
         and pulmao["confiabilidade"].startswith("SEM_GANHO_PREDITIVO")
     )
 
-    # regressão: Ovário é o caso citado na revisão cruzada (Claude +
-    # ChatGPT) em que a regressão piora bastante frente ao baseline
-    # ingênuo (49.6% vs 24.6%) -- o sistema precisa admitir isso, não
-    # empurrar a extrapolação como se fosse a melhor resposta
     ovario = resultado[resultado["tipo_cancer"] == "Ovário"].iloc[0]
     checar(
-        "Ovário não supera o baseline -- regressão claramente pior "
-        "que repetir o último ano",
+        "Ovário não supera o baseline",
         not ovario["supera_baseline"]
         and ovario["confiabilidade"].startswith("SEM_GANHO_PREDITIVO")
     )
 
-    # regressão: Mama é o caso onde a regressão demonstra ganho real
-    # (17.9% vs 22.4% do baseline) -- confirma que nem toda previsão
-    # cai em SEM_GANHO_PREDITIVO, só quando realmente não ajuda
     mama = resultado[resultado["tipo_cancer"] == "Mama"].iloc[0]
     checar(
-        "Mama supera o baseline e fica OK -- a regressão também "
-        "precisa conseguir vencer quando realmente ajuda",
+        "Mama supera o baseline e fica OK",
         bool(mama["supera_baseline"]) and mama["confiabilidade"] == "OK"
+    )
+
+    resultado_2028 = gerar_previsao_municipio(
+        serie_df,
+        ano_alvo=2028
+    )
+    checar(
+        "ano-alvo 2028 funciona também sobre os 7 cânceres reais",
+        len(resultado_2028) == len(resultado)
+        and (resultado_2028["ano_previsto"] == 2028).all()
+        and (resultado_2028["horizonte_anos"] >= 3).all()
     )
 
     print("\nPrévia da previsão sobre dado histórico real (Rio Claro):\n")
