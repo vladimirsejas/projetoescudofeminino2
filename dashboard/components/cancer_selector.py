@@ -36,7 +36,7 @@ def renderizar(cancers):
         cancers,
         index=cancers.index(atual),
         format_func=nome_cancer,
-        key="cancer_global",
+        key=f"cancer_global_{obter('municipio_origem')}",
         help="Escolha qual doença você quer acompanhar no Escudo Feminino.",
     )
 
