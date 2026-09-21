@@ -98,6 +98,50 @@ def aplicar_estilos():
             line-height: 1.45;
         }
 
+
+        .ef-forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .85rem;
+            margin: .85rem 0 1rem;
+        }
+
+        .ef-forecast-card {
+            background: var(--escudo-superficie);
+            border: 1px solid var(--escudo-linha);
+            border-radius: 16px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(24, 51, 63, .04);
+        }
+
+        .ef-forecast-cancer {
+            color: var(--escudo-subtexto);
+            font-size: .83rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .045em;
+        }
+
+        .ef-forecast-value {
+            color: var(--escudo-texto);
+            font-size: 1.8rem;
+            line-height: 1.05;
+            font-weight: 800;
+            margin: .35rem 0 .2rem;
+        }
+
+        .ef-forecast-unit {
+            color: var(--escudo-subtexto);
+            font-size: .86rem;
+        }
+
+        .ef-forecast-meta {
+            color: var(--escudo-acento);
+            font-size: .8rem;
+            font-weight: 650;
+            margin-top: .6rem;
+        }
+
         .ef-note {
             background: var(--escudo-acento-claro);
             border-left: 4px solid var(--escudo-acento);
@@ -127,6 +171,11 @@ def aplicar_estilos():
 
             .ef-card {
                 padding: .9rem;
+            }
+
+            .ef-forecast-grid {
+                grid-template-columns: 1fr;
+                gap: .7rem;
             }
 
             button[kind="secondary"] {
