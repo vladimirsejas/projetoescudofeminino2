@@ -172,6 +172,7 @@ def resolver_municipios(df, origem, catalogo):
     # Não reclassificamos esses registros pelo código do CSV.
     if origem == "RIO_CLARO":
         return (
+            df,
             pd.Series(["RIO_CLARO"] * len(df), index=df.index),
             pd.Series([3543907] * len(df), index=df.index),
         )
@@ -193,6 +194,30 @@ def resolver_municipios(df, origem, catalogo):
         if codigo is not None else None
     )
 
+    if origem == "SP":
+        codigos_texto = codigos.astype("Int64").astype("string")
+        fora_de_sp = ~codigos_texto.str.startswith("35", na=False)
+
+        if fora_de_sp.any():
+            quantidade = int(fora_de_sp.sum())
+            exemplos = (
+                codigos[fora_de_sp]
+                .dropna()
+                .astype(int)
+                .astype(str)
+                .head(10)
+                .tolist()
+            )
+            print(
+                f"ATENÇÃO: {quantidade} registros de {origem} foram "
+                "descartados porque a residência não pertence ao "
+                f"Estado de São Paulo. Exemplos: {exemplos}"
+            )
+
+            df = df.loc[~fora_de_sp].copy()
+            codigos = codigos.loc[~fora_de_sp]
+            municipios = municipios.loc[~fora_de_sp]
+
     desconhecidos = municipios.isna()
 
     if desconhecidos.any():
@@ -200,16 +225,18 @@ def resolver_municipios(df, origem, catalogo):
         exemplos = (
             codigos[desconhecidos]
             .dropna()
+            .astype(int)
             .astype(str)
             .head(10)
             .tolist()
         )
         raise RuntimeError(
             f"{quantidade} registros de {origem} possuem código municipal "
-            "sem correspondência no catálogo IBGE. Exemplos: {exemplos}"
+            "SP sem correspondência no catálogo IBGE depois da filtragem. "
+            f"Exemplos: {exemplos}"
         )
 
-    return municipios, codigos
+    return df, municipios, codigos
 
 
 VERSAO_CARGA = "carga_todas_bases.py -- com detecção automática de separador (; ou ,)"
@@ -257,7 +284,7 @@ def carregar():
             low_memory=False
         )
 
-        municipios, codigos = resolver_municipios(
+        df, municipios, codigos = resolver_municipios(
             df, origem, catalogo
         )
 
