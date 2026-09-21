@@ -131,9 +131,8 @@ def testar():
 
         ctx_limeira = data_context.construir_contexto("LIMEIRA", "MAMA")
         assert ctx_limeira["internacoes"] == 1
-        assert ctx_limeira["municipio"] if False else True
 
-        print("7/7 checagens do contexto da interface passaram.")
+        print("9/9 checagens do contexto da interface passaram.")
 
     finally:
         if os.path.exists(banco):
