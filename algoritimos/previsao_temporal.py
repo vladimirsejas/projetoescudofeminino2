@@ -1,3 +1,4 @@
+
 import sqlite3
 
 import numpy as np
@@ -13,18 +14,12 @@ from configuracao_geografica import (
 # FUNDAÇÃO DA CAMADA PREDITIVA
 #
 # Propositalmente simples: regressão linear por tipo de câncer sobre
-# a série anual de internações (serie_temporal_anual). Com ~13 anos
-# de histórico por câncer, um modelo mais complexo (random forest
-# etc.) tende a decorar ruído em vez de aprender tendência -- por
-# isso nenhuma biblioteca de machine learning nova entra aqui, só
-# numpy (já é dependência indireta de pandas).
+# a série anual de internações (serie_temporal_anual).
 #
-# Cadeia: serie_temporal_anual -> regressão -> validação temporal
-# rolling-origin (testa contra cada um dos últimos anos disponíveis,
-# nunca só o mais recente -- um holdout único pode acertar por sorte
-# e esconder erro real nos anos anteriores) -> previsão do próximo
-# ano. A explicação em linguagem natural (Gemini) fica para depois --
-# esta camada só produz o número e a confiabilidade dele.
+# A validação continua sendo temporal e contra um baseline simples.
+# A novidade desta versão é somente permitir escolher um ano futuro
+# para a extrapolação. A lógica do modelo e a régua de validação não
+# mudam.
 # =====================================
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
@@ -35,24 +30,40 @@ MAX_DOBRAS_VALIDACAO = 4
 LIMITE_ERRO_BAIXA_CONFIABILIDADE_PCT = 30.0
 
 
-def calcular_previsao_serie(anos, internacoes):
+def calcular_previsao_serie(anos, internacoes, ano_alvo=None):
     """
-    Ajusta uma reta sobre internações x ano e projeta o próximo ano.
+    Ajusta uma reta sobre internações x ano e projeta um ano futuro.
 
-    Nunca devolve só o número -- sempre vem acompanhado de uma
-    avaliação honesta da confiabilidade, seguindo o mesmo princípio
-    já usado em anomalias.py/tendencia_estadual.py para bases
-    pequenas.
+    ano_alvo=None mantém o comportamento original: projeta o ano
+    imediatamente seguinte ao último ano observado.
+
+    Quando ano_alvo é informado, ele precisa ser posterior ao último
+    ano da série. A validação histórica continua exatamente a mesma;
+    o parâmetro só altera o ponto futuro em que a reta é avaliada.
+
+    Para transparência, a função também devolve o horizonte em anos.
     """
 
     anos = np.asarray(anos, dtype=float)
     internacoes = np.asarray(internacoes, dtype=float)
 
-    proximo_ano = int(anos.max()) + 1
+    ultimo_ano = int(anos.max())
+    proximo_ano = ultimo_ano + 1
+    ano_previsto = (
+        proximo_ano if ano_alvo is None else int(ano_alvo)
+    )
+
+    if ano_previsto <= ultimo_ano:
+        raise ValueError(
+            f"ano_alvo deve ser posterior ao último ano observado ({ultimo_ano})"
+        )
+
+    horizonte_anos = ano_previsto - ultimo_ano
 
     if len(anos) < ANOS_MINIMOS_PARA_PREVISAO:
         return {
-            "ano_previsto": proximo_ano,
+            "ano_previsto": ano_previsto,
+            "horizonte_anos": horizonte_anos,
             "internacoes_previstas": None,
             "erro_validacao_pct": None,
             "erro_baseline_pct": None,
@@ -65,33 +76,25 @@ def calcular_previsao_serie(anos, internacoes):
         }
 
     inclinacao, intercepto = np.polyfit(anos, internacoes, 1)
-    internacoes_previstas = max(0.0, inclinacao * proximo_ano + intercepto)
+    internacoes_previstas = max(
+        0.0,
+        inclinacao * ano_previsto + intercepto
+    )
 
     erro_validacao_pct = None
     erro_baseline_pct = None
     dobras_testadas = 0
 
     if len(anos) >= ANOS_MINIMOS_PARA_VALIDACAO:
-        # validação temporal por múltiplas dobras (rolling-origin):
-        # testar só contra o último ano é um único ponto de sorte --
-        # provado com o próprio dado real do projeto, câncer que
-        # acerta o último ano por acaso passa como "OK" mesmo errando
-        # feio nos anos anteriores. Em vez disso, testa contra cada
-        # um dos últimos anos disponíveis (até MAX_DOBRAS_VALIDACAO),
-        # sempre treinando só com anos anteriores ao testado -- nunca
-        # embaralhar, isso vazaria dado do "futuro" para o treino.
-        #
-        # Em cada dobra, também mede o baseline ingênuo ("o próximo
-        # ano repete o último valor conhecido") -- é a régua para
-        # responder se a regressão realmente ajuda ou é só maquiagem:
-        # com ~13 pontos por câncer, um modelo que não bate uma regra
-        # trivial não demonstrou capacidade preditiva nenhuma.
         ordem = np.argsort(anos)
         anos_ord = anos[ordem]
         internacoes_ord = internacoes[ordem]
 
         n = len(anos_ord)
-        num_dobras = min(MAX_DOBRAS_VALIDACAO, n - ANOS_MINIMOS_PARA_PREVISAO)
+        num_dobras = min(
+            MAX_DOBRAS_VALIDACAO,
+            n - ANOS_MINIMOS_PARA_PREVISAO
+        )
 
         erros_dobras = []
         erros_dobras_baseline = []
@@ -106,7 +109,8 @@ def calcular_previsao_serie(anos, internacoes):
                 anos_treino, internacoes_treino, 1
             )
             previsto_teste = max(
-                0.0, inclinacao_val * ano_teste + intercepto_val
+                0.0,
+                inclinacao_val * ano_teste + intercepto_val
             )
             previsto_baseline = internacoes_treino[-1]
 
@@ -138,9 +142,8 @@ def calcular_previsao_serie(anos, internacoes):
             f"dobra de validação temporal)"
         )
     elif not supera_baseline:
-        # a regressão não bateu nem a regra "repete o último ano" --
-        # não demonstrou ganho preditivo, então a previsão que vale é
-        # o próprio baseline, não a extrapolação da reta
+        # A regressão não bateu a regra "repete o último ano".
+        # Mantemos o baseline como previsão usada.
         internacoes_previstas = internacoes_ord[-1]
         confiabilidade = (
             f"SEM_GANHO_PREDITIVO (regressão errou {erro_validacao_pct:.1f}% "
@@ -155,15 +158,11 @@ def calcular_previsao_serie(anos, internacoes):
             f"do baseline)"
         )
     else:
-        # "OK" fica exato (sem detalhe embutido) para se comportar
-        # como o mesmo sinalizador usado em tendencia_estadual.py e
-        # anomalias.py (checado com "!= OK" nesses outros arquivos) --
-        # o detalhe da validação já está em erro_validacao_pct,
-        # erro_baseline_pct e dobras_testadas, como colunas próprias.
         confiabilidade = "OK"
 
     return {
-        "ano_previsto": proximo_ano,
+        "ano_previsto": ano_previsto,
+        "horizonte_anos": horizonte_anos,
         "internacoes_previstas": round(float(internacoes_previstas), 1),
         "erro_validacao_pct": (
             round(erro_validacao_pct, 1)
@@ -179,12 +178,14 @@ def calcular_previsao_serie(anos, internacoes):
     }
 
 
-def gerar_previsao_municipio(serie_df):
+def gerar_previsao_municipio(serie_df, ano_alvo=None):
     """
-    Recebe serie_temporal_anual já filtrada pelo município e devolve
-    uma linha de previsão por tipo_cancer -- só a série do próprio
-    município (grupo == 'MUNICIPIO'), a referência estadual (SP) não
-    é prevista aqui.
+    Recebe série temporal já filtrada pelo município e devolve uma
+    linha de previsão por tipo de câncer.
+
+    ano_alvo=None preserva o comportamento original (próximo ano).
+    Quando informado, todas as séries são projetadas para esse mesmo
+    ano futuro.
     """
 
     linhas = []
@@ -192,11 +193,12 @@ def gerar_previsao_municipio(serie_df):
     municipio_df = serie_df[serie_df["grupo"] == "MUNICIPIO"]
 
     for cancer, grupo_df in municipio_df.groupby("tipo_cancer"):
-
         grupo_df = grupo_df.sort_values("ano")
 
         resultado = calcular_previsao_serie(
-            grupo_df["ano"].tolist(), grupo_df["internacoes"].tolist()
+            grupo_df["ano"].tolist(),
+            grupo_df["internacoes"].tolist(),
+            ano_alvo=ano_alvo,
         )
 
         linhas.append({
@@ -235,8 +237,7 @@ if __name__ == "__main__":
         "internações. Não é previsão epidemiológica precisa -- é uma "
         "extrapolação da tendência histórica, validada contra vários "
         "dos últimos anos reais (não só o mais recente) sempre que "
-        "há histórico suficiente para "
-        "isso.\n"
+        "há histórico suficiente para isso.\n"
     )
     print(previsao.to_string(index=False))
 
