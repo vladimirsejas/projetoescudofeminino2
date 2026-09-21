@@ -2,7 +2,8 @@ import streamlit as st
 
 from dashboard.components.municipio_selector import renderizar as selecionar_municipio
 from dashboard.components.profile_selector import renderizar as selecionar_perfil
-from dashboard.data_context import listar_municipios
+from dashboard.components.cancer_selector import renderizar as selecionar_cancer
+from dashboard.data_context import listar_municipios, listar_cancers_disponiveis
 from dashboard.state import concluir_onboarding, obter
 from dashboard.styles import marca
 
@@ -25,8 +26,9 @@ def renderizar():
             <div class="ef-overline">Entrada</div>
             <div class="ef-title">Transformar dados em entendimento.</div>
             <div class="ef-subtitle">
-                Escolha para quem a informação será apresentada e qual município
-                você quer analisar. A base analítica continua sendo a mesma.
+                Escolha a cidade e a doença que você quer analisar. Depois,
+                defina para quem a informação será apresentada. A base analítica
+                continua sendo a mesma.
             </div>
         </div>
         """,
@@ -36,13 +38,18 @@ def renderizar():
     st.markdown("### 1. Escolha o município")
     selecionar_municipio(municipios)
 
-    st.markdown("### 2. Escolha como você quer enxergar os dados")
+    cancers = listar_cancers_disponiveis(obter("municipio_origem"))
+    st.markdown("### 2. Escolha a doença")
+    selecionar_cancer(cancers)
+
+    st.markdown("### 3. Escolha como você quer enxergar os dados")
     selecionar_perfil()
 
     st.markdown(
         """
         <div class="ef-note">
-            A seleção de perfil muda a linguagem, a ordem e a ênfase da interface.
+            A seleção de doença define o foco inicial da análise. A seleção de perfil
+            muda a linguagem, a ordem e a ênfase da interface.
             Ela não cria uma base de dados diferente.
         </div>
         """,
