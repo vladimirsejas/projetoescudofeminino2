@@ -305,6 +305,22 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
             ["tipo_cancer"],
             "INCIDÊNCIA HOSPITALAR"
         ),
+        "VULNERABILIDADE": (
+            "vulnerabilidade",
+            ["tipo_cancer", "faixa_mais_vulneravel",
+             "taxa_mortalidade_faixa", "obitos_faixa",
+             "internacoes_faixa", "confiabilidade"],
+            "VULNERABILIDADE (FAIXA ETÁRIA DE MAIOR TAXA DE "
+            "MORTALIDADE POR CÂNCER)"
+        ),
+        "PREVISAO": (
+            "previsao_temporal",
+            ["tipo_cancer", "ano_previsto", "internacoes_previstas",
+             "erro_validacao_pct", "erro_baseline_pct",
+             "supera_baseline", "confiabilidade"],
+            "PREVISÃO TEMPORAL (EXTRAPOLAÇÃO DE INTERNAÇÕES SUS -- "
+            "NÃO É PREVISÃO EPIDEMIOLÓGICA DE NOVOS CASOS)"
+        ),
     }
 
     if intencao not in tabelas:
@@ -338,6 +354,16 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
         df = df.sort_values("pontuacao_final", ascending=False)
     elif intencao == "ANOMALIAS" and "situacao" in df.columns:
         df = df[df["situacao"] != "NORMAL"]
+    elif (
+        intencao == "VULNERABILIDADE"
+        and "taxa_mortalidade_faixa" in df.columns
+    ):
+        df = df.sort_values("taxa_mortalidade_faixa", ascending=False)
+    elif (
+        intencao == "PREVISAO"
+        and "internacoes_previstas" in df.columns
+    ):
+        df = df.sort_values("internacoes_previstas", ascending=False)
     elif intencao == "INCIDENCIA":
         df = (
             df.groupby("tipo_cancer")

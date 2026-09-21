@@ -224,6 +224,97 @@ def detectar_cancer(pergunta_norm):
     return None
 
 
+def calcular_simulacao(pergunta_norm):
+    """
+    Calcula a estimativa proporcional de simulação -- extraído de
+    responder() para ser a única fonte do número, usada tanto pelo
+    caminho determinístico quanto pelo contexto entregue à IA de
+    linguagem (achado da revisão cruzada: a IA não pode calcular ou
+    inventar a simulação, só explicar um resultado já calculado).
+    """
+
+    numeros = re.findall(r"\d+", pergunta_norm)
+    reducao_pct = int(numeros[0]) if numeros else 20
+    reducao_pct = max(0, min(reducao_pct, 100))
+
+    cancer_encontrado = next(
+        (
+            c for c in canceres
+            if c in pergunta_norm
+            or normalizar(c.replace("_", " ")) in pergunta_norm
+        ),
+        None
+    )
+
+    if cancer_encontrado is None:
+        cancer_encontrado = priorizacao.sort_values(
+            "pontuacao_final", ascending=False
+        ).iloc[0]["tipo_cancer"]
+
+    dados_sim = pd.read_sql(
+        """
+        SELECT
+            COUNT(*) AS internacoes,
+            SUM(obito) AS obitos,
+            SUM(valor_total) AS custo_total
+        FROM internacoes
+        WHERE tipo_cancer = ? AND municipio = ? AND ano = 2025
+        """,
+        conn,
+        params=(cancer_encontrado, obter_municipio())
+    )
+
+    internacoes_atual = int(dados_sim.iloc[0]["internacoes"] or 0)
+    obitos_atual = int(dados_sim.iloc[0]["obitos"] or 0)
+    custo_atual = float(dados_sim.iloc[0]["custo_total"] or 0)
+
+    if internacoes_atual == 0:
+        return {
+            "cancer": cancer_encontrado,
+            "reducao_pct": reducao_pct,
+            "sem_dados": True,
+        }
+
+    fracao_reduzida = reducao_pct / 100
+
+    return {
+        "cancer": cancer_encontrado,
+        "reducao_pct": reducao_pct,
+        "sem_dados": False,
+        "internacoes_atual": internacoes_atual,
+        "obitos_atual": obitos_atual,
+        "custo_atual": custo_atual,
+        "internacoes_evitadas": internacoes_atual * fracao_reduzida,
+        "obitos_evitados": obitos_atual * fracao_reduzida,
+        "economia": custo_atual * fracao_reduzida,
+    }
+
+
+def formatar_contexto_simulacao(r):
+    """Texto determinístico entregue à IA -- ela só pode explicar
+    estes números, nunca recalculá-los."""
+
+    return (
+        "SISTEMA: ESCUDO FEMININO\n"
+        "ESCOPO: SIMULAÇÃO DE IMPACTO (ESTIMATIVA PROPORCIONAL "
+        "SIMPLES, NÃO É PREVISÃO EPIDEMIOLÓGICA PRECISA)\n\n"
+        f"CÂNCER: {r['cancer']}\n"
+        f"REDUÇÃO SIMULADA: {r['reducao_pct']}%\n"
+        f"INTERNAÇÕES ATUAIS (2025): {r['internacoes_atual']}\n"
+        f"ÓBITOS ATUAIS (2025): {r['obitos_atual']}\n"
+        f"CUSTO ATUAL (2025): R$ {r['custo_atual']:,.2f}\n\n"
+        f"INTERNAÇÕES EVITADAS/ANO (ESTIMADO): "
+        f"{r['internacoes_evitadas']:.0f}\n"
+        f"ÓBITOS EVITADOS/ANO (ESTIMADO): {r['obitos_evitados']:.1f}\n"
+        f"ECONOMIA ESTIMADA/ANO: R$ {r['economia']:,.2f}\n\n"
+        "REGRA: esta estimativa assume que óbitos e custo caem na "
+        "mesma proporção das internações -- é uma ordem de grandeza "
+        "para apoiar discussão, não uma previsão epidemiológica "
+        "precisa. Use exatamente estes números para responder; não "
+        "recalcule nem invente outro valor."
+    )
+
+
 def tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
     if not IA_ATIVA:
         return False
@@ -234,12 +325,31 @@ def tentar_resposta_com_ia(pergunta, pergunta_norm, intencao):
     if intencao == "DESCONHECIDA":
         return False
 
-    cancer = detectar_cancer(pergunta_norm) if intencao == "CANCER_ESPECIFICO" else None
-    contexto = contexto_inteligente(
-        pergunta,
-        intencao,
-        cancer
-    )
+    if intencao == "SIMULACAO":
+        # SIMULACAO não é uma tabela pronta -- é um cálculo
+        # parametrizado pela pergunta (câncer + % de redução). Achado
+        # da revisão cruzada: contexto_inteligente() não tinha
+        # entrada pra SIMULACAO (nem pra PREVISAO/VULNERABILIDADE) e
+        # caía no panorama genérico, deixando a IA responder sem o
+        # número real -- ou, pior aqui, arriscando a IA "calcular"
+        # sozinha uma simulação. Por isso o cálculo determinístico
+        # roda primeiro, sempre, e a IA só recebe o resultado pronto.
+        resultado_sim = calcular_simulacao(pergunta_norm)
+
+        if resultado_sim["sem_dados"]:
+            return False
+
+        contexto = formatar_contexto_simulacao(resultado_sim)
+    else:
+        cancer = (
+            detectar_cancer(pergunta_norm)
+            if intencao == "CANCER_ESPECIFICO" else None
+        )
+        contexto = contexto_inteligente(
+            pergunta,
+            intencao,
+            cancer
+        )
 
     if not contexto:
         return False
@@ -608,69 +718,31 @@ def responder(intencao, pergunta_norm):
 
     if intencao == "SIMULACAO":
 
-        numeros = re.findall(r"\d+", pergunta_norm)
-        reducao_pct = int(numeros[0]) if numeros else 20
-        reducao_pct = max(0, min(reducao_pct, 100))
-
-        cancer_encontrado = next(
-            (
-                c for c in canceres
-                if c in pergunta_norm
-                or normalizar(c.replace("_", " ")) in pergunta_norm
-            ),
-            None
-        )
-
-        if cancer_encontrado is None:
-            cancer_encontrado = priorizacao.sort_values(
-                "pontuacao_final", ascending=False
-            ).iloc[0]["tipo_cancer"]
-
-        dados_sim = pd.read_sql(
-            """
-            SELECT
-                COUNT(*) AS internacoes,
-                SUM(obito) AS obitos,
-                SUM(valor_total) AS custo_total
-            FROM internacoes
-            WHERE tipo_cancer = ? AND municipio = ? AND ano = 2025
-            """,
-            conn,
-            params=(cancer_encontrado, obter_municipio())
-        )
-
-        internacoes_atual = int(dados_sim.iloc[0]["internacoes"] or 0)
-        obitos_atual = int(dados_sim.iloc[0]["obitos"] or 0)
-        custo_atual = float(dados_sim.iloc[0]["custo_total"] or 0)
+        r = calcular_simulacao(pergunta_norm)
 
         print(
-            f"\nSimulação: {cancer_encontrado}, redução de "
-            f"{reducao_pct}% nas internações de 2025 em {NOME_MUNICIPIO}.\n"
+            f"\nSimulação: {r['cancer']}, redução de "
+            f"{r['reducao_pct']}% nas internações de 2025 em "
+            f"{NOME_MUNICIPIO}.\n"
         )
 
-        if internacoes_atual == 0:
+        if r["sem_dados"]:
             print(
                 f"Não há internações registradas para "
-                f"{cancer_encontrado} em {NOME_MUNICIPIO} em 2025 — "
+                f"{r['cancer']} em {NOME_MUNICIPIO} em 2025 — "
                 f"sem base para simular."
             )
             return
 
-        fracao_reduzida = reducao_pct / 100
-
-        internacoes_evitadas = internacoes_atual * fracao_reduzida
-        obitos_evitados = obitos_atual * fracao_reduzida
-        economia = custo_atual * fracao_reduzida
-
         print(
-            f"Internações evitadas/ano: {internacoes_evitadas:.0f} "
-            f"(de {internacoes_atual} atuais)"
+            f"Internações evitadas/ano: {r['internacoes_evitadas']:.0f} "
+            f"(de {r['internacoes_atual']} atuais)"
         )
         print(
-            f"Óbitos evitados/ano (estimado): {obitos_evitados:.1f} "
-            f"(de {obitos_atual} atuais)"
+            f"Óbitos evitados/ano (estimado): {r['obitos_evitados']:.1f} "
+            f"(de {r['obitos_atual']} atuais)"
         )
-        print(f"Economia estimada/ano: R$ {economia:,.2f}")
+        print(f"Economia estimada/ano: R$ {r['economia']:,.2f}")
 
         print(
             "\nEsta é uma estimativa proporcional simples — assume "
