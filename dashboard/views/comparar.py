@@ -9,6 +9,7 @@ from dashboard.styles import marca
 def renderizar():
     cidade = obter("municipio_nome")
     origem = obter("municipio_origem")
+    cancer = obter("cancer_selecionado")
     municipios = listar_municipios()
 
     marca(f"{cidade} · Comparar")
@@ -54,10 +55,11 @@ def renderizar():
                 COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
             FROM internacoes
             WHERE municipio IN (?, ?)
+              AND tipo_cancer = ?
             GROUP BY municipio
             """,
             conexao,
-            params=(origem, escolhido["origem"]),
+            params=(origem, escolhido["origem"], cancer),
         )
 
         nomes_map = {
@@ -74,6 +76,9 @@ def renderizar():
                 "permanencia_media": "Permanência Média (dias)",
             }
         )
+
+        nomes_cancer = {"MAMA": "Câncer de mama", "COLORRETAL": "Câncer colorretal", "COLO_UTERO": "Câncer do colo do útero", "OVARIO": "Câncer de ovário", "PELE_NAO_MELANOMA": "Pele não melanoma", "PULMAO": "Câncer de pulmão", "TIREOIDE": "Câncer de tireoide"}
+        st.markdown(f"### Comparação · {nomes_cancer.get(cancer, cancer)}")
 
         st.dataframe(
             resumo,
