@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.data_context import construir_contexto, fechar_contexto
-from dashboard.state import obter
+from dashboard.state import definir, obter
 from dashboard.styles import marca
 
 
@@ -105,20 +105,43 @@ def renderizar():
             )
             return
 
-        ano_escolhido = st.selectbox(
-            "Escolha o ano",
-            anos,
-            index=0,
-            key="ano_previsao_interface",
-            help="Selecione uma das três estimativas futuras do Escudo Feminino.",
-        )
+        tipos = sorted(horizontes["tipo_cancer"].dropna().unique().tolist())
+        atual_cancer = obter("cancer_selecionado")
+        if atual_cancer not in tipos:
+            atual_cancer = tipos[0]
+            definir("cancer_selecionado", atual_cancer)
+
+        col_doenca, col_ano = st.columns(2)
+
+        with col_doenca:
+            cancer_escolhido = st.selectbox(
+                "Doença monitorada",
+                tipos,
+                index=tipos.index(atual_cancer),
+                format_func=_nome_cancer,
+                key="cancer_previsao_interface",
+                help="Escolha qual tipo de câncer deseja visualizar.",
+            )
+
+        if cancer_escolhido != obter("cancer_selecionado"):
+            definir("cancer_selecionado", cancer_escolhido)
+
+        with col_ano:
+            ano_escolhido = st.selectbox(
+                "Escolha o ano",
+                anos,
+                index=0,
+                key="ano_previsao_interface",
+                help="Selecione uma das três estimativas futuras do Escudo Feminino.",
+            )
 
         df = horizontes[
-            horizontes["ano_previsto"].astype(int) == int(ano_escolhido)
+            (horizontes["tipo_cancer"] == cancer_escolhido)
+            & (horizontes["ano_previsto"].astype(int) == int(ano_escolhido))
         ].copy()
 
         if df.empty:
-            st.info("Não há projeções registradas para este ano.")
+            st.info("Não há projeção registrada para essa combinação de doença e ano.")
             return
 
         ultimo_ano = (
