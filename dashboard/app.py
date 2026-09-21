@@ -268,8 +268,8 @@ def renderizar_cidada(ctx):
     )
 
     st.write(
-        f"O câncer que mais afeta as mulheres internadas pelo SUS em "
-        f"**{ctx['NOME_MUNICIPIO']}** é: **{ctx['lider']}**."
+        f"O tipo de câncer com maior número de internações registradas "
+        f"no SUS em **{ctx['NOME_MUNICIPIO']}** é: **{ctx['lider']}**."
     )
 
     st.divider()
@@ -817,8 +817,9 @@ def renderizar_investidor(ctx):
     st.warning(
         "Esta base cobre **apenas internações pelo SUS** (sistema "
         "público). Não captura demanda de quem já usa rede privada "
-        "de saúde -- trate os números abaixo como piso da demanda "
-        "real, não como o mercado total."
+        "de saúde -- trate os números abaixo como um indicador da "
+        "demanda observada na rede SUS, não como o mercado total de "
+        "saúde."
     )
 
     col1, col2, col3 = st.columns(3)
