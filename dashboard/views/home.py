@@ -8,7 +8,7 @@ from dashboard.styles import marca
 TEXTOS = {
     "cidada": {
         "overline": "Panorama da cidade",
-        "titulo": "O que está acontecendo em {cidade}?",
+        "titulo": "O que está acontecendo com {doenca} em {cidade}?",
         "subtitulo": "Uma leitura simples dos dados de internações registradas no SUS.",
     },
     "secretaria": {
@@ -18,17 +18,17 @@ TEXTOS = {
     },
     "prefeitura": {
         "overline": "Visão executiva",
-        "titulo": "O que merece atenção em {cidade}?",
+        "titulo": "O que merece atenção em {doenca} em {cidade}?",
         "subtitulo": "Uma leitura executiva baseada nos indicadores observados na rede SUS.",
     },
     "operadora": {
         "overline": "Visão assistencial",
-        "titulo": "Qual é o comportamento da demanda em {cidade}?",
+        "titulo": "Qual é o comportamento da demanda de {doenca} em {cidade}?",
         "subtitulo": "Internações, permanência, custos e distribuição observada na rede SUS.",
     },
     "investidor": {
         "overline": "Visão de mercado",
-        "titulo": "Qual é o tamanho da demanda observada em {cidade}?",
+        "titulo": "Qual é o tamanho da demanda observada de {doenca} em {cidade}?",
         "subtitulo": "Os números abaixo representam internações registradas no SUS, não o mercado total.",
     },
 }
