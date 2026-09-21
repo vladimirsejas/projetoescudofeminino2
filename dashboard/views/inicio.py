@@ -63,10 +63,17 @@ def renderizar():
         unsafe_allow_html=True,
     )
 
+    pode_entrar = bool(
+        obter("municipio_origem")
+        and obter("cancer_selecionado")
+        and obter("perfil")
+    )
+
     if st.button(
         "Entrar no Escudo Feminino",
         type="primary",
         use_container_width=True,
+        disabled=not pode_entrar,
     ):
         concluir_onboarding()
         st.switch_page("views/home.py")
