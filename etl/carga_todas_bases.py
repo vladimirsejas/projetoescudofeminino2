@@ -210,9 +210,9 @@ def resolver_municipios(df, origem, catalogo):
                 f"Estado de São Paulo. Exemplos: {exemplos}"
             )
 
-            df = df.loc[~fora_de_sp].copy()
-            codigos = codigos.loc[~fora_de_sp]
-            municipios = municipios.loc[~fora_de_sp]
+            df = df.loc[~fora_de_sp].copy().reset_index(drop=True)
+            codigos = codigos.loc[~fora_de_sp].reset_index(drop=True)
+            municipios = municipios.loc[~fora_de_sp].reset_index(drop=True)
 
     desconhecidos = municipios.isna()
 
