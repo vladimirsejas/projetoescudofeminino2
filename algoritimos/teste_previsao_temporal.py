@@ -139,11 +139,11 @@ def testar_execucao_real_multi_tenant(checar):
             "CREATE TABLE previsao_temporal ("
             "tipo_cancer TEXT, anos_historico INTEGER, ano_previsto INTEGER, "
             "internacoes_previstas REAL, erro_validacao_pct REAL, "
-            "confiabilidade TEXT, municipio TEXT)"
+            "dobras_validacao INTEGER, confiabilidade TEXT, municipio TEXT)"
         )
         conexao.execute(
             "INSERT INTO previsao_temporal VALUES "
-            "('MAMA', 13, 2026, 99.0, 5.0, 'OK', 'LIMEIRA')"
+            "('MAMA', 13, 2026, 99.0, 5.0, 4, 'OK', 'LIMEIRA')"
         )
 
         conexao.commit()
@@ -241,6 +241,25 @@ def testar_com_dado_historico_real(checar):
         "com 13 anos reais, todas as séries passaram pela validação "
         "temporal (nenhuma ficou NAO_VALIDADO)",
         resultado["erro_validacao_pct"].notna().all()
+    )
+
+    checar(
+        "todas as dobras usam o máximo disponível (4) com 13 anos "
+        "de histórico",
+        (resultado["dobras_validacao"] == 4).all()
+    )
+
+    # regressão: com holdout único (versão anterior), Pulmão saía
+    # "OK" só porque 2025 por acaso teve erro baixo (19.4%), mesmo
+    # errando 39-49% nos 3 anos anteriores -- a validação rolling-
+    # origin precisa continuar pegando isso, senão a correção
+    # silenciosamente regride
+    pulmao = resultado[resultado["tipo_cancer"] == "Pulmão"].iloc[0]
+    checar(
+        "Pulmão fica BAIXA_CONFIABILIDADE com validação rolling "
+        "(o holdout único escondia isso atrás do acerto de sorte "
+        "em 2025)",
+        pulmao["confiabilidade"].startswith("BAIXA_CONFIABILIDADE")
     )
 
     print("\nPrévia da previsão sobre dado histórico real (Rio Claro):\n")

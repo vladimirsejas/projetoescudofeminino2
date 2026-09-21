@@ -20,8 +20,10 @@ from configuracao_geografica import (
 # numpy (já é dependência indireta de pandas).
 #
 # Cadeia: serie_temporal_anual -> regressão -> validação temporal
-# (treina sem o último ano, testa nele) -> previsão do próximo ano.
-# A explicação em linguagem natural (Gemini) fica para depois --
+# rolling-origin (testa contra cada um dos últimos anos disponíveis,
+# nunca só o mais recente -- um holdout único pode acertar por sorte
+# e esconder erro real nos anos anteriores) -> previsão do próximo
+# ano. A explicação em linguagem natural (Gemini) fica para depois --
 # esta camada só produz o número e a confiabilidade dele.
 # =====================================
 
@@ -29,6 +31,7 @@ BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
 ANOS_MINIMOS_PARA_PREVISAO = 3
 ANOS_MINIMOS_PARA_VALIDACAO = 4
+MAX_DOBRAS_VALIDACAO = 4
 LIMITE_ERRO_BAIXA_CONFIABILIDADE_PCT = 30.0
 
 
@@ -52,6 +55,7 @@ def calcular_previsao_serie(anos, internacoes):
             "ano_previsto": proximo_ano,
             "internacoes_previstas": None,
             "erro_validacao_pct": None,
+            "dobras_validacao": 0,
             "confiabilidade": (
                 f"AMOSTRA_INSUFICIENTE ({len(anos)} ano(s) de "
                 f"histórico, mínimo {ANOS_MINIMOS_PARA_PREVISAO})"
@@ -62,45 +66,68 @@ def calcular_previsao_serie(anos, internacoes):
     internacoes_previstas = max(0.0, inclinacao * proximo_ano + intercepto)
 
     erro_validacao_pct = None
+    dobras_testadas = 0
 
     if len(anos) >= ANOS_MINIMOS_PARA_VALIDACAO:
-        # validação temporal: treina sem o último ano e testa nele --
-        # nunca embaralhar os anos, isso vazaria dado do "futuro"
-        # para o treino
+        # validação temporal por múltiplas dobras (rolling-origin):
+        # testar só contra o último ano é um único ponto de sorte --
+        # provado com o próprio dado real do projeto, câncer que
+        # acerta o último ano por acaso passa como "OK" mesmo errando
+        # feio nos anos anteriores. Em vez disso, testa contra cada
+        # um dos últimos anos disponíveis (até MAX_DOBRAS_VALIDACAO),
+        # sempre treinando só com anos anteriores ao testado -- nunca
+        # embaralhar, isso vazaria dado do "futuro" para o treino.
         ordem = np.argsort(anos)
         anos_ord = anos[ordem]
         internacoes_ord = internacoes[ordem]
 
-        anos_treino, ano_teste = anos_ord[:-1], anos_ord[-1]
-        internacoes_treino, internacoes_teste = (
-            internacoes_ord[:-1], internacoes_ord[-1]
-        )
+        n = len(anos_ord)
+        num_dobras = min(MAX_DOBRAS_VALIDACAO, n - ANOS_MINIMOS_PARA_PREVISAO)
 
-        inclinacao_val, intercepto_val = np.polyfit(
-            anos_treino, internacoes_treino, 1
-        )
-        previsto_teste = max(
-            0.0, inclinacao_val * ano_teste + intercepto_val
-        )
+        erros_dobras = []
 
-        if internacoes_teste > 0:
-            erro_validacao_pct = (
-                abs(previsto_teste - internacoes_teste)
-                / internacoes_teste
-            ) * 100
+        for corte in range(n - num_dobras, n):
+            anos_treino = anos_ord[:corte]
+            internacoes_treino = internacoes_ord[:corte]
+            ano_teste = anos_ord[corte]
+            internacoes_teste = internacoes_ord[corte]
+
+            inclinacao_val, intercepto_val = np.polyfit(
+                anos_treino, internacoes_treino, 1
+            )
+            previsto_teste = max(
+                0.0, inclinacao_val * ano_teste + intercepto_val
+            )
+
+            if internacoes_teste > 0:
+                erros_dobras.append(
+                    abs(previsto_teste - internacoes_teste)
+                    / internacoes_teste * 100
+                )
+
+        dobras_testadas = len(erros_dobras)
+
+        if erros_dobras:
+            erro_validacao_pct = float(np.mean(erros_dobras))
 
     if erro_validacao_pct is None:
         confiabilidade = (
             f"NAO_VALIDADO (histórico com {len(anos)} ano(s), mínimo "
-            f"{ANOS_MINIMOS_PARA_VALIDACAO} para testar o modelo "
-            f"contra um ano real)"
+            f"{ANOS_MINIMOS_PARA_VALIDACAO} para rodar ao menos uma "
+            f"dobra de validação temporal)"
         )
     elif erro_validacao_pct > LIMITE_ERRO_BAIXA_CONFIABILIDADE_PCT:
         confiabilidade = (
-            f"BAIXA_CONFIABILIDADE (erro de {erro_validacao_pct:.1f}% "
-            f"ao testar o modelo contra o último ano real)"
+            f"BAIXA_CONFIABILIDADE (erro médio de "
+            f"{erro_validacao_pct:.1f}% em {dobras_testadas} dobra(s) "
+            f"de validação temporal)"
         )
     else:
+        # "OK" fica exato (sem detalhe embutido) para se comportar
+        # como o mesmo sinalizador usado em tendencia_estadual.py e
+        # anomalias.py (checado com "!= OK" nesses outros arquivos) --
+        # o detalhe da validação já está em erro_validacao_pct e
+        # dobras_testadas, como colunas próprias.
         confiabilidade = "OK"
 
     return {
@@ -110,6 +137,7 @@ def calcular_previsao_serie(anos, internacoes):
             round(erro_validacao_pct, 1)
             if erro_validacao_pct is not None else None
         ),
+        "dobras_validacao": dobras_testadas,
         "confiabilidade": confiabilidade,
     }
 
@@ -168,8 +196,9 @@ if __name__ == "__main__":
     print(
         "Regressão linear por tipo de câncer sobre a série anual de "
         "internações. Não é previsão epidemiológica precisa -- é uma "
-        "extrapolação da tendência histórica, validada contra o "
-        "último ano real sempre que há histórico suficiente para "
+        "extrapolação da tendência histórica, validada contra vários "
+        "dos últimos anos reais (não só o mais recente) sempre que "
+        "há histórico suficiente para "
         "isso.\n"
     )
     print(previsao.to_string(index=False))
