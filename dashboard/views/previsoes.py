@@ -1,8 +1,19 @@
+
 import streamlit as st
+
+from algoritimos.previsao_temporal import gerar_previsao_municipio
 
 from dashboard.data_context import construir_contexto, fechar_contexto
 from dashboard.state import obter
 from dashboard.styles import marca
+
+
+def _anos_disponiveis(serie_temporal):
+    if serie_temporal.empty:
+        return []
+
+    ultimo_ano = int(serie_temporal["ano"].max())
+    return list(range(ultimo_ano + 1, ultimo_ano + 6))
 
 
 def renderizar():
@@ -24,17 +35,53 @@ def renderizar():
             unsafe_allow_html=True,
         )
 
-        if ctx["previsoes"].empty:
-            st.info(
-                "A tabela de previsões ainda não está disponível para este município."
+        if ctx["serie_temporal"].empty:
+            if ctx["previsoes"].empty:
+                st.info(
+                    "A série histórica necessária para calcular previsões "
+                    "ainda não está disponível para este município."
+                )
+                return
+
+            st.warning(
+                "A série histórica não está disponível para recalcular "
+                "outros horizontes. Exibindo a previsão já registrada."
             )
+            df = ctx["previsoes"].copy()
+            ano_escolhido = None
+        else:
+            anos = _anos_disponiveis(ctx["serie_temporal"])
+
+            ano_escolhido = st.selectbox(
+                "Ano da previsão",
+                anos,
+                index=0,
+                key="ano_previsao_interface",
+                help=(
+                    "Escolha um ano futuro. O sistema recalcula a "
+                    "extrapolação usando a mesma série histórica."
+                ),
+            )
+
+            df = gerar_previsao_municipio(
+                ctx["serie_temporal"],
+                ano_alvo=int(ano_escolhido),
+            )
+
+        if df.empty:
+            st.info("Não há dados suficientes para gerar uma previsão.")
             return
 
-        df = ctx["previsoes"].copy()
+        if ano_escolhido is not None:
+            st.markdown(
+                f"### Estimativas para {ano_escolhido}"
+            )
 
         colunas = [
             "tipo_cancer",
+            "anos_historico",
             "ano_previsto",
+            "horizonte_anos",
             "internacoes_previstas",
             "erro_validacao_pct",
             "erro_baseline_pct",
@@ -53,8 +100,10 @@ def renderizar():
             """
             <div class="ef-note">
                 Esta camada não prevê novos casos de câncer. Ela extrapola o comportamento
-                observado nas internações do SUS e mostra também a validação e o ganho em
-                relação ao baseline simples.
+                observado nas internações do SUS. A validação mostrada é histórica e
+                de curto prazo; projeções mais distantes têm incerteza maior. Quando a
+                regressão não demonstra ganho sobre o baseline simples, o sistema usa
+                o último valor observado como referência.
             </div>
             """,
             unsafe_allow_html=True,
