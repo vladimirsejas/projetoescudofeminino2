@@ -114,8 +114,8 @@ def classificar_intencao(pergunta_norm, canceres):
     )):
         return "INCIDENCIA"
 
-    if "RELATORIO" in pergunta_norm:
-        return "RELATORIO_EXECUTIVO"
+    if detectar_cancer(pergunta_norm, canceres):
+        return "CANCER_ESPECIFICO"
 
     return "DESCONHECIDA"
 
@@ -159,9 +159,12 @@ def responder_pergunta(pergunta, municipio, cancer_selecionado=None):
 
         if intencao == "DESCONHECIDA":
             resposta = (
-                "Posso ajudar a explorar os dados. Tente perguntar sobre "
-                "internações, mortalidade, custos, permanência hospitalar, "
-                "faixa etária, tendência, anomalias, prioridades ou evolução temporal."
+                "Posso explorar os dados de várias formas. Você pode perguntar "
+                "sobre internações, evolução, mortalidade, custos, permanência, "
+                "faixa etária, tendência em relação a São Paulo, anomalias, "
+                "priorização, vulnerabilidade, simulações ou pedir um relatório. "
+                "Também pode combinar doença + indicador, por exemplo: "
+                "'qual a mortalidade do câncer de mama?'"
             )
         else:
             if intencao == "CANCER_ESPECIFICO" and cancer is None:
