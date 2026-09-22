@@ -149,7 +149,7 @@ st.markdown("""
 # ENTRADA PRINCIPAL
 # ============================================================
 
-col_local, col_doenca = st.columns([1, 1])
+col_local, col_doenca, col_ano = st.columns([1, 1, 1])
 
 with col_local:
     nome_escolhido = st.selectbox(
@@ -173,6 +173,10 @@ doencas = ler_sql("""
 
 opcoes_doenca = ["Todas as doenças"] + doencas
 
+# Período de estudo do Escudo: 2013 a 2025.
+# O ano permanece disponível mesmo quando não há registros no município.
+anos_disponiveis = list(range(2025, 2012, -1))
+
 with col_doenca:
     doenca_escolhida = st.selectbox(
         "Doença",
@@ -183,6 +187,14 @@ with col_doenca:
 
 if doenca_escolhida == "Todas as doenças":
     doenca_escolhida = None
+
+with col_ano:
+    ano_escolhido = st.selectbox(
+        "Ano", ["Todos os anos"] + anos_disponiveis,
+        index=0, key="ano_selecao",
+        help="Escolha o ano dos registros que deseja analisar."
+    )
+ano_filtro = None if ano_escolhido == "Todos os anos" else int(ano_escolhido)
 
 # Mantém cada conversa ligada ao município selecionado.
 if "chat_municipio_atual" not in st.session_state:
@@ -198,8 +210,10 @@ elif st.session_state.chat_municipio_atual != ORIGEM:
 
 st.subheader("Pergunte ao Escudo")
 st.caption(
-    f"Você está explorando {NOME_MUNICIPIO} · Pergunte sobre qualquer indicador disponível no Escudo."
+    f"Você está explorando {NOME_MUNICIPIO}"
     + (f" · {doenca_escolhida}" if doenca_escolhida else "")
+    + (f" · {ano_filtro}" if ano_filtro is not None else " · 2013–2025")
+    + ". Pergunte sobre qualquer indicador disponível no Escudo."
 )
 
 if "chat_escudo" not in st.session_state:
@@ -234,7 +248,8 @@ if pergunta:
     resposta, _ = responder_pergunta(
         pergunta,
         ORIGEM,
-        doenca_escolhida
+        doenca_escolhida,
+        ano_filtro
     )
 
     st.session_state.chat_escudo.append(
@@ -255,8 +270,11 @@ filtro_doenca = ""
 params = [ORIGEM]
 
 if doenca_escolhida:
-    filtro_doenca = " AND tipo_cancer = ? "
+    filtro_doenca += " AND tipo_cancer = ? "
     params.append(doenca_escolhida)
+if ano_filtro is not None:
+    filtro_doenca += " AND ano = ? "
+    params.append(ano_filtro)
 
 kpis = ler_sql(f"""
     SELECT
@@ -271,7 +289,10 @@ kpis = ler_sql(f"""
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Internações", f"{int(kpis['internacoes']):,}")
 k2.metric("Óbitos registrados", f"{int(kpis['obitos']):,}")
-k3.metric("Valor hospitalar", f"R$ {float(kpis['valor_total']):,.2f}")
+k3.metric(
+    f"Valor hospitalar — {ano_filtro if ano_filtro is not None else '2013–2025'}",
+    f"R$ {float(kpis['valor_total']):,.2f}"
+)
 k4.metric("Permanência média", f"{float(kpis['permanencia']):.1f} dias")
 
 
@@ -292,16 +313,22 @@ tab_panorama, tab_evolucao, tab_analise, tab_comparar, tab_indicadores, tab_graf
 with tab_panorama:
     st.subheader(f"Panorama — {NOME_MUNICIPIO}")
 
-    ranking = ler_sql("""
+    sql_ranking = """
         SELECT tipo_cancer, COUNT(*) AS total
-        FROM internacoes
-        WHERE municipio = ?
-        GROUP BY tipo_cancer
-        ORDER BY total DESC
-    """, (ORIGEM,))
+        FROM internacoes WHERE municipio = ?
+    """
+    params_ranking = [ORIGEM]
+    if ano_filtro is not None:
+        sql_ranking += " AND ano = ?"
+        params_ranking.append(ano_filtro)
+    sql_ranking += " GROUP BY tipo_cancer ORDER BY total DESC"
+    ranking = ler_sql(sql_ranking, tuple(params_ranking))
 
     if ranking.empty:
-        st.info("Não há dados de internações para este município.")
+        if ano_filtro is not None:
+            st.info(f"Não há registros disponíveis para {NOME_MUNICIPIO} no ano {ano_filtro}.")
+        else:
+            st.info("Não há dados de internações para este município.")
     else:
         a, b = st.columns([1.15, .85])
 
@@ -360,7 +387,12 @@ with tab_evolucao:
             title="Evolução das internações hospitalares"
         )
         st.plotly_chart(fig, use_container_width=True)
-        st.caption("A série mostra internações hospitalares registradas no SIH/SUS.")
+        st.caption(
+            "A série histórica mostra todos os anos disponíveis para a seleção. "
+            + ("O ano escolhido acima é usado nos demais recortes; ele não reduz esta série a um único ponto."
+               if ano_filtro is not None else
+               "A série mostra internações hospitalares registradas no SIH/SUS.")
+        )
 
 
 
@@ -400,6 +432,9 @@ with tab_analise:
     if doenca_escolhida:
         filtro_analise = " AND tipo_cancer = ? "
         params_analise.append(doenca_escolhida)
+    if ano_filtro is not None:
+        filtro_analise += " AND ano = ? "
+        params_analise.append(ano_filtro)
 
     try:
         analise_base = ler_sql(
@@ -428,7 +463,10 @@ with tab_analise:
             m1, m2, m3 = st.columns(3)
             m1.metric("Internações analisadas", f"{total_internacoes:,}")
             m2.metric("Óbitos registrados", f"{total_obitos:,}")
-            m3.metric("Valor hospitalar", f"R$ {total_valor:,.2f}")
+            m3.metric(
+                f"Valor hospitalar — {ano_filtro if ano_filtro is not None else '2013–2025'}",
+                f"R$ {total_valor:,.2f}"
+            )
 
             if doenca_escolhida:
                 linha = analise_base.iloc[0]
@@ -436,7 +474,8 @@ with tab_analise:
                     f"**{doenca_escolhida}:** "
                     f"{int(linha['internacoes']):,} internações registradas, "
                     f"{int(linha['obitos']):,} óbitos registrados e "
-                    f"R$ {float(linha['valor_total']):,.2f} em valor hospitalar."
+                    f"R$ {float(linha['valor_total']):,.2f} em valor hospitalar registrado "
+                    f"no período selecionado."
                 )
             else:
                 st.markdown(
@@ -456,7 +495,7 @@ with tab_analise:
         ("anomalias", "Anomalias", "Mostra situações identificadas pelo motor analítico como fora do padrão."),
         ("priorizacao_executiva", "Priorização", "Apresenta os resultados da priorização calculada pelo Escudo."),
         ("mortalidade", "Mortalidade", "Indicadores de mortalidade disponíveis para a seleção."),
-        ("custos_hospitalares", "Custos hospitalares", "Indicadores de valor hospitalar calculados a partir dos registros."),
+        ("custos_hospitalares", "Valores hospitalares", "Valores hospitalares associados aos registros de internação no período disponível na tabela."),
         ("permanencia_hospitalar", "Permanência hospitalar", "Indicadores relacionados ao tempo de permanência."),
         ("faixa_etaria", "Faixa etária", "Distribuição por faixa etária quando disponível."),
         ("vulnerabilidade", "Vulnerabilidade", "Indicadores de vulnerabilidade calculados pelo projeto."),
@@ -465,9 +504,17 @@ with tab_analise:
             df = ler_sql(f"SELECT * FROM {tabela} WHERE municipio = ?", (ORIGEM,))
             if doenca_escolhida and "tipo_cancer" in df.columns:
                 df = df[df["tipo_cancer"] == doenca_escolhida]
+            if ano_filtro is not None and "ano" in df.columns:
+                df = df[df["ano"] == ano_filtro]
             if not df.empty:
                 with st.expander(titulo):
                     st.caption(descricao)
+                    if ano_filtro is not None and "ano" not in df.columns:
+                        st.caption(
+                            f"Esta tabela analítica não possui dimensão anual própria; "
+                            f"o valor anual do período selecionado é calculado diretamente "
+                            f"dos registros de {ano_filtro} no painel."
+                        )
                     st.dataframe(df, use_container_width=True, hide_index=True)
         except Exception:
             pass
@@ -511,7 +558,7 @@ with tab_comparar:
         )
         outro = next(m for m in outros if m["nome"] == outro_nome)
 
-        dados = ler_sql("""
+        sql_comparacao = """
             SELECT
                 municipio,
                 tipo_cancer,
@@ -521,8 +568,14 @@ with tab_comparar:
                 COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
             FROM internacoes
             WHERE municipio IN (?, ?)
-            GROUP BY municipio, tipo_cancer
-        """, (ORIGEM, outro["origem"]))
+        """
+        params_comparacao = [ORIGEM, outro["origem"]]
+        if ano_filtro is not None:
+            sql_comparacao += " AND ano = ?"
+            params_comparacao.append(ano_filtro)
+        sql_comparacao += " GROUP BY municipio, tipo_cancer"
+
+        dados = ler_sql(sql_comparacao, tuple(params_comparacao))
 
         nomes = {
             ORIGEM: NOME_MUNICIPIO,
@@ -534,7 +587,10 @@ with tab_comparar:
             dados = dados[dados["tipo_cancer"] == doenca_escolhida]
 
         if dados.empty:
-            st.info("Não há dados suficientes para essa comparação.")
+            if ano_filtro is not None:
+                st.info(f"Não há registros suficientes para comparar os municípios no ano {ano_filtro}.")
+            else:
+                st.info("Não há dados suficientes para essa comparação.")
         else:
             fig = px.bar(
                 dados,
@@ -549,8 +605,13 @@ with tab_comparar:
 
 with tab_indicadores:
     st.subheader("Indicadores")
+    st.caption(
+        f"Os valores abaixo correspondem ao ano {ano_filtro}."
+        if ano_filtro is not None
+        else "Os valores abaixo correspondem ao período de 2013 a 2025."
+    )
 
-    dados_ind = ler_sql("""
+    sql_indicadores = """
         SELECT
             tipo_cancer,
             COUNT(*) AS internacoes,
@@ -559,9 +620,14 @@ with tab_indicadores:
             COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
         FROM internacoes
         WHERE municipio = ?
-        GROUP BY tipo_cancer
-        ORDER BY internacoes DESC
-    """, (ORIGEM,))
+    """
+    params_indicadores = [ORIGEM]
+    if ano_filtro is not None:
+        sql_indicadores += " AND ano = ?"
+        params_indicadores.append(ano_filtro)
+    sql_indicadores += " GROUP BY tipo_cancer ORDER BY internacoes DESC"
+
+    dados_ind = ler_sql(sql_indicadores, tuple(params_indicadores))
 
     if doenca_escolhida:
         dados_ind = dados_ind[dados_ind["tipo_cancer"] == doenca_escolhida]
@@ -577,7 +643,7 @@ with tab_indicadores:
     for tabela, titulo in [
         ("priorizacao_executiva", "Priorização"),
         ("mortalidade", "Mortalidade"),
-        ("custos_hospitalares", "Custos hospitalares"),
+        ("custos_hospitalares", "Valores hospitalares"),
         ("permanencia_hospitalar", "Permanência hospitalar"),
         ("tendencia_estadual", "Tendência estadual"),
         ("anomalias", "Anomalias"),
@@ -589,6 +655,8 @@ with tab_indicadores:
             )
             if doenca_escolhida and "tipo_cancer" in df.columns:
                 df = df[df["tipo_cancer"] == doenca_escolhida]
+            if ano_filtro is not None and "ano" in df.columns:
+                df = df[df["ano"] == ano_filtro]
             if not df.empty:
                 with st.expander(titulo):
                     st.dataframe(df, use_container_width=True, hide_index=True)
@@ -630,12 +698,17 @@ with tab_graficos:
         WHERE municipio = ?
     """
     dados_graf = ler_sql(sql, (ORIGEM,))
+    if ano_filtro is not None:
+        dados_graf = dados_graf[dados_graf["ano"] == ano_filtro]
 
     if doenca_escolhida:
         dados_graf = dados_graf[dados_graf["tipo_cancer"] == doenca_escolhida]
 
     if dados_graf.empty:
-        st.info("Não há dados suficientes para montar esse gráfico.")
+        if ano_filtro is not None:
+            st.info(f"Não há registros disponíveis para {NOME_MUNICIPIO} no ano {ano_filtro}.")
+        else:
+            st.info("Não há dados suficientes para montar esse gráfico.")
     else:
         medida_map = {
             "Internações": ("internacoes", "count"),
