@@ -732,11 +732,11 @@ with tab_graficos:
         if medida == "Internações":
             grafico = agrupado.size().rename(columns={"size": coluna_resultado})
         elif medida == "Óbitos":
-            grafico = agrupado["obito"].sum().rename(coluna_resultado).reset_index()
+            grafico = agrupado["obito"].sum().reset_index(name=coluna_resultado)
         elif medida == "Valor hospitalar":
-            grafico = agrupado["valor_total"].sum().rename(coluna_resultado).reset_index()
+            grafico = agrupado["valor_total"].sum().reset_index(name=coluna_resultado)
         else:
-            grafico = agrupado["dias_permanencia"].mean().rename(coluna_resultado).reset_index()
+            grafico = agrupado["dias_permanencia"].mean().reset_index(name=coluna_resultado)
 
         if tipo_grafico == "Linha":
             fig = px.line(grafico, x=eixo, y=coluna_resultado, markers=True)
