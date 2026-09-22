@@ -198,7 +198,7 @@ elif st.session_state.chat_municipio_atual != ORIGEM:
 
 st.subheader("Pergunte ao Escudo")
 st.caption(
-    f"Você está explorando {NOME_MUNICIPIO}"
+    f"Você está explorando {NOME_MUNICIPIO} · Pergunte sobre qualquer indicador disponível no Escudo."
     + (f" · {doenca_escolhida}" if doenca_escolhida else "")
 )
 
@@ -207,9 +207,11 @@ if "chat_escudo" not in st.session_state:
         {
             "role": "assistant",
             "content": (
-                "O que você quer descobrir? Você pode perguntar sobre "
-                "evolução, internações, mortalidade, custos, permanência, "
-                "faixa etária, tendências, anomalias ou comparações."
+                "O que você quer descobrir? Você pode perguntar sobre evolução, "
+                "internações, mortalidade, custos, permanência, faixa etária, "
+                "tendência em relação a São Paulo, anomalias, prioridades, "
+                "vulnerabilidade, simulações, comparações ou relatório. "
+                "Você também pode combinar uma doença com qualquer indicador."
             ),
         }
     ]
