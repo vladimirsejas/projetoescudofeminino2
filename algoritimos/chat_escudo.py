@@ -168,17 +168,17 @@ def gerar_resposta_simples(row):
 
     if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
         texto += (
-            f"\nO número de casos está crescendo mais rápido em "
+            f"\nO número de internações está crescendo mais rápido em "
             f"{NOME_MUNICIPIO} do que na média do Estado de São Paulo."
         )
     elif row["evento"] == "ABAIXO_DA_TENDENCIA_ESTADUAL":
         texto += (
-            f"\nO número de casos está crescendo mais devagar em "
+            f"\nO número de internações está crescendo mais devagar em "
             f"{NOME_MUNICIPIO} do que na média do Estado de São Paulo."
         )
     else:
         texto += (
-            f"\nO número de casos em {NOME_MUNICIPIO} segue no mesmo "
+            f"\nO número de internações em {NOME_MUNICIPIO} segue no mesmo "
             f"ritmo do Estado de São Paulo."
         )
 
