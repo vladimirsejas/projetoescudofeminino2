@@ -11,18 +11,19 @@ def conectar():
     return sqlite3.connect(BANCO)
 
 
-def _ler_tabela(nome):
+def _ler_tabela(nome, cancer=None):
     """
     Lê `nome` filtrando sempre pelo município selecionado.\n\n    Na tabela `internacoes`, `origem` identifica a origem do arquivo\n    ou lote de dados (por exemplo, RIO_CLARO ou SP), enquanto\n    `municipio` identifica o município real de cada registro. Por isso,\n    inclusive para `internacoes`, o filtro territorial correto é\n    `municipio`.
     """
     conn = conectar()
     try:
         coluna_filtro = "municipio"
-        return pd.read_sql(
-            f"SELECT * FROM {nome} WHERE {coluna_filtro} = ?",
-            conn,
-            params=(obter_municipio(),)
-        )
+        sql = f"SELECT * FROM {nome} WHERE {coluna_filtro} = ?"
+        params = [obter_municipio()]
+        if cancer:
+            sql += " AND UPPER(tipo_cancer) = UPPER(?)"
+            params.append(cancer)
+        return pd.read_sql(sql, conn, params=params)
     except Exception:
         return pd.DataFrame()
     finally:
@@ -245,6 +246,55 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
     """
     base = contexto_geral_raciocinado()
 
+    if intencao == "SIMULACAO":
+        import re
+        df = _ler_tabela("internacoes", cancer)
+        if df.empty:
+            return base
+        achado = re.search(r"(\\d+(?:[.,]\\d+)?)\\s*%", pergunta)
+        percentual = float(achado.group(1).replace(",", ".")) if achado else 20.0
+        total = len(df)
+        projetado = total * (1 - percentual / 100)
+        return (
+            f"SIMULAÇÃO — {obter_nome_municipio()}\\n"
+            f"Doença: {cancer or 'todas'}\\n"
+            f"Redução hipotética: {percentual:.1f}%\\n"
+            f"Internações no recorte: {total}\\n"
+            f"Internações após redução hipotética: {projetado:.1f}\\n"
+            f"Redução hipotética: {total - projetado:.1f}\\n"
+            "Isto é uma simulação matemática de cenário, não uma previsão."
+        )
+
+    if intencao == "VULNERABILIDADE":
+        df = _ler_tabela("vulnerabilidade", cancer)
+        if df.empty:
+            return base
+        colunas = [c for c in [
+            "tipo_cancer", "faixa_mais_vulneravel",
+            "taxa_mortalidade_faixa", "internacoes_faixa",
+            "obitos_faixa", "confiabilidade"
+        ] if c in df.columns]
+        return (
+            f"VULNERABILIDADE POR FAIXA ETÁRIA — {obter_nome_municipio()}\\n"
+            + df[colunas].to_string(index=False)
+            + "\\nA classificação considera a taxa de mortalidade dentro de cada câncer e faixa etária."
+        )
+
+    if intencao == "RELATORIO_EXECUTIVO":
+        partes = []
+        for tabela in [
+            "priorizacao_executiva", "mortalidade", "custos_hospitalares",
+            "permanencia_hospitalar", "faixa_etaria", "tendencia_estadual",
+            "anomalias", "vulnerabilidade", "base_conhecimento"
+        ]:
+            df = _ler_tabela(tabela, cancer)
+            if not df.empty:
+                partes.append(f"{tabela.upper()}:\\n{df.head(20).to_string(index=False)}")
+        return (
+            f"RELATÓRIO — {obter_nome_municipio()}\\n"
+            + ("\\n\\n".join(partes) if partes else base)
+        )
+
     if intencao == "CANCER_ESPECIFICO" and cancer:
         return contexto_para_ia(cancer)
 
@@ -311,7 +361,7 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
         return base
 
     nome_tabela, colunas, titulo = tabelas[intencao]
-    df = _ler_tabela(nome_tabela)
+    df = _ler_tabela(nome_tabela, cancer)
 
     if df.empty:
         return base
