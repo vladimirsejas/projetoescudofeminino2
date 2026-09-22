@@ -51,6 +51,18 @@ def classificar_intencao(pergunta_norm, canceres):
         return "CANCER_ESPECIFICO"
 
     if any(p in pergunta_norm for p in (
+        "EVOLUCAO", "EVOLUIU", "EVOLUCAO TEMPORAL", "SERIE HISTORICA",
+        "AO LONGO DOS ANOS", "NOS ULTIMOS ANOS"
+    )):
+        return "EVOLUCAO"
+
+    if any(p in pergunta_norm for p in (
+        "COMPARAR", "COMPARACAO", "COMPARANDO", "EM COMPARACAO",
+        "OUTRO MUNICIPIO", "OUTRA CIDADE"
+    )):
+        return "COMPARACAO"
+
+    if any(p in pergunta_norm for p in (
         "O QUE MUDOU", "MUDOU DESDE", "MUDANCAS DESDE",
         "COMPARAR COM O ANO PASSADO", "COMPARADOS AO ANO PASSADO",
         "COMPARADO AO ANO PASSADO", "COMPARACAO COM O ANO PASSADO",
@@ -164,7 +176,9 @@ def responder_pergunta(pergunta, municipio, cancer_selecionado=None):
                 "faixa etária, tendência em relação a São Paulo, anomalias, "
                 "priorização, vulnerabilidade, simulações ou pedir um relatório. "
                 "Também pode combinar doença + indicador, por exemplo: "
-                "'qual a mortalidade do câncer de mama?'"
+                "'qual a mortalidade do câncer de mama?', "
+                "'como evoluiu o câncer de mama?' ou "
+                "'quanto foi gasto com câncer de mama?'"
             )
         else:
             if intencao == "CANCER_ESPECIFICO" and cancer is None:
