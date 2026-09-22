@@ -11,18 +11,24 @@ def conectar():
     return sqlite3.connect(BANCO)
 
 
-def _ler_tabela(nome, cancer=None):
+def _ler_tabela(nome, cancer=None, ano=None):
     """
-    Lê `nome` filtrando sempre pelo município selecionado.\n\n    Na tabela `internacoes`, `origem` identifica a origem do arquivo\n    ou lote de dados (por exemplo, RIO_CLARO ou SP), enquanto\n    `municipio` identifica o município real de cada registro. Por isso,\n    inclusive para `internacoes`, o filtro territorial correto é\n    `municipio`.
+    Lê a tabela pelo município e, quando a tabela possui a coluna `ano`,
+    também pelo ano selecionado.
     """
     conn = conectar()
     try:
-        coluna_filtro = "municipio"
-        sql = f"SELECT * FROM {nome} WHERE {coluna_filtro} = ?"
+        sql = f"SELECT * FROM {nome} WHERE municipio = ?"
         params = [obter_municipio()]
         if cancer:
             sql += " AND UPPER(tipo_cancer) = UPPER(?)"
             params.append(cancer)
+
+        colunas = pd.read_sql(f"SELECT * FROM {nome} LIMIT 0", conn).columns
+        if ano is not None and "ano" in colunas:
+            sql += " AND ano = ?"
+            params.append(ano)
+
         return pd.read_sql(sql, conn, params=params)
     except Exception:
         return pd.DataFrame()
@@ -126,16 +132,16 @@ MEMÓRIA ESTRUTURADA DO ESCUDO:
 """
     return contexto.strip()
 
-def contexto_geral_raciocinado():
+def contexto_geral_raciocinado(ano=None):
     """
     Organiza o panorama geral em camadas de raciocínio.
     Usa somente indicadores já calculados pelo Escudo.
     Não recalcula score, tendência ou anomalia.
     """
-    priorizacao = _ler_tabela("priorizacao_executiva")
-    tendencia = _ler_tabela("tendencia_estadual")
-    anomalias = _ler_tabela("anomalias")
-    mortalidade = _ler_tabela("mortalidade")
+    priorizacao = _ler_tabela("priorizacao_executiva", ano=ano)
+    tendencia = _ler_tabela("tendencia_estadual", ano=ano)
+    anomalias = _ler_tabela("anomalias", ano=ano)
+    mortalidade = _ler_tabela("mortalidade", ano=ano)
 
     if priorizacao.empty:
         return None
@@ -238,13 +244,13 @@ aos dados fornecidos pelo Escudo.
 
 
 
-def contexto_inteligente(pergunta, intencao, cancer=None):
+def contexto_inteligente(pergunta, intencao, cancer=None, ano=None):
     """
     Seleciona o contexto já calculado de acordo com a intenção.
     Não recalcula indicadores; apenas escolhe os dados necessários
     para responder à pergunta.
     """
-    base = contexto_geral_raciocinado()
+    base = contexto_geral_raciocinado(ano=ano)
 
     if intencao == "SIMULACAO":
         import re
@@ -390,8 +396,21 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
         return base
 
     nome_tabela, colunas, titulo = tabelas[intencao]
-    df = _ler_tabela(nome_tabela, cancer)
 
+    if intencao == "CUSTO" and ano is not None:
+        # Para custo, usa os registros de internação do ano escolhido.
+        # Assim o valor apresentado corresponde exatamente ao período selecionado.
+        df = _ler_tabela("internacoes", cancer, ano=ano)
+        if not df.empty and "valor_total" in df.columns:
+            df = (
+                df.groupby("tipo_cancer", as_index=False)["valor_total"]
+                .sum()
+                .sort_values("valor_total", ascending=False)
+            )
+            colunas = ["tipo_cancer", "valor_total"]
+            titulo = f"CUSTOS HOSPITALARES — ANO {ano}"
+    else:
+        df = _ler_tabela(nome_tabela, cancer, ano=ano)
     if df.empty:
         return base
 
