@@ -403,6 +403,31 @@ with tab_analise:
     st.markdown("### Acesse uma análise")
     st.caption("Clique em uma opção para abrir a análise correspondente aos filtros escolhidos.")
 
+    filtro_analise = ""
+    params_analise = [ORIGEM]
+    if doenca_escolhida:
+        filtro_analise += " AND tipo_cancer = ? "
+        params_analise.append(doenca_escolhida)
+    if ano_filtro is not None:
+        filtro_analise += " AND ano = ? "
+        params_analise.append(ano_filtro)
+
+    analise_base = ler_sql(
+        """
+        SELECT
+            tipo_cancer,
+            COUNT(*) AS internacoes,
+            COALESCE(SUM(obito), 0) AS obitos,
+            COALESCE(SUM(valor_total), 0) AS valor_total,
+            COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
+        FROM internacoes
+        WHERE municipio = ? """ + filtro_analise + """
+        GROUP BY tipo_cancer
+        ORDER BY internacoes DESC
+        """,
+        tuple(params_analise)
+    )
+
     with st.expander("Tendências", expanded=False):
         st.markdown("**Evolução das internações ao longo dos anos**")
         if doenca_escolhida:
