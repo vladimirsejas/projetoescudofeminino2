@@ -459,15 +459,20 @@ with tab_analise:
             WHERE municipio = ?
         """ + filtro_analise + """
             GROUP BY tipo_cancer
-            ORDER BY obitos DESC
         """, tuple(params_analise))
+        if not df_mort.empty:
+            df_mort["taxa_mortalidade"] = (
+                df_mort["obitos"] / df_mort["internacoes"] * 100
+            ).round(1)
+            df_mort = df_mort.sort_values("taxa_mortalidade", ascending=False)
         st.dataframe(df_mort, use_container_width=True, hide_index=True)
 
     with st.expander("Custos", expanded=False):
         df_custos = ler_sql("""
             SELECT tipo_cancer,
                    COUNT(*) AS internacoes,
-                   COALESCE(SUM(valor_total), 0) AS valor_total
+                   COALESCE(SUM(valor_total), 0) AS valor_total,
+                   COALESCE(AVG(valor_total), 0) AS valor_medio
             FROM internacoes
             WHERE municipio = ?
         """ + filtro_analise + """
@@ -592,6 +597,34 @@ with tab_analise:
             f"{permanencia_media:.1f} dias. "
             "O resumo descreve os registros disponíveis e não representa incidência de casos novos."
         )
+
+    st.divider()
+    st.markdown("### Relatório analítico")
+    st.caption(
+        "Prioridades explicadas pelo motor analítico do Escudo (motivo, impacto e "
+        "recomendação). Esta tabela não possui dimensão anual própria, por isso não "
+        "muda com o ano selecionado acima."
+    )
+    try:
+        base = ler_sql(
+            "SELECT * FROM base_conhecimento WHERE municipio = ? ORDER BY pontuacao_final DESC",
+            (ORIGEM,)
+        )
+        if doenca_escolhida and "tipo_cancer" in base.columns:
+            base = base[base["tipo_cancer"] == doenca_escolhida]
+        if base.empty:
+            st.info("Não há relatório analítico calculado para essa seleção.")
+        else:
+            for _, row in base.iterrows():
+                st.markdown(
+                    f"**{row.get('tipo_cancer', '')} — {row.get('nivel_prioridade', '')}**"
+                )
+                st.write(row.get("motivo", ""))
+                st.write(row.get("impacto", ""))
+                st.write(row.get("recomendacao", ""))
+                st.divider()
+    except Exception as erro:
+        st.info(f"Relatório analítico indisponível: {erro}")
 
 with tab_comparar:
     st.subheader("Comparar municípios")
