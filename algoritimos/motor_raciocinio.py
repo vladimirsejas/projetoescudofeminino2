@@ -295,6 +295,35 @@ def contexto_inteligente(pergunta, intencao, cancer=None):
             + ("\\n\\n".join(partes) if partes else base)
         )
 
+    if intencao == "EVOLUCAO":
+        df = _ler_tabela("internacoes", cancer)
+        if df.empty:
+            return base
+        serie = (
+            df.groupby("ano")
+            .size()
+            .reset_index(name="internacoes")
+            .sort_values("ano")
+        )
+        return (
+            f"EVOLUÇÃO TEMPORAL — {obter_nome_municipio()}\\n"
+            f"Doença: {cancer or 'todas'}\\n"
+            + serie.to_string(index=False)
+            + "\\nFonte: internações hospitalares registradas no SIH/SUS."
+        )
+
+    if intencao == "COMPARACAO":
+        df = _ler_tabela("tendencia_estadual", cancer)
+        if not df.empty:
+            colunas = [c for c in [
+                "tipo_cancer", "variacao_municipio", "variacao_sp", "desvio", "evento"
+            ] if c in df.columns]
+            return (
+                f"COMPARAÇÃO COM A REFERÊNCIA ESTADUAL — {obter_nome_municipio()}\\n"
+                + df[colunas].to_string(index=False)
+            )
+        return base
+
     if intencao == "CANCER_ESPECIFICO" and cancer:
         return contexto_para_ia(cancer)
 
