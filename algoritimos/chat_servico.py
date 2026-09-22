@@ -158,7 +158,7 @@ def registrar_pergunta(pergunta, categoria, reconhecida):
         conn.close()
 
 
-def responder_pergunta(pergunta, municipio, cancer_selecionado=None):
+def responder_pergunta(pergunta, municipio, cancer_selecionado=None, ano_selecionado=None):
     canceres = listar_canceres()
     pergunta_norm = normalizar(pergunta)
     intencao = classificar_intencao(pergunta_norm, canceres)
@@ -184,7 +184,7 @@ def responder_pergunta(pergunta, municipio, cancer_selecionado=None):
             if intencao == "CANCER_ESPECIFICO" and cancer is None:
                 cancer = cancer_selecionado
 
-            contexto = contexto_inteligente(pergunta, intencao, cancer)
+            contexto = contexto_inteligente(pergunta, intencao, cancer, ano_selecionado)
             if not contexto:
                 resposta = "Não encontrei dados suficientes no Escudo para responder a essa pergunta."
             else:
