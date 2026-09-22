@@ -489,26 +489,6 @@ with tab_analise:
         """, tuple(params_analise))
         st.dataframe(df_perm, use_container_width=True, hide_index=True)
 
-    with st.expander("Faixa etária", expanded=False):
-        sql_faixa = """
-            SELECT faixa_etaria, COUNT(*) AS internacoes,
-                   COALESCE(SUM(obito), 0) AS obitos
-            FROM internacoes
-            WHERE municipio = ? AND faixa_etaria IS NOT NULL
-        """
-        params_faixa = [ORIGEM]
-        if doenca_escolhida:
-            sql_faixa += " AND tipo_cancer = ?"
-            params_faixa.append(doenca_escolhida)
-        if ano_filtro is not None:
-            sql_faixa += " AND ano = ?"
-            params_faixa.append(ano_filtro)
-        sql_faixa += " GROUP BY faixa_etaria ORDER BY internacoes DESC"
-        df_faixa = ler_sql(sql_faixa, tuple(params_faixa))
-        if df_faixa.empty:
-            st.info("Não há dados de faixa etária para a seleção.")
-        else:
-            st.dataframe(df_faixa, use_container_width=True, hide_index=True)
 
     with st.expander("Tendência estadual", expanded=False):
         df_estado = ler_sql(
