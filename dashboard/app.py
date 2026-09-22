@@ -387,7 +387,12 @@ with tab_evolucao:
             title="Evolução das internações hospitalares"
         )
         st.plotly_chart(fig, use_container_width=True)
-        st.caption("A série mostra internações hospitalares registradas no SIH/SUS.")
+        st.caption(
+            "A série histórica mostra todos os anos disponíveis para a seleção. "
+            + ("O ano escolhido acima é usado nos demais recortes; ele não reduz esta série a um único ponto."
+               if ano_filtro is not None else
+               "A série mostra internações hospitalares registradas no SIH/SUS.")
+        )
 
 
 
@@ -504,6 +509,12 @@ with tab_analise:
             if not df.empty:
                 with st.expander(titulo):
                     st.caption(descricao)
+                    if ano_filtro is not None and "ano" not in df.columns:
+                        st.caption(
+                            f"Esta tabela analítica não possui dimensão anual própria; "
+                            f"o valor anual do período selecionado é calculado diretamente "
+                            f"dos registros de {ano_filtro} no painel."
+                        )
                     st.dataframe(df, use_container_width=True, hide_index=True)
         except Exception:
             pass
@@ -644,6 +655,8 @@ with tab_indicadores:
             )
             if doenca_escolhida and "tipo_cancer" in df.columns:
                 df = df[df["tipo_cancer"] == doenca_escolhida]
+            if ano_filtro is not None and "ano" in df.columns:
+                df = df[df["ano"] == ano_filtro]
             if not df.empty:
                 with st.expander(titulo):
                     st.dataframe(df, use_container_width=True, hide_index=True)
