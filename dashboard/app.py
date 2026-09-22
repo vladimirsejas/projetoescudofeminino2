@@ -490,6 +490,28 @@ with tab_analise:
         st.dataframe(df_perm, use_container_width=True, hide_index=True)
 
 
+    with st.expander("Faixa etária", expanded=False):
+        st.markdown("**Distribuição das internações por faixa etária**")
+        st.caption(
+            "Esta análise utiliza a tabela consolidada de faixa etária disponível no banco. "
+            + (
+                f"O banco não possui uma dimensão anual própria para esta tabela; "
+                f"por isso, os valores abaixo não representam exclusivamente o ano {ano_filtro}."
+                if ano_filtro is not None
+                else
+                "Os valores correspondem ao período disponível na tabela consolidada."
+            )
+        )
+        sql_faixa = "SELECT * FROM faixa_etaria WHERE municipio = ?"
+        params_faixa = [ORIGEM]
+        df_faixa = ler_sql(sql_faixa, tuple(params_faixa))
+        if doenca_escolhida and "tipo_cancer" in df_faixa.columns:
+            df_faixa = df_faixa[df_faixa["tipo_cancer"] == doenca_escolhida]
+        if df_faixa.empty:
+            st.info("Não há dados de faixa etária para essa seleção.")
+        else:
+            st.dataframe(df_faixa, use_container_width=True, hide_index=True)
+
     with st.expander("Tendência estadual", expanded=False):
         df_estado = ler_sql(
             "SELECT * FROM tendencia_estadual WHERE municipio = ?",
