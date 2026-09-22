@@ -1,33 +1,27 @@
-import streamlit as st
-import pandas as pd
-import sqlite3
-import plotly.express as px
-import sys
 import os
+import sys
+import sqlite3
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "algoritimos")
-)
+import pandas as pd
+import plotly.express as px
+import streamlit as st
 
-from configuracao_geografica import (
-    listar_municipios_disponiveis,
-    UF_REFERENCIA
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
-# ==================================================
-# CONFIGURAÇÃO
-# ==================================================
+from configuracao_geografica import listar_municipios_disponiveis, UF_REFERENCIA
+from chat_servico import responder_pergunta
+
+
+BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
+
 
 st.set_page_config(
     page_title="Escudo Feminino",
     page_icon="E",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
-# ==================================================
-# IDENTIDADE VISUAL — NOVA INTERFACE
-# ==================================================
 
 st.markdown("""
 <style>
@@ -36,703 +30,533 @@ st.markdown("""
 html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
 }
-
 .stApp {
     background: #f8f7fb;
 }
-
 .block-container {
     max-width: 1400px;
-    padding-top: 2rem;
+    padding-top: 1.5rem;
     padding-bottom: 4rem;
 }
-
 h1, h2, h3 {
     font-family: 'Manrope', sans-serif;
-    color: #25243a;
+    color: #292541;
     letter-spacing: -0.02em;
 }
-
-h1 {
-    font-size: 2.5rem !important;
-}
-
-[data-testid="stSidebar"] {
-    background: #f1eff8;
-    border-right: 1px solid #e7e3f0;
-}
-
 [data-testid="stMetric"] {
-    background: #ffffff;
+    background: #fff;
     border: 1px solid #ebe8f2;
     border-radius: 18px;
-    padding: 18px 20px;
-    box-shadow: 0 4px 18px rgba(53, 45, 82, 0.05);
+    padding: 16px 18px;
+    box-shadow: 0 4px 18px rgba(53,45,82,.05);
 }
-
 [data-testid="stMetricLabel"] {
     color: #706b82;
-    font-weight: 500;
 }
-
 [data-testid="stMetricValue"] {
     color: #312b52;
 }
-
 div[data-baseweb="select"] > div {
     border-radius: 12px;
     border-color: #ddd8ea;
-    background: #ffffff;
+    background: #fff;
 }
-
-button[kind="primary"] {
-    border-radius: 12px;
-}
-
 .escudo-hero {
     background: linear-gradient(135deg, #eee9fb 0%, #f7eef5 52%, #edf4f7 100%);
     border: 1px solid #e5dfef;
     border-radius: 28px;
-    padding: 34px 38px;
-    margin: 0 0 26px 0;
+    padding: 30px 36px;
+    margin-bottom: 22px;
 }
-
 .escudo-eyebrow {
     color: #7565a8;
-    font-size: 0.82rem;
+    font-size: .8rem;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: .12em;
     text-transform: uppercase;
-    margin-bottom: 8px;
 }
-
-.escudo-hero-title {
+.escudo-title {
     color: #292541;
     font-family: 'Manrope', sans-serif;
     font-size: 2.25rem;
     font-weight: 700;
-    margin: 0;
+    margin-top: 6px;
 }
-
-.escudo-hero-text {
+.escudo-text {
     color: #625d72;
-    font-size: 1.02rem;
-    margin-top: 10px;
-    max-width: 760px;
+    font-size: 1rem;
+    max-width: 820px;
+    margin-top: 8px;
 }
-
-.escudo-section {
-    background: #ffffff;
+.escudo-card {
+    background: #fff;
     border: 1px solid #ebe8f2;
-    border-radius: 22px;
-    padding: 22px 24px;
-    margin: 18px 0;
-}
-
-.escudo-option {
-    background: #ffffff;
-    border: 1px solid #e9e5f0;
     border-radius: 18px;
-    padding: 20px;
-    min-height: 105px;
-    box-shadow: 0 3px 14px rgba(53, 45, 82, 0.035);
+    padding: 18px 20px;
+    min-height: 92px;
 }
-
-.escudo-option-title {
+.escudo-card-title {
     color: #383251;
     font-weight: 700;
-    font-size: 1rem;
 }
-
-.escudo-option-text {
+.escudo-card-text {
     color: #777184;
-    font-size: 0.88rem;
-    margin-top: 5px;
+    font-size: .88rem;
+    margin-top: 4px;
 }
-
 div[data-testid="stTabs"] button {
     font-weight: 600;
-}
-
-hr {
-    border-color: #e8e4ef;
-}
-
-[data-testid="stDataFrame"] {
-    border-radius: 16px;
-    overflow: hidden;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ==================================================
-# BANCO
-# ==================================================
+@st.cache_data
+def ler_sql(sql, params=()):
+    conn = sqlite3.connect(BANCO)
+    try:
+        return pd.read_sql(sql, conn, params=params)
+    finally:
+        conn.close()
 
-BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
-conexao = sqlite3.connect(BANCO)
+@st.cache_data
+def municipios():
+    return listar_municipios_disponiveis()
 
-# ==================================================
-# SELEÇÃO DE MUNICÍPIO
-#
-# A lista vem do banco (municipios ∩ internacoes), nunca de uma
-# lista fixa no código -- assim que outro município tiver dados
-# carregados, ele aparece aqui automaticamente.
-# ==================================================
 
-municipios_disponiveis = listar_municipios_disponiveis()
+municipios_disponiveis = municipios()
 
 if not municipios_disponiveis:
-    st.error(
-        "Nenhum município cadastrado em `municipios` com dados "
-        "carregados em `internacoes`. Rode "
-        "etl\\criar_tabela_municipios.py e confira o ETL antes de "
-        "abrir o dashboard."
-    )
+    st.error("Nenhum município disponível no banco.")
     st.stop()
 
 nomes_disponiveis = [m["nome"] for m in municipios_disponiveis]
 
-nome_escolhido = st.selectbox("Município", nomes_disponiveis)
+st.markdown("""
+<div class="escudo-hero">
+    <div class="escudo-eyebrow">ESCUDO FEMININO</div>
+    <div class="escudo-title">Plataforma de informações de saúde</div>
+    <div class="escudo-text">
+        Explore os dados por município e doença. Escolha o que deseja investigar.
+        O Escudo organiza a informação para você.
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ============================================================
+# ENTRADA PRINCIPAL
+# ============================================================
+
+col_local, col_doenca = st.columns([1, 1])
+
+with col_local:
+    nome_escolhido = st.selectbox(
+        "Município",
+        nomes_disponiveis,
+        help="Digite o nome para localizar um município."
+    )
 
 municipio_escolhido = next(
     m for m in municipios_disponiveis if m["nome"] == nome_escolhido
 )
-
 ORIGEM = municipio_escolhido["origem"]
 NOME_MUNICIPIO = municipio_escolhido["nome"]
 
-# ==================================================
-# KPIs PRINCIPAIS
-#
-# Total de Registros continua sendo a soma geral (município +
-# referência estadual), como visão de conjunto. As demais métricas
-# nomeadas pelo município (Câncer Líder, custos, permanência,
-# óbitos) são filtradas por origem -- sem isso, ficam diluídas pelo
-# volume do Estado (o mesmo problema já corrigido nos indicadores
-# em algoritimos/).
-# ==================================================
-
-total = pd.read_sql(
-    """
-    SELECT COUNT(*) AS total
+doencas = ler_sql("""
+    SELECT DISTINCT tipo_cancer
     FROM internacoes
-    """,
-    conexao
-).iloc[0]["total"]
-
-ranking = pd.read_sql(
-    """
-    SELECT
-        tipo_cancer,
-        COUNT(*) AS total
-    FROM internacoes
-    WHERE municipio = ?
-    GROUP BY tipo_cancer
-    ORDER BY total DESC
-    """,
-    conexao,
-    params=(ORIGEM,)
-)
-
-origens = pd.read_sql(
-    """
-    SELECT
-        origem,
-        COUNT(*) AS total
-    FROM internacoes
-    GROUP BY origem
-    """,
-    conexao
-)
-
-lider = ranking.iloc[0]["tipo_cancer"] if not ranking.empty else "—"
-
-total_municipio = int(
-    pd.read_sql(
-        "SELECT COUNT(*) AS total FROM internacoes WHERE municipio = ?",
-        conexao,
-        params=(ORIGEM,)
-    ).iloc[0]["total"]
-)
-
-sp_vals = origens.loc[
-    origens["origem"] == UF_REFERENCIA,
-    "total"
-].values
-
-sp = int(sp_vals[0]) if len(sp_vals) > 0 else 0
-
-# ==================================================
-# KPIs AVANÇADOS (filtrados pelo município selecionado)
-# ==================================================
-
-valor_total = pd.read_sql(
-    """
-    SELECT SUM(valor_total) AS valor
-    FROM internacoes
-    WHERE municipio = ?
-    """,
-    conexao,
-    params=(ORIGEM,)
-).iloc[0]["valor"] or 0
-
-permanencia_media = pd.read_sql(
-    """
-    SELECT AVG(dias_permanencia) AS media
-    FROM internacoes
-    WHERE municipio = ?
-    """,
-    conexao,
-    params=(ORIGEM,)
-).iloc[0]["media"] or 0
-
-obitos = pd.read_sql(
-    """
-    SELECT SUM(obito) AS total
-    FROM internacoes
-    WHERE municipio = ?
-    """,
-    conexao,
-    params=(ORIGEM,)
-).iloc[0]["total"] or 0
-
-# ==================================================
-# CABEÇALHO
-# ==================================================
-
-st.title("🎗️ Escudo Feminino")
-
-st.markdown(f"""
-### Sistema de Apoio à Decisão para Saúde Pública
-
-**{NOME_MUNICIPIO} x Estado de {UF_REFERENCIA}**
-""")
-
-# ==================================================
-# KPIs
-# ==================================================
-
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric("Total de Registros", f"{int(total):,}")
-col2.metric(NOME_MUNICIPIO, f"{total_municipio:,}")
-col3.metric(f"Estado ({UF_REFERENCIA})", f"{sp:,}")
-col4.metric("Câncer Líder", lider)
-
-st.divider()
-
-col5, col6, col7 = st.columns(3)
-
-col5.metric("Valor Total", f"R$ {valor_total:,.2f}")
-col6.metric("Permanência Média", f"{permanencia_media:.1f} dias")
-col7.metric("Óbitos", f"{int(obitos):,}")
-
-st.divider()
-
-# ==================================================
-# PRIORIZAÇÃO E EXPLICAÇÃO
-#
-# Esta é a seção nova: traz pro dashboard o mesmo
-# conhecimento (motivo, impacto, recomendação) que
-# o chat_escudo.py já entrega — até agora o painel
-# só mostrava gráficos, sem explicar "e daí".
-# ==================================================
-
-st.subheader("Priorização e Recomendações")
-
-base = None
-erro_base = None
-
-try:
-    base = pd.read_sql(
-        """
-        SELECT *
-        FROM base_conhecimento
-        WHERE municipio = ?
-        ORDER BY pontuacao_final DESC
-        """,
-        conexao,
-        params=(ORIGEM,)
-    )
-except Exception as e:
-    erro_base = e
-
-if erro_base is not None:
-    st.warning(
-        f"Não foi possível carregar 'base_conhecimento': {erro_base}. "
-        f"Rode algoritimos\\base_conhecimento.py antes de abrir o "
-        f"dashboard."
-    )
-elif base.empty:
-    st.info(
-        f"{NOME_MUNICIPIO} ainda não foi processado pela cadeia "
-        f"determinística. Rode os scripts em algoritimos\\*.py com "
-        f"ESCUDO_MUNICIPIO={ORIGEM} (ou o código IBGE correspondente) "
-        f"para gerar esta análise."
-    )
-else:
-    cores_prioridade = {
-        "CRITICA": "🔴",
-        "ALTA": "🟠",
-        "MEDIA": "🟡",
-        "BAIXA": "🟢",
-    }
-
-    for _, row in base.iterrows():
-
-        emoji = cores_prioridade.get(row["nivel_prioridade"], "⚪")
-
-        titulo = (
-            f"{emoji} {row['tipo_cancer']} — "
-            f"{row['nivel_prioridade']} "
-            f"(pontuação {row['pontuacao_final']:.2f})"
-        )
-
-        with st.expander(titulo):
-
-            st.markdown("**Por que acontece:**")
-            st.write(row["motivo"])
-
-            st.markdown("**Impacto:**")
-            st.write(row["impacto"])
-
-            st.markdown("**Recomendação:**")
-            st.write(row["recomendacao"])
-
-            avisos = []
-
-            if row.get("confiabilidade", "OK") != "OK":
-                avisos.append(
-                    f"Tendência estadual: {row['confiabilidade']}"
-                )
-
-            if row.get("confiabilidade_anomalia", "OK") not in (
-                "OK", None
-            ) and pd.notna(row.get("confiabilidade_anomalia")):
-                avisos.append(
-                    f"Anomalia: {row['confiabilidade_anomalia']}"
-                )
-
-            for aviso in avisos:
-                st.warning(aviso)
-
-st.divider()
-
-# ==================================================
-# RELATÓRIO EXECUTIVO
-#
-# Mostra o mesmo relatorio_executivo.txt que o chat
-# lê quando alguém pede um relatório — aqui, pronto
-# pra ler ou baixar direto do painel.
-# ==================================================
-
-st.subheader("Relatório Executivo")
-
-try:
-    with open("relatorio_executivo.txt", "r", encoding="utf-8") as arquivo:
-        texto_relatorio = arquivo.read()
-
-    with st.expander("Ver relatório executivo completo"):
-        st.text(texto_relatorio)
-
-    st.download_button(
-        label="Baixar relatório executivo (.txt)",
-        data=texto_relatorio,
-        file_name="relatorio_executivo.txt",
-        mime="text/plain"
-    )
-
-except FileNotFoundError:
-    st.info(
-        "Relatório executivo ainda não foi gerado. Rode "
-        "algoritimos\\relatorio_executivo.py na raiz do projeto."
-    )
-
-st.divider()
-
-# ==================================================
-# RANKING DOS CÂNCERES
-# ==================================================
-
-st.subheader("Ranking dos Cânceres")
-
-fig_ranking = px.bar(
-    ranking,
-    x="tipo_cancer",
-    y="total",
-    color="total",
-    text="total",
-    title="Ranking de Internações por Tipo de Câncer"
-)
-
-st.plotly_chart(
-    fig_ranking,
-    use_container_width=True
-)
-
-# ==================================================
-# MUNICÍPIO X SP
-# ==================================================
-
-comparativo = pd.read_sql(
-    """
-    SELECT tipo_cancer, ? AS origem, COUNT(*) AS total
-    FROM internacoes
-    WHERE municipio = ?
-    GROUP BY tipo_cancer
-
-    UNION ALL
-
-    SELECT tipo_cancer, ? AS origem, COUNT(*) AS total
-    FROM internacoes
-    WHERE origem = ?
-    GROUP BY tipo_cancer
-
+    WHERE municipio = ? AND tipo_cancer IS NOT NULL
     ORDER BY tipo_cancer
-    """,
-    conexao,
-    params=(NOME_MUNICIPIO, ORIGEM, UF_REFERENCIA, UF_REFERENCIA)
-)
+""", (ORIGEM,))["tipo_cancer"].tolist()
 
-st.subheader(f"{NOME_MUNICIPIO} x {UF_REFERENCIA}")
-
-fig_comparativo = px.bar(
-    comparativo,
-    x="tipo_cancer",
-    y="total",
-    color="origem",
-    barmode="group"
-)
-
-st.plotly_chart(
-    fig_comparativo,
-    use_container_width=True
-)
-
-# ==================================================
-# COMPARAÇÃO DIRETA ENTRE MUNICÍPIOS
-#
-# Permite comparar o município selecionado com outro
-# município que tenha dados reais carregados no banco.
-# Não substitui a comparação com o Estado (SP).
-# ==================================================
-
-st.subheader("Comparar cidades")
-
-municipios_comparacao = [
-    m for m in municipios_disponiveis
-    if m["origem"] != ORIGEM
-]
-
-if not municipios_comparacao:
-    st.info("Não há outro município com dados carregados para comparação.")
-else:
-    origens_comparacao = [m["origem"] for m in municipios_comparacao]
-
-    origem_padrao = (
-        "SAO_JOSE_DO_RIO_PRETO"
-        if ORIGEM == "RIO_CLARO"
-        and "SAO_JOSE_DO_RIO_PRETO" in origens_comparacao
-        else origens_comparacao[0]
+with col_doenca:
+    doenca_escolhida = st.selectbox(
+        "Doença",
+        doencas,
+        index=0 if doencas else None,
+        placeholder="Selecione uma doença"
     )
 
-    indice_padrao = origens_comparacao.index(origem_padrao)
 
-    municipio_comparado_nome = st.selectbox(
-        "Comparar com",
-        [m["nome"] for m in municipios_comparacao],
-        index=indice_padrao,
-        key="municipio_comparacao"
+# ============================================================
+# CHAT
+# ============================================================
+
+st.subheader("Pergunte ao Escudo")
+st.caption(
+    f"Você está explorando {NOME_MUNICIPIO}"
+    + (f" · {doenca_escolhida}" if doenca_escolhida else "")
+)
+
+if "chat_escudo" not in st.session_state:
+    st.session_state.chat_escudo = [
+        {
+            "role": "assistant",
+            "content": (
+                "O que você quer descobrir? Você pode perguntar sobre "
+                "evolução, internações, mortalidade, custos, permanência, "
+                "faixa etária, tendências, anomalias ou comparações."
+            ),
+        }
+    ]
+
+for mensagem in st.session_state.chat_escudo:
+    with st.chat_message(mensagem["role"]):
+        st.markdown(mensagem["content"])
+
+pergunta = st.chat_input(
+    f"Pergunte sobre {NOME_MUNICIPIO}..."
+)
+
+if pergunta:
+    st.session_state.chat_escudo.append(
+        {"role": "user", "content": pergunta}
+    )
+    with st.chat_message("user"):
+        st.markdown(pergunta)
+
+    resposta, _ = responder_pergunta(
+        pergunta,
+        ORIGEM,
+        doenca_escolhida
     )
 
-    municipio_comparado = next(
-        m for m in municipios_comparacao
-        if m["nome"] == municipio_comparado_nome
+    st.session_state.chat_escudo.append(
+        {"role": "assistant", "content": resposta}
     )
+    with st.chat_message("assistant"):
+        st.markdown(resposta)
 
-    ORIGEM_COMPARADA = municipio_comparado["origem"]
 
-    indicadores_comparacao = pd.read_sql(
-        """
+st.divider()
+
+
+# ============================================================
+# INDICADORES RÁPIDOS
+# ============================================================
+
+filtro_doenca = ""
+params = [ORIGEM]
+
+if doenca_escolhida:
+    filtro_doenca = " AND tipo_cancer = ? "
+    params.append(doenca_escolhida)
+
+kpis = ler_sql(f"""
+    SELECT
+        COUNT(*) AS internacoes,
+        COALESCE(SUM(obito), 0) AS obitos,
+        COALESCE(SUM(valor_total), 0) AS valor_total,
+        COALESCE(AVG(dias_permanencia), 0) AS permanencia
+    FROM internacoes
+    WHERE municipio = ? {filtro_doenca}
+""", tuple(params)).iloc[0]
+
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("Internações", f"{int(kpis['internacoes']):,}")
+k2.metric("Óbitos registrados", f"{int(kpis['obitos']):,}")
+k3.metric("Valor hospitalar", f"R$ {float(kpis['valor_total']):,.2f}")
+k4.metric("Permanência média", f"{float(kpis['permanencia']):.1f} dias")
+
+
+# ============================================================
+# ÁREAS DE EXPLORAÇÃO
+# ============================================================
+
+tab_panorama, tab_evolucao, tab_comparar, tab_indicadores, tab_graficos = st.tabs([
+    "Panorama",
+    "Evolução",
+    "Comparar",
+    "Indicadores",
+    "Gráficos",
+])
+
+
+with tab_panorama:
+    st.subheader(f"Panorama — {NOME_MUNICIPIO}")
+
+    ranking = ler_sql("""
+        SELECT tipo_cancer, COUNT(*) AS total
+        FROM internacoes
+        WHERE municipio = ?
+        GROUP BY tipo_cancer
+        ORDER BY total DESC
+    """, (ORIGEM,))
+
+    if ranking.empty:
+        st.info("Não há dados de internações para este município.")
+    else:
+        a, b = st.columns([1.15, .85])
+
+        with a:
+            fig = px.bar(
+                ranking,
+                x="tipo_cancer",
+                y="total",
+                text="total",
+                title="Volume de internações por doença"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        with b:
+            st.markdown("#### O que está disponível")
+            st.markdown(
+                "Evolução temporal, mortalidade, custos hospitalares, "
+                "permanência, faixa etária, tendência estadual, "
+                "anomalias, comparações e gráficos personalizados."
+            )
+            st.markdown("#### Sobre os registros")
+            st.caption(
+                "Os dados do SIH/SUS representam internações hospitalares "
+                "(AIH). Eles não equivalem a casos novos ou incidência."
+            )
+
+
+with tab_evolucao:
+    st.subheader(f"Evolução — {doenca_escolhida or 'todas as doenças'}")
+
+    if doenca_escolhida:
+        evolucao = ler_sql("""
+            SELECT ano, COUNT(*) AS internacoes
+            FROM internacoes
+            WHERE municipio = ? AND tipo_cancer = ?
+            GROUP BY ano
+            ORDER BY ano
+        """, (ORIGEM, doenca_escolhida))
+    else:
+        evolucao = ler_sql("""
+            SELECT ano, COUNT(*) AS internacoes
+            FROM internacoes
+            WHERE municipio = ?
+            GROUP BY ano
+            ORDER BY ano
+        """, (ORIGEM,))
+
+    if evolucao.empty:
+        st.info("Não há série temporal disponível para a seleção.")
+    else:
+        fig = px.line(
+            evolucao,
+            x="ano",
+            y="internacoes",
+            markers=True,
+            title="Evolução das internações hospitalares"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("A série mostra internações hospitalares registradas no SIH/SUS.")
+
+
+with tab_comparar:
+    st.subheader("Comparar municípios")
+
+    outros = [m for m in municipios_disponiveis if m["origem"] != ORIGEM]
+
+    if not outros:
+        st.info("Não há outro município com dados carregados para comparação.")
+    else:
+        outro_nome = st.selectbox(
+            "Escolha o município para comparar",
+            [m["nome"] for m in outros],
+            key="comparacao_municipio"
+        )
+        outro = next(m for m in outros if m["nome"] == outro_nome)
+
+        dados = ler_sql("""
+            SELECT
+                municipio,
+                tipo_cancer,
+                COUNT(*) AS internacoes,
+                COALESCE(SUM(obito), 0) AS obitos,
+                COALESCE(SUM(valor_total), 0) AS valor_total,
+                COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
+            FROM internacoes
+            WHERE municipio IN (?, ?)
+            GROUP BY municipio, tipo_cancer
+        """, (ORIGEM, outro["origem"]))
+
+        nomes = {
+            ORIGEM: NOME_MUNICIPIO,
+            outro["origem"]: outro_nome
+        }
+        dados["municipio"] = dados["municipio"].map(nomes)
+
+        if doenca_escolhida:
+            dados = dados[dados["tipo_cancer"] == doenca_escolhida]
+
+        if dados.empty:
+            st.info("Não há dados suficientes para essa comparação.")
+        else:
+            fig = px.bar(
+                dados,
+                x="tipo_cancer",
+                y="internacoes",
+                color="municipio",
+                barmode="group",
+                title=f"Internações — {NOME_MUNICIPIO} x {outro_nome}"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+
+with tab_indicadores:
+    st.subheader("Indicadores")
+
+    dados_ind = ler_sql("""
         SELECT
-            municipio,
+            tipo_cancer,
             COUNT(*) AS internacoes,
             COALESCE(SUM(obito), 0) AS obitos,
             COALESCE(SUM(valor_total), 0) AS valor_total,
             COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
         FROM internacoes
-        WHERE municipio IN (?, ?)
-        GROUP BY municipio
-        """,
-        conexao,
-        params=(ORIGEM, ORIGEM_COMPARADA)
-    )
+        WHERE municipio = ?
+        GROUP BY tipo_cancer
+        ORDER BY internacoes DESC
+    """, (ORIGEM,))
 
-    nomes_municipios = {
-        ORIGEM: NOME_MUNICIPIO,
-        ORIGEM_COMPARADA: municipio_comparado_nome
-    }
-
-    indicadores_comparacao["municipio"] = (
-        indicadores_comparacao["municipio"].map(nomes_municipios)
-    )
-
-    indicadores_comparacao["taxa_obitos_%"] = (
-        indicadores_comparacao["obitos"]
-        / indicadores_comparacao["internacoes"].replace(0, pd.NA)
-        * 100
-    ).fillna(0)
-
-    indicadores_comparacao = indicadores_comparacao.rename(columns={
-        "municipio": "Município",
-        "internacoes": "Internações",
-        "obitos": "Óbitos",
-        "taxa_obitos_%": "Óbitos / Internações (%)",
-        "valor_total": "Valor Total (R$)",
-        "permanencia_media": "Permanência Média (dias)"
-    })
+    if doenca_escolhida:
+        dados_ind = dados_ind[dados_ind["tipo_cancer"] == doenca_escolhida]
 
     st.dataframe(
-        indicadores_comparacao[
-            [
-                "Município",
-                "Internações",
-                "Óbitos",
-                "Óbitos / Internações (%)",
-                "Valor Total (R$)",
-                "Permanência Média (dias)"
-            ]
-        ],
+        dados_ind,
         use_container_width=True,
         hide_index=True
     )
 
-    cancer_comparacao = pd.read_sql(
-        """
-        SELECT
-            municipio,
-            tipo_cancer,
-            COUNT(*) AS total
+    st.markdown("#### Indicadores analíticos já calculados pelo Escudo")
+
+    for tabela, titulo in [
+        ("priorizacao_executiva", "Priorização"),
+        ("mortalidade", "Mortalidade"),
+        ("custos_hospitalares", "Custos hospitalares"),
+        ("permanencia_hospitalar", "Permanência hospitalar"),
+        ("tendencia_estadual", "Tendência estadual"),
+        ("anomalias", "Anomalias"),
+    ]:
+        try:
+            df = ler_sql(
+                f"SELECT * FROM {tabela} WHERE municipio = ?",
+                (ORIGEM,)
+            )
+            if doenca_escolhida and "tipo_cancer" in df.columns:
+                df = df[df["tipo_cancer"] == doenca_escolhida]
+            if not df.empty:
+                with st.expander(titulo):
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+        except Exception:
+            pass
+
+
+with tab_graficos:
+    st.subheader("Monte seu gráfico")
+    st.caption("Escolha o que quer visualizar. O gráfico é construído a partir dos dados do Escudo.")
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        dimensao = st.selectbox(
+            "Eixo",
+            ["Ano", "Doença", "Município"],
+            key="grafico_dimensao"
+        )
+
+    with c2:
+        medida = st.selectbox(
+            "Indicador",
+            ["Internações", "Óbitos", "Valor hospitalar", "Permanência média"],
+            key="grafico_medida"
+        )
+
+    with c3:
+        tipo_grafico = st.selectbox(
+            "Tipo de gráfico",
+            ["Linha", "Barras", "Área"],
+            key="grafico_tipo"
+        )
+
+    sql = """
+        SELECT ano, tipo_cancer, municipio,
+               obito, valor_total, dias_permanencia
         FROM internacoes
-        WHERE municipio IN (?, ?)
-        GROUP BY municipio, tipo_cancer
-        ORDER BY tipo_cancer
-        """,
-        conexao,
-        params=(ORIGEM, ORIGEM_COMPARADA)
-    )
-
-    cancer_comparacao["municipio"] = cancer_comparacao["municipio"].map(
-        nomes_municipios
-    )
-
-    fig_municipios = px.bar(
-        cancer_comparacao,
-        x="tipo_cancer",
-        y="total",
-        color="municipio",
-        barmode="group",
-        title=f"Internações por tipo de câncer — {NOME_MUNICIPIO} x {municipio_comparado_nome}"
-    )
-
-    st.plotly_chart(
-        fig_municipios,
-        use_container_width=True
-    )
-
-st.divider()
-
-# ==================================================
-# EVOLUÇÃO TEMPORAL
-# ==================================================
-
-st.subheader("Evolução Temporal")
-
-cancer_escolhido = st.selectbox(
-    "Selecione o câncer",
-    ranking["tipo_cancer"].tolist()
-)
-
-evolucao = pd.read_sql(
+        WHERE municipio = ?
     """
-    SELECT
-        ano,
-        COUNT(*) AS internacoes
-    FROM internacoes
-    WHERE tipo_cancer = ? AND municipio = ?
-    GROUP BY ano
-    ORDER BY ano
-    """,
-    conexao,
-    params=(cancer_escolhido, ORIGEM)
-)
+    dados_graf = ler_sql(sql, (ORIGEM,))
 
-fig_evolucao = px.line(
-    evolucao,
-    x="ano",
-    y="internacoes",
-    markers=True,
-    title=f"Evolução Temporal - {cancer_escolhido} ({NOME_MUNICIPIO})"
-)
+    if doenca_escolhida:
+        dados_graf = dados_graf[dados_graf["tipo_cancer"] == doenca_escolhida]
 
-st.plotly_chart(
-    fig_evolucao,
-    use_container_width=True
-)
-
-# ==================================================
-# ALERTAS ANALÍTICOS
-#
-# Agora mostra também o selo de confiabilidade
-# estatística quando o desvio vem de uma base
-# pequena de casos.
-# ==================================================
-
-st.subheader("Alertas Analíticos")
-
-eventos = pd.read_sql(
-    """
-    SELECT *
-    FROM tendencia_estadual
-    WHERE municipio = ?
-    ORDER BY desvio DESC
-    """,
-    conexao,
-    params=(ORIGEM,)
-)
-
-if eventos.empty:
-    st.info(
-        f"{NOME_MUNICIPIO} ainda não foi processado pela cadeia "
-        f"determinística (tendencia_estadual). Rode "
-        f"algoritimos\\tendencia_estadual.py com "
-        f"ESCUDO_MUNICIPIO={ORIGEM} para gerar esta análise."
-    )
-
-for _, row in eventos.iterrows():
-
-    mensagem = (
-        f"{row['tipo_cancer']} "
-        f"({row['desvio']:.2f}%)"
-    )
-
-    if row.get("confiabilidade", "OK") != "OK":
-        mensagem += f" — ⚠️ {row['confiabilidade']}"
-
-    if row["evento"] == "ACIMA_DA_TENDENCIA_ESTADUAL":
-        st.error(mensagem)
-
-    elif row["evento"] == "ABAIXO_DA_TENDENCIA_ESTADUAL":
-        st.success(mensagem)
-
+    if dados_graf.empty:
+        st.info("Não há dados suficientes para montar esse gráfico.")
     else:
-        st.info(mensagem)
+        medida_map = {
+            "Internações": ("internacoes", "count"),
+            "Óbitos": ("obitos", "sum"),
+            "Valor hospitalar": ("valor_hospitalar", "sum"),
+            "Permanência média": ("permanencia_media", "mean"),
+        }
 
-# ==================================================
-# FECHAMENTO DA CONEXÃO
-# ==================================================
+        coluna_resultado, agregacao = medida_map[medida]
 
-conexao.close()
+        if dimensao == "Ano":
+            eixo = "ano"
+            agrupado = dados_graf.groupby("ano", as_index=False)
+        elif dimensao == "Doença":
+            eixo = "tipo_cancer"
+            agrupado = dados_graf.groupby("tipo_cancer", as_index=False)
+        else:
+            eixo = "municipio"
+            agrupado = dados_graf.groupby("municipio", as_index=False)
+
+        if medida == "Internações":
+            grafico = agrupado.size().rename(columns={"size": coluna_resultado})
+        elif medida == "Óbitos":
+            grafico = agrupado["obito"].sum().rename(coluna_resultado).reset_index()
+        elif medida == "Valor hospitalar":
+            grafico = agrupado["valor_total"].sum().rename(coluna_resultado).reset_index()
+        else:
+            grafico = agrupado["dias_permanencia"].mean().rename(coluna_resultado).reset_index()
+
+        if tipo_grafico == "Linha":
+            fig = px.line(grafico, x=eixo, y=coluna_resultado, markers=True)
+        elif tipo_grafico == "Área":
+            fig = px.area(grafico, x=eixo, y=coluna_resultado)
+        else:
+            fig = px.bar(grafico, x=eixo, y=coluna_resultado, text=coluna_resultado)
+
+        st.plotly_chart(fig, use_container_width=True)
+
+
+# ============================================================
+# PRIORIZAÇÃO / RELATÓRIO — SOB DEMANDA
+# ============================================================
+
+with st.expander("Análise executiva e relatório"):
+    try:
+        base = ler_sql(
+            "SELECT * FROM base_conhecimento WHERE municipio = ? ORDER BY pontuacao_final DESC",
+            (ORIGEM,)
+        )
+        if doenca_escolhida and "tipo_cancer" in base.columns:
+            base = base[base["tipo_cancer"] == doenca_escolhida]
+
+        if base.empty:
+            st.info("Não há análise executiva calculada para essa seleção.")
+        else:
+            for _, row in base.iterrows():
+                st.markdown(
+                    f"**{row.get('tipo_cancer', '')} — "
+                    f"{row.get('nivel_prioridade', '')}**"
+                )
+                st.write(row.get("motivo", ""))
+                st.write(row.get("impacto", ""))
+                st.write(row.get("recomendacao", ""))
+                st.divider()
+    except Exception as erro:
+        st.info(f"Análise executiva indisponível: {erro}")
+
+
+st.caption(
+    "Escudo Feminino · dados públicos de saúde · "
+    "internações hospitalares do SIH/SUS não equivalem a casos novos."
+)
