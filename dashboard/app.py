@@ -8,7 +8,7 @@ import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
-from configuracao_geografica import listar_municipios_disponiveis, UF_REFERENCIA
+from configuracao_geografica import listar_municipios_disponiveis
 from chat_servico import responder_pergunta
 
 
@@ -171,13 +171,25 @@ doencas = ler_sql("""
     ORDER BY tipo_cancer
 """, (ORIGEM,))["tipo_cancer"].tolist()
 
+opcoes_doenca = ["Todas as doenças"] + doencas
+
 with col_doenca:
     doenca_escolhida = st.selectbox(
         "Doença",
-        doencas,
-        index=0 if doencas else None,
-        placeholder="Selecione uma doença"
+        opcoes_doenca,
+        index=0,
+        key="doenca_selecao"
     )
+
+if doenca_escolhida == "Todas as doenças":
+    doenca_escolhida = None
+
+# Mantém cada conversa ligada ao município selecionado.
+if "chat_municipio_atual" not in st.session_state:
+    st.session_state.chat_municipio_atual = ORIGEM
+elif st.session_state.chat_municipio_atual != ORIGEM:
+    st.session_state.pop("chat_escudo", None)
+    st.session_state.chat_municipio_atual = ORIGEM
 
 
 # ============================================================
@@ -457,7 +469,7 @@ with tab_graficos:
     with c1:
         dimensao = st.selectbox(
             "Eixo",
-            ["Ano", "Doença", "Município"],
+            ["Ano", "Doença"],
             key="grafico_dimensao"
         )
 
