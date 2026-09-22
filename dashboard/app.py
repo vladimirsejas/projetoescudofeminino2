@@ -149,7 +149,7 @@ st.markdown("""
 # ENTRADA PRINCIPAL
 # ============================================================
 
-col_local, col_doenca = st.columns([1, 1])
+col_local, col_doenca, col_ano = st.columns([1, 1, 1])
 
 with col_local:
     nome_escolhido = st.selectbox(
@@ -173,6 +173,12 @@ doencas = ler_sql("""
 
 opcoes_doenca = ["Todas as doenças"] + doencas
 
+anos_disponiveis = ler_sql("""
+    SELECT DISTINCT ano FROM internacoes
+    WHERE municipio = ? AND ano IS NOT NULL
+    ORDER BY ano DESC
+""", (ORIGEM,))["ano"].astype(int).tolist()
+
 with col_doenca:
     doenca_escolhida = st.selectbox(
         "Doença",
@@ -183,6 +189,14 @@ with col_doenca:
 
 if doenca_escolhida == "Todas as doenças":
     doenca_escolhida = None
+
+with col_ano:
+    ano_escolhido = st.selectbox(
+        "Ano", ["Todos os anos"] + anos_disponiveis,
+        index=0, key="ano_selecao",
+        help="Escolha o ano dos registros que deseja analisar."
+    )
+ano_filtro = None if ano_escolhido == "Todos os anos" else int(ano_escolhido)
 
 # Mantém cada conversa ligada ao município selecionado.
 if "chat_municipio_atual" not in st.session_state:
@@ -255,8 +269,11 @@ filtro_doenca = ""
 params = [ORIGEM]
 
 if doenca_escolhida:
-    filtro_doenca = " AND tipo_cancer = ? "
+    filtro_doenca += " AND tipo_cancer = ? "
     params.append(doenca_escolhida)
+if ano_filtro is not None:
+    filtro_doenca += " AND ano = ? "
+    params.append(ano_filtro)
 
 kpis = ler_sql(f"""
     SELECT
@@ -271,7 +288,7 @@ kpis = ler_sql(f"""
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Internações", f"{int(kpis['internacoes']):,}")
 k2.metric("Óbitos registrados", f"{int(kpis['obitos']):,}")
-k3.metric("Valor hospitalar", f"R$ {float(kpis['valor_total']):,.2f}")
+k3.metric("Valor registrado em AIH", f"R$ {float(kpis['valor_total']):,.2f}")
 k4.metric("Permanência média", f"{float(kpis['permanencia']):.1f} dias")
 
 
@@ -292,13 +309,16 @@ tab_panorama, tab_evolucao, tab_analise, tab_comparar, tab_indicadores, tab_graf
 with tab_panorama:
     st.subheader(f"Panorama — {NOME_MUNICIPIO}")
 
-    ranking = ler_sql("""
+    sql_ranking = """
         SELECT tipo_cancer, COUNT(*) AS total
-        FROM internacoes
-        WHERE municipio = ?
-        GROUP BY tipo_cancer
-        ORDER BY total DESC
-    """, (ORIGEM,))
+        FROM internacoes WHERE municipio = ?
+    """
+    params_ranking = [ORIGEM]
+    if ano_filtro is not None:
+        sql_ranking += " AND ano = ?"
+        params_ranking.append(ano_filtro)
+    sql_ranking += " GROUP BY tipo_cancer ORDER BY total DESC"
+    ranking = ler_sql(sql_ranking, tuple(params_ranking))
 
     if ranking.empty:
         st.info("Não há dados de internações para este município.")
@@ -400,6 +420,9 @@ with tab_analise:
     if doenca_escolhida:
         filtro_analise = " AND tipo_cancer = ? "
         params_analise.append(doenca_escolhida)
+    if ano_filtro is not None:
+        filtro_analise += " AND ano = ? "
+        params_analise.append(ano_filtro)
 
     try:
         analise_base = ler_sql(
@@ -428,7 +451,7 @@ with tab_analise:
             m1, m2, m3 = st.columns(3)
             m1.metric("Internações analisadas", f"{total_internacoes:,}")
             m2.metric("Óbitos registrados", f"{total_obitos:,}")
-            m3.metric("Valor hospitalar", f"R$ {total_valor:,.2f}")
+            m3.metric("Valor registrado em AIH", f"R$ {total_valor:,.2f}")
 
             if doenca_escolhida:
                 linha = analise_base.iloc[0]
@@ -456,7 +479,7 @@ with tab_analise:
         ("anomalias", "Anomalias", "Mostra situações identificadas pelo motor analítico como fora do padrão."),
         ("priorizacao_executiva", "Priorização", "Apresenta os resultados da priorização calculada pelo Escudo."),
         ("mortalidade", "Mortalidade", "Indicadores de mortalidade disponíveis para a seleção."),
-        ("custos_hospitalares", "Custos hospitalares", "Indicadores de valor hospitalar calculados a partir dos registros."),
+        ("custos_hospitalares", "Valores registrados nas AIHs", "Valores financeiros registrados nas AIHs; não representam automaticamente o custo econômico total."),
         ("permanencia_hospitalar", "Permanência hospitalar", "Indicadores relacionados ao tempo de permanência."),
         ("faixa_etaria", "Faixa etária", "Distribuição por faixa etária quando disponível."),
         ("vulnerabilidade", "Vulnerabilidade", "Indicadores de vulnerabilidade calculados pelo projeto."),
@@ -465,6 +488,8 @@ with tab_analise:
             df = ler_sql(f"SELECT * FROM {tabela} WHERE municipio = ?", (ORIGEM,))
             if doenca_escolhida and "tipo_cancer" in df.columns:
                 df = df[df["tipo_cancer"] == doenca_escolhida]
+            if ano_filtro is not None and "ano" in df.columns:
+                df = df[df["ano"] == ano_filtro]
             if not df.empty:
                 with st.expander(titulo):
                     st.caption(descricao)
@@ -577,7 +602,7 @@ with tab_indicadores:
     for tabela, titulo in [
         ("priorizacao_executiva", "Priorização"),
         ("mortalidade", "Mortalidade"),
-        ("custos_hospitalares", "Custos hospitalares"),
+        ("custos_hospitalares", "Valores registrados nas AIHs"),
         ("permanencia_hospitalar", "Permanência hospitalar"),
         ("tendencia_estadual", "Tendência estadual"),
         ("anomalias", "Anomalias"),
@@ -612,7 +637,7 @@ with tab_graficos:
     with c2:
         medida = st.selectbox(
             "Indicador",
-            ["Internações", "Óbitos", "Valor hospitalar", "Permanência média"],
+            ["Internações", "Óbitos", "Valor registrado em AIH", "Permanência média"],
             key="grafico_medida"
         )
 
@@ -630,6 +655,8 @@ with tab_graficos:
         WHERE municipio = ?
     """
     dados_graf = ler_sql(sql, (ORIGEM,))
+    if ano_filtro is not None:
+        dados_graf = dados_graf[dados_graf["ano"] == ano_filtro]
 
     if doenca_escolhida:
         dados_graf = dados_graf[dados_graf["tipo_cancer"] == doenca_escolhida]
@@ -640,7 +667,7 @@ with tab_graficos:
         medida_map = {
             "Internações": ("internacoes", "count"),
             "Óbitos": ("obitos", "sum"),
-            "Valor hospitalar": ("valor_hospitalar", "sum"),
+            "Valor registrado em AIH": ("valor_hospitalar", "sum"),
             "Permanência média": ("permanencia_media", "mean"),
         }
 
@@ -660,7 +687,7 @@ with tab_graficos:
             grafico = agrupado.size().rename(columns={"size": coluna_resultado})
         elif medida == "Óbitos":
             grafico = agrupado["obito"].sum().rename(coluna_resultado).reset_index()
-        elif medida == "Valor hospitalar":
+        elif medida == "Valor registrado em AIH":
             grafico = agrupado["valor_total"].sum().rename(coluna_resultado).reset_index()
         else:
             grafico = agrupado["dias_permanencia"].mean().rename(coluna_resultado).reset_index()
