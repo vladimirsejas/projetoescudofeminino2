@@ -20,9 +20,151 @@ from configuracao_geografica import (
 
 st.set_page_config(
     page_title="Escudo Feminino",
-    page_icon="🎗️",
-    layout="wide"
+    page_icon="E",
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
+
+# ==================================================
+# IDENTIDADE VISUAL — NOVA INTERFACE
+# ==================================================
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+}
+
+.stApp {
+    background: #f8f7fb;
+}
+
+.block-container {
+    max-width: 1400px;
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+}
+
+h1, h2, h3 {
+    font-family: 'Manrope', sans-serif;
+    color: #25243a;
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    font-size: 2.5rem !important;
+}
+
+[data-testid="stSidebar"] {
+    background: #f1eff8;
+    border-right: 1px solid #e7e3f0;
+}
+
+[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #ebe8f2;
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 18px rgba(53, 45, 82, 0.05);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #706b82;
+    font-weight: 500;
+}
+
+[data-testid="stMetricValue"] {
+    color: #312b52;
+}
+
+div[data-baseweb="select"] > div {
+    border-radius: 12px;
+    border-color: #ddd8ea;
+    background: #ffffff;
+}
+
+button[kind="primary"] {
+    border-radius: 12px;
+}
+
+.escudo-hero {
+    background: linear-gradient(135deg, #eee9fb 0%, #f7eef5 52%, #edf4f7 100%);
+    border: 1px solid #e5dfef;
+    border-radius: 28px;
+    padding: 34px 38px;
+    margin: 0 0 26px 0;
+}
+
+.escudo-eyebrow {
+    color: #7565a8;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.escudo-hero-title {
+    color: #292541;
+    font-family: 'Manrope', sans-serif;
+    font-size: 2.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.escudo-hero-text {
+    color: #625d72;
+    font-size: 1.02rem;
+    margin-top: 10px;
+    max-width: 760px;
+}
+
+.escudo-section {
+    background: #ffffff;
+    border: 1px solid #ebe8f2;
+    border-radius: 22px;
+    padding: 22px 24px;
+    margin: 18px 0;
+}
+
+.escudo-option {
+    background: #ffffff;
+    border: 1px solid #e9e5f0;
+    border-radius: 18px;
+    padding: 20px;
+    min-height: 105px;
+    box-shadow: 0 3px 14px rgba(53, 45, 82, 0.035);
+}
+
+.escudo-option-title {
+    color: #383251;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.escudo-option-text {
+    color: #777184;
+    font-size: 0.88rem;
+    margin-top: 5px;
+}
+
+div[data-testid="stTabs"] button {
+    font-weight: 600;
+}
+
+hr {
+    border-color: #e8e4ef;
+}
+
+[data-testid="stDataFrame"] {
+    border-radius: 16px;
+    overflow: hidden;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # ==================================================
 # BANCO
@@ -53,7 +195,7 @@ if not municipios_disponiveis:
 
 nomes_disponiveis = [m["nome"] for m in municipios_disponiveis]
 
-nome_escolhido = st.sidebar.selectbox("Município", nomes_disponiveis)
+nome_escolhido = st.selectbox("Município", nomes_disponiveis)
 
 municipio_escolhido = next(
     m for m in municipios_disponiveis if m["nome"] == nome_escolhido
@@ -199,7 +341,7 @@ st.divider()
 # só mostrava gráficos, sem explicar "e daí".
 # ==================================================
 
-st.subheader("🎯 Priorização e Recomendações")
+st.subheader("Priorização e Recomendações")
 
 base = None
 erro_base = None
@@ -287,7 +429,7 @@ st.divider()
 # pra ler ou baixar direto do painel.
 # ==================================================
 
-st.subheader("📋 Relatório Executivo")
+st.subheader("Relatório Executivo")
 
 try:
     with open("relatorio_executivo.txt", "r", encoding="utf-8") as arquivo:
@@ -315,7 +457,7 @@ st.divider()
 # RANKING DOS CÂNCERES
 # ==================================================
 
-st.subheader("📊 Ranking dos Cânceres")
+st.subheader("Ranking dos Cânceres")
 
 fig_ranking = px.bar(
     ranking,
@@ -355,7 +497,7 @@ comparativo = pd.read_sql(
     params=(NOME_MUNICIPIO, ORIGEM, UF_REFERENCIA, UF_REFERENCIA)
 )
 
-st.subheader(f"🏥 {NOME_MUNICIPIO} x {UF_REFERENCIA}")
+st.subheader(f"{NOME_MUNICIPIO} x {UF_REFERENCIA}")
 
 fig_comparativo = px.bar(
     comparativo,
@@ -378,7 +520,7 @@ st.plotly_chart(
 # Não substitui a comparação com o Estado (SP).
 # ==================================================
 
-st.subheader("🏙️ Comparação direta entre municípios")
+st.subheader("Comparar cidades")
 
 municipios_comparacao = [
     m for m in municipios_disponiveis
@@ -507,7 +649,7 @@ st.divider()
 # EVOLUÇÃO TEMPORAL
 # ==================================================
 
-st.subheader("📈 Evolução Temporal")
+st.subheader("Evolução Temporal")
 
 cancer_escolhido = st.selectbox(
     "Selecione o câncer",
@@ -549,7 +691,7 @@ st.plotly_chart(
 # pequena de casos.
 # ==================================================
 
-st.subheader("🚨 Alertas Analíticos")
+st.subheader("Alertas Analíticos")
 
 eventos = pd.read_sql(
     """
