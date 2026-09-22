@@ -497,7 +497,7 @@ with tab_analise:
         ("mortalidade", "Mortalidade", "Indicadores de mortalidade disponíveis para a seleção."),
         ("custos_hospitalares", "Valores hospitalares", "Valores hospitalares associados aos registros de internação no período disponível na tabela."),
         ("permanencia_hospitalar", "Permanência hospitalar", "Indicadores relacionados ao tempo de permanência."),
-        ("faixa_etaria", "Faixa etária", "Distribuição por faixa etária quando disponível."),
+
         ("vulnerabilidade", "Vulnerabilidade", "Indicadores de vulnerabilidade calculados pelo projeto."),
     ]:
         try:
