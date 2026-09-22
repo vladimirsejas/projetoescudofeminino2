@@ -279,9 +279,10 @@ k4.metric("Permanência média", f"{float(kpis['permanencia']):.1f} dias")
 # ÁREAS DE EXPLORAÇÃO
 # ============================================================
 
-tab_panorama, tab_evolucao, tab_comparar, tab_indicadores, tab_graficos = st.tabs([
+tab_panorama, tab_evolucao, tab_analise, tab_comparar, tab_indicadores, tab_graficos = st.tabs([
     "Panorama",
     "Evolução",
+    "Análise",
     "Comparar",
     "Indicadores",
     "Gráficos",
@@ -360,6 +361,139 @@ with tab_evolucao:
         )
         st.plotly_chart(fig, use_container_width=True)
         st.caption("A série mostra internações hospitalares registradas no SIH/SUS.")
+
+
+
+with tab_analise:
+    st.subheader("Análise")
+    st.caption("Aqui o Escudo transforma os indicadores em análises: tendências, comparações, anomalias, prioridades e outros sinais relevantes.")
+
+    st.markdown("### O que podemos analisar")
+    a1, a2, a3 = st.columns(3)
+    with a1:
+        st.markdown("**Tendências**")
+        st.caption("Evolução das internações ao longo dos anos e comportamento temporal.")
+        st.markdown("**Mortalidade**")
+        st.caption("Óbitos registrados e indicadores de mortalidade disponíveis.")
+        st.markdown("**Custos**")
+        st.caption("Valores hospitalares associados aos registros de internação.")
+    with a2:
+        st.markdown("**Permanência**")
+        st.caption("Tempo médio de permanência hospitalar e sua distribuição.")
+        st.markdown("**Faixa etária**")
+        st.caption("Concentração das internações e óbitos por faixa etária.")
+        st.markdown("**Tendência estadual**")
+        st.caption("Comportamento do município em relação à referência estadual.")
+    with a3:
+        st.markdown("**Anomalias**")
+        st.caption("Situações identificadas pelo motor analítico como fora do padrão.")
+        st.markdown("**Priorização**")
+        st.caption("Situações priorizadas pelos critérios analíticos calculados.")
+        st.markdown("**Vulnerabilidade**")
+        st.caption("Faixas e situações de maior vulnerabilidade quando houver dados suficientes.")
+
+    st.divider()
+    st.markdown("### Análise da seleção")
+
+    filtro_analise = ""
+    params_analise = [ORIGEM]
+    if doenca_escolhida:
+        filtro_analise = " AND tipo_cancer = ? "
+        params_analise.append(doenca_escolhida)
+
+    try:
+        analise_base = ler_sql(
+            """
+            SELECT
+                tipo_cancer,
+                COUNT(*) AS internacoes,
+                COALESCE(SUM(obito), 0) AS obitos,
+                COALESCE(SUM(valor_total), 0) AS valor_total,
+                COALESCE(AVG(dias_permanencia), 0) AS permanencia_media
+            FROM internacoes
+            WHERE municipio = ? """ + filtro_analise + """
+            GROUP BY tipo_cancer
+            ORDER BY internacoes DESC
+            """,
+            tuple(params_analise)
+        )
+
+        if analise_base.empty:
+            st.info("Não há dados suficientes para realizar a análise.")
+        else:
+            total_internacoes = int(analise_base["internacoes"].sum())
+            total_obitos = int(analise_base["obitos"].sum())
+            total_valor = float(analise_base["valor_total"].sum())
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Internações analisadas", f"{total_internacoes:,}")
+            m2.metric("Óbitos registrados", f"{total_obitos:,}")
+            m3.metric("Valor hospitalar", f"R$ {total_valor:,.2f}")
+
+            if doenca_escolhida:
+                linha = analise_base.iloc[0]
+                st.markdown(
+                    f"**{doenca_escolhida}:** "
+                    f"{int(linha['internacoes']):,} internações registradas, "
+                    f"{int(linha['obitos']):,} óbitos registrados e "
+                    f"R$ {float(linha['valor_total']):,.2f} em valor hospitalar."
+                )
+            else:
+                st.markdown(
+                    f"O conjunto selecionado reúne **{total_internacoes:,} internações "
+                    f"hospitalares registradas** entre as doenças disponíveis para o município."
+                )
+
+            st.caption("Esta análise descreve os registros disponíveis. Internações hospitalares não equivalem diretamente a casos novos ou incidência.")
+    except Exception as erro:
+        st.info(f"Análise indisponível: {erro}")
+
+    st.divider()
+    st.markdown("### Análises calculadas pelo Escudo")
+
+    for tabela, titulo, descricao in [
+        ("tendencia_estadual", "Tendência em relação a São Paulo", "Compara indicadores municipais com a referência estadual disponível."),
+        ("anomalias", "Anomalias", "Mostra situações identificadas pelo motor analítico como fora do padrão."),
+        ("priorizacao_executiva", "Priorização", "Apresenta os resultados da priorização calculada pelo Escudo."),
+        ("mortalidade", "Mortalidade", "Indicadores de mortalidade disponíveis para a seleção."),
+        ("custos_hospitalares", "Custos hospitalares", "Indicadores de valor hospitalar calculados a partir dos registros."),
+        ("permanencia_hospitalar", "Permanência hospitalar", "Indicadores relacionados ao tempo de permanência."),
+        ("faixa_etaria", "Faixa etária", "Distribuição por faixa etária quando disponível."),
+        ("vulnerabilidade", "Vulnerabilidade", "Indicadores de vulnerabilidade calculados pelo projeto."),
+    ]:
+        try:
+            df = ler_sql(f"SELECT * FROM {tabela} WHERE municipio = ?", (ORIGEM,))
+            if doenca_escolhida and "tipo_cancer" in df.columns:
+                df = df[df["tipo_cancer"] == doenca_escolhida]
+            if not df.empty:
+                with st.expander(titulo):
+                    st.caption(descricao)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+        except Exception:
+            pass
+
+    st.divider()
+    st.markdown("### Relatório analítico")
+    try:
+        base = ler_sql(
+            "SELECT * FROM base_conhecimento WHERE municipio = ? ORDER BY pontuacao_final DESC",
+            (ORIGEM,)
+        )
+        if doenca_escolhida and "tipo_cancer" in base.columns:
+            base = base[base["tipo_cancer"] == doenca_escolhida]
+        if base.empty:
+            st.info("Não há relatório analítico calculado para essa seleção.")
+        else:
+            for _, row in base.iterrows():
+                st.markdown(
+                    f"**{row.get('tipo_cancer', '')} — {row.get('nivel_prioridade', '')}**"
+                )
+                st.write(row.get("motivo", ""))
+                st.write(row.get("impacto", ""))
+                st.write(row.get("recomendacao", ""))
+                st.divider()
+    except Exception as erro:
+        st.info(f"Relatório analítico indisponível: {erro}")
 
 
 with tab_comparar:
@@ -541,33 +675,8 @@ with tab_graficos:
         st.plotly_chart(fig, use_container_width=True)
 
 
-# ============================================================
-# PRIORIZAÇÃO / RELATÓRIO — SOB DEMANDA
-# ============================================================
 
-with st.expander("Análise executiva e relatório"):
-    try:
-        base = ler_sql(
-            "SELECT * FROM base_conhecimento WHERE municipio = ? ORDER BY pontuacao_final DESC",
-            (ORIGEM,)
-        )
-        if doenca_escolhida and "tipo_cancer" in base.columns:
-            base = base[base["tipo_cancer"] == doenca_escolhida]
-
-        if base.empty:
-            st.info("Não há análise executiva calculada para essa seleção.")
-        else:
-            for _, row in base.iterrows():
-                st.markdown(
-                    f"**{row.get('tipo_cancer', '')} — "
-                    f"{row.get('nivel_prioridade', '')}**"
-                )
-                st.write(row.get("motivo", ""))
-                st.write(row.get("impacto", ""))
-                st.write(row.get("recomendacao", ""))
-                st.divider()
-    except Exception as erro:
-        st.info(f"Análise executiva indisponível: {erro}")
+# A área de Análise concentra as análises e o relatório analítico.
 
 
 st.caption(
