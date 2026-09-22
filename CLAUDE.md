@@ -76,9 +76,15 @@ configurável", identificado pelo código oficial do IBGE:
 **Pendências conhecidas desta etapa** (arquitetura pronta, mas não
 tudo foi feito -- ver commits para detalhes):
 - Comparação entre múltiplos municípios (ex.: "Rio Claro x
-  Limeira") foi deliberadamente **não implementada** nesta etapa --
-  só a base para isso foi preparada (as tabelas já suportam vários
-  municípios coexistindo).
+  Limeira") já existe na aba "Comparar" do `dashboard/app.py`
+  (commit `5100b20`), mas só compara internações/óbitos/valor/
+  permanência agregados direto de `internacoes`, município a
+  município escolhido em um seletor -- não usa as 13 tabelas
+  derivadas (mortalidade, score, anomalias etc.), não aparece no
+  chat (`chat_escudo.py` não tem intenção de comparar duas
+  cidades) e compara só duas cidades por vez, nunca uma lista. Hoje
+  só Rio Claro está cadastrado em `municipios`, então a aba mostra
+  "não há outro município" até uma segunda cidade ser carregada.
 - Teste de regressão real (rodar a cadeia contra o banco de verdade
   no Windows do autor) ainda não foi feito -- `teste_territorial.py`
   valida a lógica com banco sintético/temporário.
