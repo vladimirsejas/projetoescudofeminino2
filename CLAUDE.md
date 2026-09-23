@@ -161,6 +161,20 @@ Estado atual:
   (EVOLUCAO sem câncer citado deveria comparar todos); ano futuro
   além dos dados ("em 2030?") não cai em PROJECAO (só 2026-2028 são
   palavras-chave).
+- **O "salto de 2025" é falta de meses nos anos anteriores
+  (confirmado no banco real, 23/09/2026).** `investigar_2025.py`
+  mostrou que no Estado só 2025 tem os 12 meses de competência
+  (MES_CMPT); 2024 tem 8, 2022 tem 10, 2021 e 2023 têm 11. Por mês,
+  o crescimento é suave em todos os cânceres (mama: 1.387, 1.557,
+  1.794, 1.908, 1.982 AIHs/mês de 2021 a 2025); atraso de registro,
+  IDENT e N_AIH repetido foram descartados. Totais anuais de anos com
+  mês faltando saem menores e distorcem tendência, anos fora do
+  padrão, projeção e radar. O aviso "2025 em investigação / mudança
+  de registro" aponta a causa errada. Próximo passo combinado:
+  `py etl\completude_meses.py` (grade ano x mês por câncer + lista do
+  que baixar de novo no DATASUS), baixar os meses faltantes, recarregar;
+  só então corrigir aviso, investigar_2025 (só olhava > 12 meses) e
+  o que mais depender disso.
 - **Coerência passado x projeção (09/2026):** 2025 ficou muito acima
   da reta em vários cânceres e a projeção de 2028 aparecia ABAIXO de
   2025 com "cresce X% ao ano". Agora a projeção sai da reta
