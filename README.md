@@ -13,6 +13,17 @@ Claro, 3º semestre.
 
 ---
 
+## Abrir o painel (com a Lia) sem terminal
+
+Dê dois cliques em **`Abrir Escudo Feminino.bat`**, na pasta do
+projeto. Ele atualiza o projeto pelo GitHub, liga o painel numa janela
+minimizada e abre o navegador em http://localhost:8600 quando estiver
+pronto. Para fechar, feche a janela "Escudo Feminino - painel". Dá para
+criar um atalho na Área de Trabalho (botão direito no arquivo → Enviar
+para → Área de trabalho).
+
+---
+
 ## Como rodar o projeto do zero (ordem obrigatória)
 
 Cada script lê o resultado do anterior. Rodar fora de ordem quebra o
