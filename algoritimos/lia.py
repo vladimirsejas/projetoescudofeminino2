@@ -322,7 +322,7 @@ def _evolucao(ctx, c):
     ritmo = comp["ritmo_municipio"]
     verbo = "crescem" if ritmo > 1 else ("caem" if ritmo < -1 else "ficam estáveis")
     fala = (f"**O que aconteceu:** em {ano_fim} foram {formatar_numero(ultimo)} internações por {cancer_de(c)}. "
-            f"**O que está acontecendo:** desde {int(mun['ano'].min())}, as internações {verbo} "
+            f"\n\n**O que está acontecendo:** desde {int(mun['ano'].min())}, as internações {verbo} "
             f"{formatar_numero(abs(ritmo), 1)}% ao ano em média")
     if comp["ritmo_estado"] is not None:
         fala += f" (no Estado, {formatar_numero(comp['ritmo_estado'], 1)}%)"
@@ -403,6 +403,16 @@ def _estado_cancer(ctx, c):
                     destino={"aba": "Evolução", "cancer": c, "camadas": {"ver_estado": True}})
 
 
+def _quanto(v, unidade="", prefixo=""):
+    """"cerca de X"; quando a reta bate no zero, "poucos" com a faixa --
+    "cerca de 0 dias" soa como erro (ex.: pele não melanoma quase não
+    usa leito, e a tendência dos dias é de queda)."""
+    if v["previsto"] < 1:
+        return (f"poucos{unidade} (faixa de {prefixo}{formatar_numero(v['minimo'])} a "
+                f"{prefixo}{formatar_numero(v['maximo'])})")
+    return f"cerca de {prefixo}{formatar_numero(v['previsto'])}{unidade}"
+
+
 def _projecao(ctx, c):
     mun = serie_doenca(ctx.serie, c)
     p = pressao_projetada(ctx.serie, c)
@@ -410,11 +420,11 @@ def _projecao(ctx, c):
     i = p["internacoes"]
     ano_fim = int(mun["ano"].max())
     fala = (f"**O que aconteceu:** em {ano_fim}, {formatar_numero(i['atual'])} internações por {cancer_de(c)}. "
-            f"**O que está acontecendo:** a tendência é de {formatar_numero(comp['ritmo_municipio'], 1)}% ao ano. "
-            f"**O que pode acontecer:** se esse comportamento continuar, {i['ano']} deve ficar entre "
+            f"\n\n**O que está acontecendo:** a tendência é de {formatar_numero(comp['ritmo_municipio'], 1)}% ao ano. "
+            f"\n\n**O que pode acontecer:** se esse comportamento continuar, {i['ano']} deve ficar entre "
             f"**{formatar_numero(i['minimo'])} e {formatar_numero(i['maximo'])} internações** (em torno de "
-            f"{formatar_numero(i['previsto'])}), com cerca de {formatar_numero(p['dias_permanencia']['previsto'])} dias "
-            f"de internação e R$ {formatar_numero(p['valor_total']['previsto'])} em valores hospitalares registrados.")
+            f"{formatar_numero(i['previsto'])}), com {_quanto(p['dias_permanencia'], ' dias')} "
+            f"de internação e {_quanto(p['valor_total'], '', 'R$ ')} em valores hospitalares registrados.")
     teste = testar_projecao(mun)
     fragil = not i["tendencia_acerta_mais"] or _pequeno(ctx, c)
     if teste:
@@ -422,7 +432,7 @@ def _projecao(ctx, c):
                  f"{'menos' if i['tendencia_acerta_mais'] else 'mais'} do que simplesmente repetir a média.")
     ponta = leitura_ponta_projecao(mun)
     if ponta:  # último ano longe da reta: explica por que a projeção parece "cair"
-        fala += " " + ponta
+        fala += "\n\n" + ponta
     fala += (" É uma **projeção de tendência**, não previsão de casos novos. Serve de sinal para discutir "
              "planejamento e acompanhar a demanda.")
     return Resposta(

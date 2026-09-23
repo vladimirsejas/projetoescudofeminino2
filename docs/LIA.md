@@ -89,6 +89,15 @@ sinais), não é enfeite.
 
 Sempre com **[Voltar]** e **[Começar de novo]**.
 
+**Balão.** Tudo o que é da Lia fica num balão preso ao rosto (a
+pontinha aponta para ela): a fala, "os números por trás", os próximos
+passos como fichas e, discretos, "← Voltar" e "Começar de novo". Um
+pouco de vida, sem distrair: o rosto "respira" devagar e, a cada fala
+nova, o balão entra com três pontinhos de "digitando" antes do texto.
+Tudo desliga para quem pede menos movimento no sistema
+(`prefers-reduced-motion`). Falas longas vêm em parágrafos (o que
+aconteceu / está acontecendo / pode acontecer).
+
 **Sem caixa de texto livre.** Existiu (09/2026) e saiu por decisão
 do autor: o motor de texto (`conversa.py`) só entende os mesmos
 assuntos que os botões já cobrem, então a caixa respondia o mesmo com

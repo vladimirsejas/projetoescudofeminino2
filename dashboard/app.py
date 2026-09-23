@@ -100,7 +100,49 @@ section[data-testid="stSidebar"] { min-width: 400px; }
 .lia-nome { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 1.25rem; color: #292541; }
 .lia-nome span { font-weight: 500; font-size: .95rem; color: #706b82; }
 .lia-cargo { color: #706b82; font-size: .85rem; line-height: 1.3; }
-.lia-fala-grande { color: #3d3852; font-size: 1.08rem; margin: 6px 0 12px; }
+.lia-fala-grande { color: #3d3852; font-size: 1.08rem; margin: 2px 0 10px; }
+
+/* ---- Lia: balão preso ao rosto, com um pouco de vida ----
+   O balão é um st.container com key "lia_balao_*": o Streamlit põe a
+   classe st-key-<key> nele. A key muda a cada fala, então o balão
+   nasce de novo e a animação de entrada roda (e os pontinhos de
+   "digitando" aparecem antes do texto). */
+.lia-rosto { animation: lia-respira 5s ease-in-out infinite; transform-origin: 50% 90%; }
+.lia-rosto img { border-radius: 50%; }
+@keyframes lia-respira { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-3px) scale(1.015); } }
+[class*="st-key-lia_balao"] {
+    position: relative; background: #ffffff; border: 1px solid #e3dcf2; border-radius: 20px;
+    padding: 16px 18px 12px; box-shadow: 0 6px 18px rgba(78, 60, 130, 0.08);
+    animation: lia-balao-entra .35s ease-out both;
+}
+[class*="st-key-lia_balao"]::before {           /* a pontinha, apontando para o rosto */
+    content: ""; position: absolute; width: 16px; height: 16px; background: #ffffff;
+    border-left: 1px solid #e3dcf2; border-top: 1px solid #e3dcf2;
+    top: -9px; left: 34px; transform: rotate(45deg);
+}
+[class*="st-key-lia_balao_centro"]::before { top: 34px; left: -9px; transform: rotate(-45deg); }
+[class*="st-key-lia_balao"]::after {            /* "digitando..." antes do texto */
+    content: "• • •"; position: absolute; top: 14px; left: 20px; color: #9b8fc4; letter-spacing: 2px;
+    animation: lia-digitando .5s ease-out both;
+}
+[class*="st-key-lia_balao"] > div { animation: lia-texto-entra .3s ease-out .45s both; }
+@keyframes lia-balao-entra { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes lia-digitando { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lia-texto-entra { from { opacity: 0; } to { opacity: 1; } }
+[class*="st-key-lia_balao"] p { color: #3d3852; line-height: 1.55; }
+[class*="st-key-lia_balao"] .stButton button {
+    border-radius: 999px; background: #f4f0fb; border: 1px solid #e3dcf2; color: #4a3d78;
+    font-weight: 600; min-height: 0; padding: 6px 14px;
+}
+[class*="st-key-lia_balao"] .stButton button:hover { background: #ebe4f8; border-color: #cdbfeb; color: #33285c; }
+[class*="st-key-lia_balao"] [class*="st-key-lia_discreto"] button,
+[class*="st-key-lia_balao"] [class*="st-key-bv_fechar"] button {
+    background: transparent; border: none; color: #8a8599; font-weight: 500; padding: 2px 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .lia-rosto, [class*="st-key-lia_balao"], [class*="st-key-lia_balao"] > div { animation: none; }
+    [class*="st-key-lia_balao"]::after { display: none; }
+}
 div[data-testid="stRadio"]:has(input[value="Panorama"]) > div { gap: 4px; border-bottom: 1px solid #e6e3ef; }
 </style>
 """, unsafe_allow_html=True)
@@ -296,6 +338,7 @@ def lia_mostrar(resposta):
     if lia_estado["atual"] is not None:
         lia_estado["pilha"].append(lia_estado["atual"])
     lia_estado["atual"] = resposta
+    lia_estado["falas"] = lia_estado.get("falas", 0) + 1  # balão novo -> animação
     st.session_state["lia_fechada"] = True
     destino = resposta.destino or {}
     if destino.get("aba") in ABAS:
@@ -321,6 +364,23 @@ def recarregar():
 def lia_voltar():
     if lia_estado["pilha"]:
         lia_estado["atual"] = lia_estado["pilha"].pop()
+        lia_estado["falas"] = lia_estado.get("falas", 0) + 1
+
+
+def balao(nome):
+    """Container do balão da Lia (ver CSS). A key muda a cada fala, para
+    o balão "nascer" de novo com a animação. Streamlit antigo, sem key
+    em container: cai num container com borda, sem a pontinha."""
+    chave = f"lia_balao_{nome}_{lia_estado.get('falas', 0)}"
+    try:
+        return st.container(key=chave)
+    except TypeError:
+        return st.container(border=True)
+
+
+def rosto(expressao, tamanho):
+    """O rosto da Lia, "respirando" devagar (ver CSS)."""
+    return f'<div class="lia-rosto">{rosto_lia(expressao, tamanho)}</div>'
 
 
 # ------------------------------------------------------------
@@ -329,23 +389,21 @@ def lia_voltar():
 
 if not st.session_state.get("lia_fechada"):
     boas_vindas = lia_responder(ctx_lia, INICIO)
-    st.markdown('<div class="lia-boasvindas">', unsafe_allow_html=True)
-    c_rosto, c_fala = st.columns([1, 4.2])
+    c_rosto, c_fala = st.columns([1, 4.6])
     with c_rosto:
-        st.markdown(rosto_lia("acolhedora", 150), unsafe_allow_html=True)
-    with c_fala:
+        st.markdown(rosto("acolhedora", 150), unsafe_allow_html=True)
+    with c_fala, balao("centro"):
         st.markdown(f'<div class="lia-nome">Lia <span>· pesquisadora do Escudo Feminino</span></div>'
                     f'<div class="lia-fala-grande">{boas_vindas.fala.replace("**", "")}</div>',
                     unsafe_allow_html=True)
         # 4 portas de entrada (docs/LIA.md); os 8 caminhos ficam na lateral
         principais = {"mais_aparece", "aumentando", "atencao", "futuro"}
-        colunas = st.columns(4)
+        colunas = st.columns(2)  # 2 x 2: os rótulos cabem inteiros
         for i, (rotulo, acao) in enumerate(a for a in boas_vindas.botoes if a[1].get("id") in principais):
-            colunas[i].button(rotulo, key=f"bv_{i}", on_click=lia_clicar, args=(acao,),
+            colunas[i % 2].button(rotulo, key=f"bv_{i}", on_click=lia_clicar, args=(acao,),
                               use_container_width=True)
         st.button("Prefiro explorar sozinha", key="bv_fechar",
                   on_click=lambda: st.session_state.update(lia_fechada=True))
-    st.markdown('</div>', unsafe_allow_html=True)
 
 aba = seletor(st, "Navegação", "aba", ABAS, horizontal=True, label_visibility="collapsed")
 
@@ -724,27 +782,35 @@ with st.sidebar:
     atual = lia_estado["atual"]
     c_rosto, c_nome = st.columns([1, 2.6])
     with c_rosto:
-        st.markdown(rosto_lia(atual.expressao, 76), unsafe_allow_html=True)
+        st.markdown(rosto(atual.expressao, 76), unsafe_allow_html=True)
     with c_nome:
         st.markdown('<div class="lia-nome">Lia</div><div class="lia-cargo">Pesquisadora do Escudo Feminino'
                     f'<br>{nome_cidade}</div>', unsafe_allow_html=True)
 
+    # Tudo o que é dela fica DENTRO do balão, preso ao rosto: fala,
+    # números, próximos passos. Antes os botões soltos na lateral
+    # pareciam longe dela.
     boas_vindas_aberta = not st.session_state.get("lia_fechada")
-    if boas_vindas_aberta:
-        # a saudação já está no centro da tela: aqui não se repete
-        st.markdown("Escolha um caminho ali no centro da tela.")
-    if not boas_vindas_aberta:
-        st.markdown(atual.fala)
-    if atual.destino and atual.destino.get("aba") and lia_estado["pilha"]:
-        st.caption(f"O painel foi para a aba {atual.destino['aba']}"
-                   + (f" · {nome_doenca(atual.destino['cancer'])}" if atual.destino.get("cancer") else "") + ".")
-    if atual.numeros:
-        with st.expander("Os números por trás"):
-            st.markdown("\n".join(f"- {n}" for n in atual.numeros))
-
-    for i, (rotulo, acao) in enumerate([] if boas_vindas_aberta else atual.botoes):
-        st.button(rotulo, key=f"lia_{i}_{rotulo}", on_click=lia_clicar, args=(acao,), use_container_width=True)
-    if lia_estado["pilha"]:
-        st.button("← Voltar", key="lia_voltar", on_click=lia_voltar)
+    with balao("lateral"):
+        if boas_vindas_aberta:
+            # a saudação já está no centro da tela: aqui não se repete
+            st.markdown("Estou ali no centro da tela. Escolha um caminho por lá.")
+        else:
+            st.markdown(atual.fala)
+            if atual.destino and atual.destino.get("aba") and lia_estado["pilha"]:
+                st.caption(f"O painel foi para a aba {atual.destino['aba']}"
+                           + (f" · {nome_doenca(atual.destino['cancer'])}" if atual.destino.get("cancer") else "")
+                           + ".")
+            if atual.numeros:
+                with st.expander("Os números por trás"):
+                    st.markdown("\n".join(f"- {n}" for n in atual.numeros))
+            proximos = [(r, a) for r, a in atual.botoes if a is not INICIO and a.get("tipo") != "inicio"]
+            for i, (rotulo, acao) in enumerate(proximos):
+                st.button(rotulo, key=f"lia_{i}_{rotulo}", on_click=lia_clicar, args=(acao,),
+                          use_container_width=True)
+            c_voltar, c_inicio = st.columns(2)
+            if lia_estado["pilha"]:
+                c_voltar.button("← Voltar", key="lia_discreto_voltar", on_click=lia_voltar)
+            c_inicio.button("Começar de novo", key="lia_discreto_inicio", on_click=lia_clicar, args=(INICIO,))
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")
