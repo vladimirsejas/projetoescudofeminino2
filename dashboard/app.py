@@ -4,12 +4,23 @@ import sqlite3
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
-from configuracao_geografica import listar_municipios_disponiveis
+from configuracao_geografica import listar_municipios_disponiveis, UF_REFERENCIA
 from chat_servico import responder_pergunta
+from predicao_orcamento import (
+    PESOS_PADRAO,
+    NOMES_CRITERIOS,
+    calcular_prioridades,
+    carregar_serie_banco,
+    distribuir_orcamento,
+    formatar_numero,
+    projetar,
+    validar,
+)
 
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
@@ -123,6 +134,68 @@ def ler_sql(sql, params=()):
 @st.cache_data
 def municipios():
     return listar_municipios_disponiveis()
+
+
+@st.cache_data
+def serie_anual(origem):
+    conn = sqlite3.connect(BANCO)
+    try:
+        return carregar_serie_banco(conn, origem, UF_REFERENCIA)
+    finally:
+        conn.close()
+
+
+# ============================================================
+# ESTILO ÚNICO DOS GRÁFICOS
+#
+# Todo gráfico passa por estilizar(): mesma fonte, grade discreta,
+# sem barra de ferramentas do Plotly e cores fixas por papel (uma
+# cor para "dado", cinza para "contexto"). Paleta validada para
+# daltonismo; como três cores ficam abaixo de 3:1 de contraste, todo
+# gráfico tem os números também em tabela ("Ver números").
+# ============================================================
+
+COR_PRINCIPAL = "#2a78d6"
+COR_CONTEXTO = "#b9b7c4"
+COR_TEXTO = "#292541"
+COR_TEXTO_SUAVE = "#706b82"
+COR_GRADE = "#ebe8f2"
+PALETA = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+CONFIG_GRAFICO = {"displayModeBar": False, "locale": "pt-BR"}
+
+
+def estilizar(fig, titulo=None, subtitulo=None, altura=380):
+    if titulo:
+        texto = f"<b>{titulo}</b>"
+        if subtitulo:
+            texto += f"<br><span style='font-size:13px;color:{COR_TEXTO_SUAVE}'>{subtitulo}</span>"
+        fig.update_layout(title={"text": texto, "x": 0, "xanchor": "left"})
+    fig.update_layout(
+        height=altura,
+        font={"family": "DM Sans, sans-serif", "size": 13, "color": COR_TEXTO},
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin={"l": 10, "r": 20, "t": 80 if titulo else 20, "b": 40},
+        # legenda embaixo do gráfico: em cima ela disputava espaço com o subtítulo
+        legend={"orientation": "h", "yanchor": "top", "y": -0.12, "x": 0, "title": None},
+        hoverlabel={"bgcolor": "#ffffff", "font_color": COR_TEXTO, "bordercolor": COR_GRADE},
+        separators=",.",
+        bargap=0.35,
+    )
+    fig.update_xaxes(showgrid=False, linecolor=COR_GRADE, title=None, automargin=True,
+                     tickfont={"color": COR_TEXTO_SUAVE})
+    fig.update_yaxes(gridcolor=COR_GRADE, zeroline=False, title=None, automargin=True,
+                     tickfont={"color": COR_TEXTO_SUAVE})
+    fig.update_traces(selector={"type": "bar"}, marker_line_width=0)
+    return fig
+
+
+def mostrar(fig):
+    st.plotly_chart(fig, use_container_width=True, theme=None, config=CONFIG_GRAFICO)
+
+
+def reais(valor, casas=0):
+    return "R$ " + formatar_numero(valor, casas)
 
 
 municipios_disponiveis = municipios()
@@ -287,20 +360,23 @@ kpis = ler_sql(f"""
 """, tuple(params)).iloc[0]
 
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("Internações", f"{int(kpis['internacoes']):,}")
-k2.metric("Óbitos registrados", f"{int(kpis['obitos']):,}")
+k1.metric("Internações", formatar_numero(kpis["internacoes"], 0))
+k2.metric("Óbitos registrados", formatar_numero(kpis["obitos"], 0))
+valor_kpi = float(kpis["valor_total"])
 k3.metric(
     f"Valor hospitalar — {ano_filtro if ano_filtro is not None else '2013–2025'}",
-    f"R$ {float(kpis['valor_total']):,.2f}"
+    f"R$ {formatar_numero(valor_kpi / 1e6, 2)} mi" if valor_kpi >= 1e6 else reais(valor_kpi),
+    help=f"Valor exato: {reais(valor_kpi, 2)}",
 )
-k4.metric("Permanência média", f"{float(kpis['permanencia']):.1f} dias")
+k4.metric("Permanência média", f"{formatar_numero(kpis['permanencia'])} dias")
 
 
 # ============================================================
 # ÁREAS DE EXPLORAÇÃO
 # ============================================================
 
-tab_panorama, tab_evolucao, tab_analise, tab_comparar, tab_indicadores, tab_graficos = st.tabs([
+tab_investir, tab_panorama, tab_evolucao, tab_analise, tab_comparar, tab_indicadores, tab_graficos = st.tabs([
+    "Onde investir",
     "Panorama",
     "Evolução",
     "Análise",
@@ -308,6 +384,268 @@ tab_panorama, tab_evolucao, tab_analise, tab_comparar, tab_indicadores, tab_graf
     "Indicadores",
     "Gráficos",
 ])
+
+
+# ============================================================
+# ONDE INVESTIR — predição + sugestão de orçamento
+#
+# Pedido da Secretaria da Mulher: a predição tem que indicar onde
+# colocar o orçamento, não só como cada doença vai evoluir. Toda a
+# conta está em algoritimos/predicao_orcamento.py; aqui só mostra.
+# Compara sempre todas as doenças entre si (orçamento é repartido
+# entre elas), por isso não usa o filtro de doença nem de ano.
+# ============================================================
+
+with tab_investir:
+    serie = serie_anual(ORIGEM)
+
+    if serie.empty or serie[serie["grupo"] == "MUNICIPIO"]["ano"].nunique() < 5:
+        st.info(
+            f"{NOME_MUNICIPIO} ainda não tem série histórica suficiente "
+            "(mínimo de 5 anos) para projetar e sugerir orçamento."
+        )
+    else:
+        with st.expander("Ajustar o que pesa mais na decisão", expanded=False):
+            st.caption(
+                "Os pesos abaixo definem a sugestão. O padrão equilibra volume, "
+                "crescimento, gravidade, custo e o quanto dá para prevenir. "
+                "Mude conforme a prioridade política da gestão — a sugestão se "
+                "recalcula na hora."
+            )
+            colunas_peso = st.columns(3)
+            pesos = {}
+            for i, (chave, padrao) in enumerate(PESOS_PADRAO.items()):
+                with colunas_peso[i % 3]:
+                    pesos[chave] = st.slider(
+                        NOMES_CRITERIOS[chave], 0, 100, int(padrao * 100), 5,
+                        key=f"peso_{chave}"
+                    ) / 100
+
+        prioridades = calcular_prioridades(serie, pesos)
+        projecao = projetar(serie)
+        ultimo_ano = int(serie["ano"].max())
+        anos_proj = f"{ultimo_ano + 1}–{ultimo_ano + 3}"
+
+        top3 = prioridades.head(3)
+        pct_top3 = top3["pct_orcamento"].sum()
+        nomes_top = top3["tipo_cancer"].tolist()
+        lista_top = nomes_top[0] if len(nomes_top) == 1 else ", ".join(nomes_top[:-1]) + " e " + nomes_top[-1]
+        # o texto descreve o que as prioridades têm de fato em comum
+        # (muda se a gestora mexer nos pesos), nunca uma frase fixa
+        tracos = []
+        if (top3["crescimento_anual_pct"] > 1).all():
+            tracos.append("crescem ano a ano")
+        if (top3["nota_prevencao"] >= 0.8).all():
+            tracos.append("têm prevenção ou rastreamento que o município pode executar")
+        if top3["internacoes_previstas"].sum() >= prioridades["internacoes_previstas"].sum() / 2:
+            tracos.append("concentram a maior parte das internações previstas")
+        porque = ("Elas " + ", ".join(tracos) + ". ") if tracos else ""
+        st.markdown(
+            f"""
+<div class="escudo-card" style="margin-bottom:18px">
+  <div class="escudo-eyebrow">Recomendação para {NOME_MUNICIPIO} · {anos_proj}</div>
+  <div class="escudo-title" style="font-size:1.6rem">
+    Concentrar {formatar_numero(pct_top3, 0)}% do orçamento em {lista_top}
+  </div>
+  <div class="escudo-text">
+    {porque}Baseado nas internações do SIH/SUS de {serie["ano"].min()} a {ultimo_ano}
+    e nos pesos escolhidos acima.
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+        col_valor, col_vazia = st.columns([1, 2])
+        with col_valor:
+            orcamento = st.number_input(
+                "Orçamento disponível para câncer feminino (R$)",
+                min_value=0.0, value=1_000_000.0, step=50_000.0, format="%.0f",
+                help="Digite o valor e veja quanto iria para cada doença."
+            )
+
+        distribuicao = distribuir_orcamento(prioridades, orcamento)
+        distribuicao = distribuicao.sort_values("pct_orcamento")
+        distribuicao["rotulo"] = distribuicao.apply(
+            lambda r: f"{formatar_numero(r['pct_orcamento'], 0)}% · {reais(r['valor_sugerido'])}",
+            axis=1,
+        )
+        cores = [COR_PRINCIPAL if c in set(top3["tipo_cancer"]) else COR_CONTEXTO
+                 for c in distribuicao["tipo_cancer"]]
+        fig = px.bar(
+            distribuicao, x="pct_orcamento", y="tipo_cancer", orientation="h",
+            text="rotulo", custom_data=["acao_sugerida"],
+        )
+        fig.update_traces(
+            marker_color=cores, textposition="outside", cliponaxis=False,
+            hovertemplate="<b>%{y}</b><br>%{x:.1f}% do orçamento<br>%{customdata[0]}<extra></extra>",
+        )
+        fig.update_xaxes(visible=False, range=[0, distribuicao["pct_orcamento"].max() * 1.45])
+        fig.update_yaxes(showgrid=False)
+        mostrar(estilizar(
+            fig,
+            "Quanto do orçamento para cada doença",
+            f"Sugestão sobre {reais(orcamento)} · em azul, as três prioridades",
+            altura=360,
+        ))
+
+        st.markdown("#### O que fazer com o recurso em cada doença")
+        for _, linha in prioridades.iterrows():
+            with st.container(border=True):
+                a, b = st.columns([1, 3])
+                a.metric(
+                    linha["tipo_cancer"],
+                    f"{formatar_numero(linha['pct_orcamento'], 0)}%",
+                    help="Parcela sugerida do orçamento",
+                )
+                b.markdown(f"**{linha['acao_sugerida']}**")
+                b.caption(
+                    linha["justificativa"]
+                    + f" Previsão para {anos_proj}: {formatar_numero(linha['internacoes_previstas'], 0)} "
+                    f"internações (provável entre {formatar_numero(linha['internacoes_previstas_min'], 0)} "
+                    f"e {formatar_numero(linha['internacoes_previstas_max'], 0)})."
+                )
+
+        # --- Por que essa ordem: contribuição de cada critério ---
+        partes = prioridades.melt(
+            id_vars="tipo_cancer",
+            value_vars=[f"pontos_{k}" for k in PESOS_PADRAO],
+            var_name="criterio", value_name="pontos",
+        )
+        partes["criterio"] = partes["criterio"].str.replace("pontos_", "").map(NOMES_CRITERIOS)
+        ordem = prioridades.sort_values("indice")["tipo_cancer"].tolist()
+        fig = px.bar(
+            partes, x="pontos", y="tipo_cancer", color="criterio", orientation="h",
+            category_orders={"tipo_cancer": ordem, "criterio": list(NOMES_CRITERIOS.values())},
+            color_discrete_sequence=PALETA,
+        )
+        fig.update_traces(
+            marker_line_color="#ffffff", marker_line_width=2,
+            hovertemplate="<b>%{y}</b><br>%{fullData.name}: %{x:.1f} pontos<extra></extra>",
+        )
+        fig.update_layout(barmode="stack")
+        fig.update_xaxes(showgrid=True, gridcolor=COR_GRADE)
+        fig.update_yaxes(showgrid=False)
+        mostrar(estilizar(
+            fig,
+            "Por que essa ordem",
+            "Pontos de prioridade (0 a 100) e de onde cada ponto vem",
+            altura=420,
+        ))
+
+        # --- Predição: histórico + projeção com faixa provável ---
+        st.markdown("#### Como cada doença deve evoluir")
+        doenca_proj = st.selectbox(
+            "Doença", prioridades["tipo_cancer"].tolist(),
+            index=(prioridades["tipo_cancer"].tolist().index(doenca_escolhida)
+                   if doenca_escolhida in prioridades["tipo_cancer"].tolist() else 0),
+            key="doenca_projecao",
+        )
+        dados_proj = projecao[(projecao["tipo_cancer"] == doenca_proj)
+                              & (projecao["grupo"] == "MUNICIPIO")]
+        hist = dados_proj[dados_proj["tipo"] == "historico"]
+        fut = dados_proj[dados_proj["tipo"] == "projecao"]
+        ponte = hist.tail(1)  # liga a linha do histórico à da projeção
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=list(fut["ano"]) + list(fut["ano"])[::-1],
+            y=list(fut["internacoes_max"]) + list(fut["internacoes_min"])[::-1],
+            mode="lines", fill="toself", fillcolor="rgba(42,120,214,0.14)", line={"width": 0},
+            hoverinfo="skip", name="Faixa provável (90%)",
+        ))
+        fig.add_trace(go.Scatter(
+            x=hist["ano"], y=hist["internacoes"], mode="lines+markers",
+            line={"color": COR_PRINCIPAL, "width": 2}, marker={"size": 8},
+            name="Registrado", hovertemplate="%{x}: %{y:.0f} internações<extra></extra>",
+        ))
+        fig.add_trace(go.Scatter(
+            x=list(ponte["ano"]) + list(fut["ano"]),
+            y=list(ponte["internacoes"]) + list(fut["internacoes"]),
+            mode="lines+markers", line={"color": COR_PRINCIPAL, "width": 2, "dash": "dot"},
+            marker={"size": 8, "symbol": "circle-open"},
+            name="Previsto", hovertemplate="%{x}: %{y:.0f} previstas<extra></extra>",
+        ))
+        linha_p = prioridades[prioridades["tipo_cancer"] == doenca_proj].iloc[0]
+        tendencia = "sobem" if linha_p["crescimento_anual_pct"] > 1 else (
+            "caem" if linha_p["crescimento_anual_pct"] < -1 else "ficam estáveis")
+        fig.update_xaxes(dtick=1)
+        mostrar(estilizar(
+            fig,
+            f"{doenca_proj}: internações {tendencia} "
+            f"({formatar_numero(linha_p['crescimento_anual_pct'])}% ao ano)",
+            f"No Estado de SP a mesma doença varia {formatar_numero(linha_p['crescimento_anual_sp_pct'])}% ao ano",
+        ))
+        if linha_p["ultimo_ano_atipico"]:
+            st.caption(
+                f"Atenção: {ultimo_ano} ficou bem acima da tendência dos anos anteriores"
+                + (" — e o Estado de SP inteiro também saltou nesse ano, o que sugere efeito de "
+                   "registro/faturamento das AIHs, não só aumento real de casos"
+                   if linha_p["ultimo_ano_atipico_sp"] else "")
+                + ". Por isso a previsão segue a tendência de longo prazo e não parte do valor de "
+                f"{ultimo_ano}. Se {ultimo_ano} se confirmar como novo patamar, a faixa de cima é a mais provável."
+            )
+
+        with st.expander("Ver números"):
+            st.dataframe(
+                prioridades[[
+                    "tipo_cancer", "pct_orcamento", "indice", "internacoes_ultimo_ano",
+                    "internacoes_previstas", "internacoes_previstas_min", "internacoes_previstas_max",
+                    "custo_previsto", "crescimento_anual_pct", "crescimento_anual_sp_pct",
+                    "letalidade_pct", "letalidade_sp_pct",
+                ]].rename(columns={
+                    "tipo_cancer": "Doença", "pct_orcamento": "% do orçamento",
+                    "indice": "Pontos de prioridade",
+                    "internacoes_ultimo_ano": f"Internações {ultimo_ano}",
+                    "internacoes_previstas": f"Previstas {anos_proj}",
+                    "internacoes_previstas_min": "Previstas (mínimo provável)",
+                    "internacoes_previstas_max": "Previstas (máximo provável)",
+                    "custo_previsto": f"Custo hospitalar previsto {anos_proj} (R$)",
+                    "crescimento_anual_pct": "Crescimento ao ano (%)",
+                    "crescimento_anual_sp_pct": "Crescimento no Estado (%)",
+                    "letalidade_pct": "Letalidade (%)",
+                    "letalidade_sp_pct": "Letalidade no Estado (%)",
+                }).round(1),
+                use_container_width=True, hide_index=True,
+            )
+
+        with st.expander("Como a previsão é feita e quanto ela acerta"):
+            validacao = validar(serie)
+            melhor = validacao[validacao["erro_medio_tendencia"] <= validacao["erro_medio_ingenuo"]]
+            st.markdown(
+                f"""
+**Previsão.** Para cada doença, uma linha de tendência é ajustada sobre todos os anos
+de {serie["ano"].min()} a {ultimo_ano} e prolongada por 3 anos. A faixa sombreada mostra
+onde o número real deve cair em 9 de cada 10 cenários — com poucas internações por ano,
+a faixa é larga, e isso é informação, não defeito.
+
+**Teste de acerto.** O mesmo método foi treinado só até {ultimo_ano - 3} e usado para
+"prever" {ultimo_ano - 2}–{ultimo_ano}, anos que já conhecemos. Ele errou menos que
+simplesmente repetir a média dos últimos anos em **{len(melhor)} de {len(validacao)}
+doenças** ({", ".join(melhor["tipo_cancer"]) or "nenhuma"}).
+
+**Prioridade.** Cada doença recebe de 0 a 100 pontos somando seis critérios com os pesos
+ajustáveis acima: internações previstas, ritmo de crescimento, crescimento acima do
+Estado, letalidade hospitalar (estabilizada com a taxa estadual quando há poucos casos),
+custo hospitalar previsto e potencial de prevenção (diretrizes do INCA). A parcela do
+orçamento é proporcional aos pontos.
+
+**Limites.** Os dados são internações do SUS (AIH): não contam casos novos, atendimentos
+ambulatoriais (quimioterapia, radioterapia) nem quem usa só plano privado. O custo é o
+valor pago pela AIH. A sugestão é um ponto de partida para a decisão da gestão, não uma
+regra.
+"""
+            )
+            st.dataframe(
+                validacao.rename(columns={
+                    "tipo_cancer": "Doença",
+                    "erro_medio_tendencia": "Erro médio da tendência (internações/ano)",
+                    "erro_medio_ingenuo": "Erro médio de repetir a média",
+                    "anos_dentro_intervalo": "Anos dentro da faixa provável",
+                    "anos_testados": "Anos testados",
+                }).round(1),
+                use_container_width=True, hide_index=True,
+            )
 
 
 with tab_panorama:
@@ -333,14 +671,23 @@ with tab_panorama:
         a, b = st.columns([1.15, .85])
 
         with a:
-            fig = px.bar(
-                ranking,
-                x="tipo_cancer",
-                y="total",
-                text="total",
-                title="Volume de internações por doença"
+            ranking = ranking.sort_values("total")
+            fig = px.bar(ranking, x="total", y="tipo_cancer", orientation="h", text="total")
+            fig.update_traces(
+                # ordem crescente: a última barra (a maior) fica em destaque
+                marker_color=[COR_CONTEXTO] * (len(ranking) - 1) + [COR_PRINCIPAL],
+                textposition="outside", cliponaxis=False,
+                hovertemplate="%{y}: %{x} internações<extra></extra>",
             )
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_xaxes(visible=False)
+            fig.update_yaxes(showgrid=False)
+            lider = ranking.iloc[-1]
+            mostrar(estilizar(
+                fig,
+                f"{lider['tipo_cancer']} lidera as internações",
+                f"{int(lider['total']):,} de {int(ranking['total'].sum()):,} internações".replace(",", ".")
+                + (f" em {ano_filtro}" if ano_filtro is not None else " em 2013–2025"),
+            ))
 
         with b:
             st.markdown("#### O que está disponível")
@@ -379,14 +726,21 @@ with tab_evolucao:
     if evolucao.empty:
         st.info("Não há série temporal disponível para a seleção.")
     else:
-        fig = px.line(
-            evolucao,
-            x="ano",
-            y="internacoes",
-            markers=True,
-            title="Evolução das internações hospitalares"
+        fig = px.line(evolucao, x="ano", y="internacoes", markers=True)
+        fig.update_traces(
+            line={"color": COR_PRINCIPAL, "width": 2}, marker={"size": 8},
+            hovertemplate="%{x}: %{y} internações<extra></extra>",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_xaxes(dtick=1)
+        primeiro, ultimo = evolucao.iloc[0], evolucao.iloc[-1]
+        variacao = (ultimo["internacoes"] / primeiro["internacoes"] - 1) * 100 if primeiro["internacoes"] else 0
+        mostrar(estilizar(
+            fig,
+            f"Internações {'subiram' if variacao > 0 else 'caíram'} "
+            f"{formatar_numero(abs(variacao), 0)}% de {int(primeiro['ano'])} a {int(ultimo['ano'])}",
+            f"{int(primeiro['internacoes'])} → {int(ultimo['internacoes'])} internações por ano · "
+            "a previsão dos próximos anos está na aba Onde investir",
+        ))
         st.caption(
             "A série histórica mostra todos os anos disponíveis para a seleção. "
             + ("O ano escolhido acima é usado nos demais recortes; ele não reduz esta série a um único ponto."
@@ -449,7 +803,11 @@ with tab_analise:
         if df_tend.empty:
             st.info("Não há série temporal disponível.")
         else:
-            st.line_chart(df_tend.set_index("ano")["internacoes"])
+            fig = px.line(df_tend, x="ano", y="internacoes", markers=True)
+            fig.update_traces(line={"color": COR_PRINCIPAL, "width": 2}, marker={"size": 8},
+                              hovertemplate="%{x}: %{y} internações<extra></extra>")
+            fig.update_xaxes(dtick=1)
+            mostrar(estilizar(fig, altura=300))
 
     with st.expander("Mortalidade", expanded=False):
         df_mort = ler_sql("""
@@ -676,14 +1034,13 @@ with tab_comparar:
                 st.info("Não há dados suficientes para essa comparação.")
         else:
             fig = px.bar(
-                dados,
-                x="tipo_cancer",
-                y="internacoes",
-                color="municipio",
-                barmode="group",
-                title=f"Internações — {NOME_MUNICIPIO} x {outro_nome}"
+                dados, x="tipo_cancer", y="internacoes", color="municipio",
+                barmode="group", color_discrete_sequence=PALETA,
+                category_orders={"municipio": [NOME_MUNICIPIO, outro_nome]},
             )
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_traces(hovertemplate="%{x}: %{y} internações<extra>%{fullData.name}</extra>")
+            mostrar(estilizar(fig, f"Internações — {NOME_MUNICIPIO} x {outro_nome}",
+                              "Números absolutos: municípios de tamanhos diferentes não se comparam só por aqui"))
 
 
 with tab_indicadores:
@@ -823,12 +1180,17 @@ with tab_graficos:
 
         if tipo_grafico == "Linha":
             fig = px.line(grafico, x=eixo, y=coluna_resultado, markers=True)
+            fig.update_traces(line={"color": COR_PRINCIPAL, "width": 2}, marker={"size": 8})
         elif tipo_grafico == "Área":
             fig = px.area(grafico, x=eixo, y=coluna_resultado)
+            fig.update_traces(line={"color": COR_PRINCIPAL, "width": 2})
         else:
-            fig = px.bar(grafico, x=eixo, y=coluna_resultado, text=coluna_resultado)
+            fig = px.bar(grafico, x=eixo, y=coluna_resultado)
+            fig.update_traces(marker_color=COR_PRINCIPAL)
+        if eixo == "ano":
+            fig.update_xaxes(dtick=1)
 
-        st.plotly_chart(fig, use_container_width=True)
+        mostrar(estilizar(fig, medida, NOME_MUNICIPIO + (f" · {doenca_escolhida}" if doenca_escolhida else "")))
 
 
 

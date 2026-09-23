@@ -107,6 +107,41 @@ isso fazer sentido metodologicamente.
 python algoritimos\serie_temporal.py
 ```
 
+### Predição e sugestão de orçamento ("Onde investir")
+
+Pedido da Secretaria da Mulher: a predição deve indicar **onde colocar
+o orçamento**, não só como cada doença vai evoluir.
+`algoritimos\predicao_orcamento.py` faz isso em três camadas
+determinísticas:
+
+1. **Projeção** — reta de tendência sobre toda a série anual
+   (2013–2025) de cada câncer, projetada 3 anos à frente com faixa
+   provável de ~90%.
+2. **Validação** — o mesmo método treinado até 2022 e testado em
+   2023–2025, comparado com "repetir a média dos últimos 3 anos".
+3. **Prioridade de orçamento** — índice 0–100 por câncer (internações
+   previstas, crescimento, crescimento acima do Estado, letalidade
+   estabilizada pela taxa estadual, custo previsto e potencial de
+   prevenção segundo o INCA); a parcela sugerida do orçamento é
+   proporcional ao índice, e cada câncer recebe o tipo de ação em que
+   o recurso rende mais.
+
+O dashboard mostra tudo isso na primeira aba, **Onde investir**,
+calculado na hora a partir de `internacoes` (não precisa rodar nada
+antes). Os pesos são ajustáveis pela gestora na própria tela. Rodar o
+script direto é opcional e só grava as tabelas `predicao_orcamento` e
+`predicao_projecao` (multi-tenant):
+
+```powershell
+python algoritimos\predicao_orcamento.py
+python algoritimos\teste_predicao_orcamento.py
+```
+
+Achado dos dados: em 2025 as internações do Estado inteiro saltaram
+cerca de 50% nos 7 cânceres ao mesmo tempo — padrão de efeito de
+registro/faturamento, não só de aumento real. A previsão segue a
+tendência de longo prazo e o dashboard avisa isso ao lado do gráfico.
+
 ---
 
 ## Estrutura do projeto

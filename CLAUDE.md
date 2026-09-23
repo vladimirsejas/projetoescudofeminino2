@@ -89,6 +89,23 @@ tudo foi feito -- ver commits para detalhes):
   no Windows do autor) ainda não foi feito -- `teste_territorial.py`
   valida a lógica com banco sintético/temporário.
 
+## Predição e orçamento (feedback da Secretaria da Mulher, 09/2026)
+
+A Secretaria viu o trabalho e pediu: (1) predição, (2) gráficos que
+sirvam para decidir, não só enfeitar, (3) que a predição indique
+**onde colocar o orçamento**, não só a evolução das doenças.
+
+- `algoritimos/predicao_orcamento.py`: funções puras (projeção,
+  backtest, índice de prioridade, distribuição em R$) + carregador
+  do banco e do CSV público. Testado por
+  `algoritimos/teste_predicao_orcamento.py` (roda sem o banco).
+- `dashboard/app.py`: aba "Onde investir" é a primeira. Todo gráfico
+  passa por `estilizar()`/`mostrar()` (paleta validada para
+  daltonismo, título que diz a conclusão, formato numérico
+  brasileiro). Gráfico novo deve seguir esse padrão.
+- Em `POTENCIAL_PREVENCAO` a ordem das chaves importa: "colorretal"
+  contém "colo" e precisa vir antes.
+
 ## Notas de contexto do domínio
 
 - Banco de dados: `banco/escudo_feminino.db` (SQLite). Caminho hardcoded
