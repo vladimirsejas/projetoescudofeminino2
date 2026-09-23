@@ -69,6 +69,13 @@ estavel = [50, 52, 49, 51, 50, 53, 48, 50, 52, 49, 51, 50, 52]
 checar("C. série estável: nenhum ano marcado",
        anos_fora_do_padrao(serie_doenca(serie(estavel), "MAMA")).empty)
 
+# As pontas não podem ser avaliadas por uma reta ajustada aos outros
+# anos, porque isso extrapola para fora do intervalo observado.
+pontas = [90] + [50] * 11 + [90]
+fora_pontas = anos_fora_do_padrao(serie_doenca(serie(pontas), "MAMA"))
+checar("C. primeiro e último ano não são marcados por extrapolação",
+       fora_pontas.empty)
+
 pico = estavel.copy(); pico[8] = 90  # 2021
 fora = anos_fora_do_padrao(serie_doenca(serie(pico), "MAMA"))
 checar("C. pico marcado no ano certo e como 'acima'",
@@ -154,8 +161,8 @@ if os.path.exists(CSV_REAL):
     checar("H. base real: Mama é o maior volume em Rio Claro (670)",
            resumo.iloc[0]["doenca"] == "Mama" and resumo.iloc[0]["internacoes"] == 670)
     fora, total = ano_atipico_no_estado(s, 2025)
-    checar("H. base real: 2025 fora do padrão no Estado na maioria dos cânceres",
-           total == 7 and fora >= 4)
+    checar("H. base real: 2025, por ser a ponta da série, não é marcado automaticamente",
+           total == 7 and fora == 0)
 else:
     print("(pulado) H. base real não encontrada em " + CSV_REAL)
 
