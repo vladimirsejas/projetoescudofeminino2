@@ -54,12 +54,10 @@ configurável", identificado pelo código oficial do IBGE:
   dinamicamente pelo município) exatamente por isso -- nome de
   coluna dinâmico é incompatível com tabela multi-tenant. SP
   continua fixo como referência estadual.
-- `dashboard/app.py` tem seletor de município na sidebar (populado
-  por `listar_municipios_disponiveis()`) e agora filtra
-  `base_conhecimento`/`tendencia_estadual` pelo município
-  selecionado de verdade -- se esse município ainda não foi
-  processado pela cadeia determinística, mostra aviso claro em vez
-  de dado errado ou vazio.
+- `dashboard/app.py` tem seletor de município no topo (populado por
+  `listar_municipios_disponiveis()`) e lê tudo de
+  `algoritimos/inteligencia.py`, direto de `internacoes` -- não
+  depende da cadeia determinística (ver "Painel novo" abaixo).
 - Textos narrativos (`chat_escudo.py`, `base_conhecimento.py`,
   `relatorio_executivo.py`, `motor_raciocinio.py`) usam
   `obter_nome_municipio()` dinamicamente -- não há mais "Rio Claro"
@@ -75,36 +73,49 @@ configurável", identificado pelo código oficial do IBGE:
 
 **Pendências conhecidas desta etapa** (arquitetura pronta, mas não
 tudo foi feito -- ver commits para detalhes):
-- Comparação entre múltiplos municípios (ex.: "Rio Claro x
-  Limeira") já existe na aba "Comparar" do `dashboard/app.py`
-  (commit `5100b20`), mas só compara internações/óbitos/valor/
-  permanência agregados direto de `internacoes`, município a
-  município escolhido em um seletor -- não usa as 13 tabelas
-  derivadas (mortalidade, score, anomalias etc.), não aparece no
-  chat (`chat_escudo.py` não tem intenção de comparar duas
-  cidades) e compara só duas cidades por vez, nunca uma lista. Hoje
-  só Rio Claro está cadastrado em `municipios`, então a aba mostra
-  "não há outro município" até uma segunda cidade ser carregada.
+- Comparação entre múltiplos municípios: a aba "Comparar" do painel
+  antigo (só 2 cidades, números absolutos) saiu junto com ele. A
+  comparação nova depende de trazer a população do IBGE (gráfico de
+  funil) -- ver "Painel novo" abaixo.
 - Teste de regressão real (rodar a cadeia contra o banco de verdade
   no Windows do autor) ainda não foi feito -- `teste_territorial.py`
   valida a lógica com banco sintético/temporário.
 
-## Predição e orçamento (feedback da Secretaria da Mulher, 09/2026)
+## Painel novo (09/2026) — decisões combinadas com o autor
 
-A Secretaria viu o trabalho e pediu: (1) predição, (2) gráficos que
-sirvam para decidir, não só enfeitar, (3) que a predição indique
-**onde colocar o orçamento**, não só a evolução das doenças.
+Depois do retorno da Secretaria da Mulher, o autor (com Claude e
+ChatGPT) decidiu **reduzir** o Escudo: uma inteligência central com
+poucas portas de entrada, não cinco sistemas. Regras:
 
-- `algoritimos/predicao_orcamento.py`: funções puras (projeção,
-  backtest, índice de prioridade, distribuição em R$) + carregador
-  do banco e do CSV público. Testado por
-  `algoritimos/teste_predicao_orcamento.py` (roda sem o banco).
-- `dashboard/app.py`: aba "Onde investir" é a primeira. Todo gráfico
-  passa por `estilizar()`/`mostrar()` (paleta validada para
-  daltonismo, título que diz a conclusão, formato numérico
-  brasileiro). Gráfico novo deve seguir esse padrão.
-- Em `POTENCIAL_PREVENCAO` a ordem das chaves importa: "colorretal"
-  contém "colo" e precisa vir antes.
+- **Toda funcionalidade nova precisa responder uma pergunta que o
+  Escudo ainda não responde.** Se não responder, não entra.
+- **Cada informação tem uma casa só** no painel; não repetir números
+  em várias telas.
+- **Todo gráfico = pergunta (título) + gráfico + leitura em texto.**
+- **A inteligência calcula, o Gemini explica.** Nunca atribuir
+  causa; detectar ≠ explicar.
+- **Nada de orçamento em reais.** O Escudo aponta o que merece
+  atenção no planejamento, com evidências; quem decide é o gestor.
+  (A aba "Onde investir", commit `273fbe5`, foi descartada por isso.)
+- Usuários: gestores (Secretaria é uma delas), pesquisadores,
+  estudantes, população (via modo simples do chat).
+- **Pensar e combinar antes de codar.** O autor pediu explicitamente
+  para não sair implementando sem conversar.
+
+Estado atual:
+- `algoritimos/inteligencia.py`: única fonte dos números do painel
+  (série anual cidade + Estado, anos fora do padrão, ritmo do Estado
+  na escala da cidade, projeção exploratória com teste de acerto,
+  frases de leitura). Testado por `teste_inteligencia.py`.
+- `dashboard/app.py`: uma tela (barras de cânceres + evolução do
+  câncer escolhido, com camadas) e chat no painel lateral.
+- Próximos passos combinados, nesta ordem: investigar 2025
+  (`ANO_CMPT` x `DT_INTER` nos CSVs brutos); confirmar no banco real
+  a contagem em dobro de Rio Claro; repensar o chat para ler de
+  `inteligencia.py` (hoje há dois classificadores de intenção,
+  em `chat_escudo.py` e `chat_servico.py`, e ele depende das 13
+  tabelas antigas); população do IBGE para comparar cidades (gráfico
+  de funil); tela de Planejamento.
 
 ## Notas de contexto do domínio
 

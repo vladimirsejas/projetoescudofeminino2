@@ -107,40 +107,37 @@ isso fazer sentido metodologicamente.
 python algoritimos\serie_temporal.py
 ```
 
-### Predição e sugestão de orçamento ("Onde investir")
+### Painel novo e inteligência central
 
-Pedido da Secretaria da Mulher: a predição deve indicar **onde colocar
-o orçamento**, não só como cada doença vai evoluir.
-`algoritimos\predicao_orcamento.py` faz isso em três camadas
-determinísticas:
+O dashboard (`dashboard\app.py`) foi reescrito do zero em 09/2026: o
+anterior tinha 7 abas que repetiam os mesmos números. O novo tem uma
+tela só, organizada por perguntas:
 
-1. **Projeção** — reta de tendência sobre toda a série anual
-   (2013–2025) de cada câncer, projetada 3 anos à frente com faixa
-   provável de ~90%.
-2. **Validação** — o mesmo método treinado até 2022 e testado em
-   2023–2025, comparado com "repetir a média dos últimos 3 anos".
-3. **Prioridade de orçamento** — índice 0–100 por câncer (internações
-   previstas, crescimento, crescimento acima do Estado, letalidade
-   estabilizada pela taxa estadual, custo previsto e potencial de
-   prevenção segundo o INCA); a parcela sugerida do orçamento é
-   proporcional ao índice, e cada câncer recebe o tipo de ação em que
-   o recurso rende mais.
+1. **Quais cânceres mais levam as mulheres da cidade ao hospital?**
+   (barras; clicar numa barra escolhe o câncer)
+2. **Como as internações desse câncer mudaram?** (linha de 2013 a
+   2025, com camadas que liga/desliga: ritmo do Estado de SP, anos
+   fora do padrão e projeção exploratória)
 
-O dashboard mostra tudo isso na primeira aba, **Onde investir**,
-calculado na hora a partir de `internacoes` (não precisa rodar nada
-antes). Os pesos são ajustáveis pela gestora na própria tela. Rodar o
-script direto é opcional e só grava as tabelas `predicao_orcamento` e
-`predicao_projecao` (multi-tenant):
+Embaixo de cada gráfico vem a leitura em texto, e o chat fica no
+painel lateral. A tela não calcula nada: tudo vem de
+`algoritimos\inteligencia.py`, que lê `internacoes` direto (não
+depende da cadeia de scripts acima) e é testado sem o banco:
 
 ```powershell
-python algoritimos\predicao_orcamento.py
-python algoritimos\teste_predicao_orcamento.py
+python algoritimos\teste_inteligencia.py
+py -m streamlit run dashboard\app.py
 ```
 
-Achado dos dados: em 2025 as internações do Estado inteiro saltaram
-cerca de 50% nos 7 cânceres ao mesmo tempo — padrão de efeito de
-registro/faturamento, não só de aumento real. A previsão segue a
-tendência de longo prazo e o dashboard avisa isso ao lado do gráfico.
+Dois cuidados que a inteligência central já aplica:
+- **Uma fonte por cidade.** As moradoras de Rio Claro podem estar em
+  `internacoes` duas vezes (arquivo de Rio Claro + arquivo estadual,
+  ambos com `municipio = 'RIO_CLARO'`); somar tudo contaria em dobro.
+  Usa-se só o arquivo estadual (o mesmo para todas as cidades).
+- **2025 em investigação.** No Estado inteiro, 6 dos 7 cânceres
+  saltaram ao mesmo tempo em 2025 -- mais provável efeito de
+  registro/processamento (o ano gravado é `ANO_CMPT`, competência da
+  AIH) do que de adoecimento. O painel avisa isso ao lado do gráfico.
 
 ---
 
