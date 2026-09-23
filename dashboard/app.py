@@ -351,6 +351,8 @@ SUGESTOES = [
     f"Como evoluiu o câncer de {nome.lower()}?",
     "O que esperar até 2028?",
     "Qual câncer mais mata?",
+    "Quanto foi registrado em valores hospitalares?",
+    "Quanto tempo as internações duram?",
     "Estamos crescendo mais que o Estado?",
     "Houve algum ano fora do padrão?",
 ]
@@ -378,11 +380,38 @@ with st.sidebar:
 
     pergunta = sugerida or (digitada.strip() if enviar else "")
     if pergunta:
-        resultado = responder(pergunta, serie, nome_cidade, cancer_em_foco=doenca, perfil=perfil)
-        registrar_pergunta(BANCO, pergunta, resultado["assunto"])
-        historico.insert(0, (pergunta, resultado))
+        historico_contexto = []
+        for item in historico:
+            if isinstance(item, dict):
+                historico_contexto.append(item)
+            elif isinstance(item, tuple) and len(item) == 2:
+                p_antiga, r_antiga = item
+                historico_contexto.append({
+                    "pergunta": p_antiga,
+                    "assunto": r_antiga.get("assunto"),
+                    "contexto": r_antiga.get("contexto", {
+                        "cancer": r_antiga.get("cancer"),
+                        "ano": None,
+                    }),
+                })
 
-    for p, r in historico:
+        resultado = responder(
+            pergunta,
+            serie,
+            nome_cidade,
+            cancer_em_foco=doenca,
+            perfil=perfil,
+            historico=historico_contexto,
+        )
+        registrar_pergunta(BANCO, pergunta, resultado["assunto"])
+        historico.insert(0, {
+            "pergunta": pergunta,
+            **resultado,
+        })
+
+    for item in historico:
+        p = item["pergunta"]
+        r = item
         st.markdown(f"**{p}**")
         st.markdown(r["texto"])
         # Só quando a IA redigiu: aí os números de origem acrescentam
