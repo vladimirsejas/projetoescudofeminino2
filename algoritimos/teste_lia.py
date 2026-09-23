@@ -103,6 +103,40 @@ checar("C. texto livre usa o motor do chat e volta com botões e destino",
 r, _ = responder_texto(ctx, "Qual câncer mais mata?", explicar=sem_ia)
 checar("C. texto livre sem câncer oferece caminhos gerais", any("atenção" in rot for rot, _ in r.botoes))
 
+# ---- D. caixa de texto: tempo limite da IA e exemplos ----
+import time
+import lia as modulo_lia
+
+def ia_lenta(pergunta, contexto, perfil):
+    time.sleep(3)
+    return "resposta tardia"
+
+# a própria função com limite, trocando o Gemini por uma IA lenta
+import ia_linguagem
+original = ia_linguagem.responder_com_ia
+ia_linguagem.responder_com_ia = ia_lenta
+try:
+    inicio = time.time()
+    r, bruto = responder_texto(ctx, "Qual a mortalidade do câncer de mama?",
+                               explicar=modulo_lia.explicar_com_limite(segundos=0.5))
+    demorou = time.time() - inicio
+finally:
+    ia_linguagem.responder_com_ia = original
+checar("D. IA lenta: responde em menos de 2 s, direto com os números",
+       demorou < 2 and not bruto["usou_ia"] and "Mama" in r.fala)
+
+from conversa import entender
+exemplos = modulo_lia.exemplos_de_pergunta(ctx, "MAMA", 2025)
+esperado = ["MORTALIDADE", "EVOLUCAO", "PROJECAO"]
+checar("D. os exemplos da caixa de texto caem no assunto certo",
+       [entender(e, set(codigos.values()), "MAMA")["assunto"] for e in exemplos] == esperado)
+
+r, _ = responder_texto(ctx, "O que esperar para 2028?", explicar=sem_ia)
+checar("D. pergunta sobre o futuro liga a projeção no gráfico",
+       r.destino["aba"] == "Evolução" and r.destino["camadas"]["ver_projecao"])
+r, _ = responder_texto(ctx, "Qual a mortalidade do câncer de mama?", explicar=sem_ia)
+checar("D. pergunta sobre óbitos troca a medida das barras", r.destino.get("medida") == "Óbitos na internação")
+
 print()
 if falhas:
     print(f"{len(falhas)} checagem(ns) falharam.")

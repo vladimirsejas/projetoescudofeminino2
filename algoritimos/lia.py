@@ -480,10 +480,58 @@ ASSUNTO_PARA_ABA = {"PANORAMA": "Panorama", "EVOLUCAO": "Evolução", "ESTADO": 
                     "METODO": "Método"}
 
 
+LIMITE_IA_SEGUNDOS = 20
+
+
+def explicar_com_limite(segundos=LIMITE_IA_SEGUNDOS):
+    """A função de redação da IA (Gemini, via ia_linguagem), mas com
+    tempo máximo. Sem isso, um Gemini lento ou travado deixava a tela
+    parada sem aviso -- no computador do autor, a caixa de texto
+    "não respondia". Estourou o tempo (ou deu erro): conversa.py cai
+    na resposta direta com os números."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def explicar(pergunta, contexto, perfil):
+        from ia_linguagem import responder_com_ia
+        executor = ThreadPoolExecutor(max_workers=1)
+        try:
+            return executor.submit(responder_com_ia, pergunta, contexto, perfil).result(timeout=segundos)
+        finally:
+            executor.shutdown(wait=False)  # não espera a chamada lenta terminar
+
+    return explicar
+
+
+def exemplos_de_pergunta(ctx, cancer_em_foco, ano_fim):
+    """Perguntas de exemplo para a caixa de texto -- só as que o motor
+    de conversa entende bem (testadas em teste_lia.py)."""
+    canceres = _canceres(ctx)
+    foco = cancer_em_foco if cancer_em_foco in canceres else canceres[0]
+    outro = next(c for c in canceres if c != foco) if len(canceres) > 1 else foco
+    return [f"Qual a mortalidade do {cancer_de(foco)}?",
+            f"Como evoluiu o {cancer_de(outro)}?",
+            f"O que esperar para {ano_fim + 3}?"]
+
+
+# O gráfico certo para cada assunto: quem pergunta do futuro quer ver
+# a projeção ligada; quem pergunta de óbitos, as barras de óbitos.
+DETALHE_DO_DESTINO = {
+    "PROJECAO": {"camadas": {"ver_projecao": True}},
+    "ESTADO": {"camadas": {"ver_estado": True}},
+    "EVOLUCAO": {"camadas": {"ver_estado": True, "ver_fora": True}},
+    "MORTALIDADE": {"medida": "Óbitos na internação"},
+    "CUSTO": {"medida": "Valor hospitalar registrado"},
+    "PERMANENCIA": {"medida": "Dias de internação"},
+    "PANORAMA": {"medida": "Internações"},
+}
+
+
 def responder_texto(ctx, pergunta, cancer_em_foco=None, perfil="SIMPLES", explicar=None):
     """Pergunta digitada: o motor de conversa.py responde, e a Lia
     devolve no formato dela (expressão, botões, destino)."""
     from conversa import responder as responder_conversa
+    if explicar is None:
+        explicar = explicar_com_limite()
     r = responder_conversa(pergunta, ctx.serie, ctx.cidade, cancer_em_foco=cancer_em_foco,
                            perfil=perfil, explicar=explicar)
     cancer = r.get("cancer")
@@ -495,6 +543,7 @@ def responder_texto(ctx, pergunta, cancer_em_foco=None, perfil="SIMPLES", explic
     botoes = (_mais(cancer, "evolucao", "projecao", "porque") if cancer
               else [("Onde prestar atenção?", caminho("atencao")), ("O que mais aparece?", caminho("mais_aparece"))])
     destino = {"aba": ASSUNTO_PARA_ABA.get(r["assunto"], "Panorama")}
+    destino.update(DETALHE_DO_DESTINO.get(r["assunto"], {}))
     if cancer:
         destino["cancer"] = cancer
     return Resposta(fala=r["texto"], expressao=expressao, botoes=botoes + [("Começar de novo", INICIO)],

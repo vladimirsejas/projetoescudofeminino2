@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
 from configuracao_geografica import listar_municipios_disponiveis, obter_municipio, UF_REFERENCIA
 from conversa import registrar_pergunta
-from lia import INICIO, Contexto, responder as lia_responder, responder_texto as lia_texto
+from lia import INICIO, Contexto, Resposta, exemplos_de_pergunta, responder as lia_responder, responder_texto as lia_texto
 from lia_rosto import img as rosto_lia
 from inteligencia import (
     anos_fora_do_padrao,
@@ -321,6 +321,34 @@ def lia_clicar(acao):
     lia_mostrar(lia_responder(ctx_lia, acao))
 
 
+def lia_perguntar(texto, perfil):
+    """Pergunta em texto livre. Nunca deixa a tela sem resposta: se
+    algo falhar, a Lia diz que não conseguiu e mostra o detalhe
+    técnico (para o autor poder mandar a quem for corrigir)."""
+    try:
+        resposta, bruto = lia_texto(ctx_lia, texto, cancer_em_foco=doenca, perfil=perfil)
+        registrar_pergunta(BANCO, texto, bruto["assunto"])
+        return resposta
+    except Exception as erro:
+        return Resposta(
+            fala=("Não consegui responder essa pergunta agora. Tente um dos caminhos abaixo, ou escreva "
+                  "de outro jeito. Se continuar, mande o detalhe técnico para quem cuida do Escudo."),
+            expressao="cautelosa",
+            botoes=[("O que mais aparece?", {"tipo": "caminho", "id": "mais_aparece"}),
+                    ("Começar de novo", INICIO)],
+            numeros=[f"Detalhe técnico: {type(erro).__name__}: {erro}"],
+        )
+
+
+def lia_perguntar_exemplo(texto, perfil):
+    lia_mostrar(lia_perguntar(texto, perfil), pergunta_digitada=texto)
+
+
+def recarregar():
+    """st.rerun nas versões novas do Streamlit; experimental_rerun nas antigas."""
+    (getattr(st, "rerun", None) or st.experimental_rerun)()
+
+
 def lia_voltar():
     if lia_estado["pilha"]:
         lia_estado["atual"] = lia_estado["pilha"].pop()
@@ -407,7 +435,7 @@ if aba == "Panorama":
         if clicado and clicado != st.session_state.get("ultimo_clique"):
             st.session_state["ultimo_clique"] = clicado
             definir("doenca", clicado)
-            st.rerun()
+            recarregar()
 
     seletor(st, "Câncer em foco", "doenca", codigos, format_func=nome_doenca, horizontal=True)
     ficha = ficha_cancer(serie, doenca)
@@ -742,17 +770,24 @@ with st.sidebar:
     st.divider()
     linguagem = st.radio("Linguagem", ["Simples", "Técnica"], horizontal=True, key="linguagem")
     perfil = "SIMPLES" if linguagem == "Simples" else "TECNICO"
+    exemplos = exemplos_de_pergunta(ctx_lia, doenca, ano_fim)
     with st.form("form_lia", clear_on_submit=True):
-        digitada = st.text_area("Ou escreva sua pergunta", height=80,
-                                placeholder=f"Ex.: e o pulmão? Isso está piorando?")
+        digitada = st.text_area("Ou escreva sua pergunta", height=80, placeholder=f"Ex.: {exemplos[0]}")
         enviar = st.form_submit_button("Perguntar à Lia", use_container_width=True, type="primary")
     if enviar and digitada.strip():
-        resposta, bruto = lia_texto(ctx_lia, digitada.strip(), cancer_em_foco=doenca, perfil=perfil)
-        registrar_pergunta(BANCO, digitada.strip(), bruto["assunto"])
+        with st.spinner("A Lia está lendo os dados..."):
+            resposta = lia_perguntar(digitada.strip(), perfil)
         # A navegação já foi desenhada nesta execução e o Streamlit não
         # deixa mudar um widget depois disso: a resposta é aplicada no
         # começo da próxima execução.
         st.session_state["lia_pendente"] = (resposta, digitada.strip())
-        st.rerun()
+        recarregar()
+
+    # Para quem não sabe o que escrever: perguntas que o motor entende
+    # bem, montadas com o câncer em foco. Um clique já pergunta.
+    st.caption("Não sabe o que perguntar? Experimente:")
+    for i, exemplo in enumerate(exemplos):
+        st.button(exemplo, key=f"exemplo_{i}_{exemplo}", on_click=lia_perguntar_exemplo,
+                  args=(exemplo, perfil), use_container_width=True)
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")
