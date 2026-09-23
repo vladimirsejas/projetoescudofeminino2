@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
 from configuracao_geografica import listar_municipios_disponiveis, obter_municipio, UF_REFERENCIA
 from lia import INICIO, Contexto, responder as lia_responder
+from passeio import PARADAS, parada as passeio_parada
 from lia_rosto import img as rosto_lia
 from inteligencia import (
     ano_atipico_no_estado,
@@ -153,6 +154,24 @@ section[data-testid="stSidebar"] { min-width: 400px; }
 [class*="st-key-lia_balao"] [class*="st-key-bv_fechar"] button {
     background: transparent; border: none; color: #8a8599; font-weight: 500; padding: 2px 4px;
 }
+/* ---- Passeio pelo Escudo: outra interação, outra cara ----
+   Retângulo verde-água com barra à esquerda (o balão da Lia é
+   lilás/branco, arredondado, com pontinha). */
+[class*="st-key-passeiocard_"] {
+    background: #f0fdfa; border: 1px solid #99e0d6; border-left: 6px solid #0f9d8a; border-radius: 10px;
+    padding: 12px 14px 10px; margin-top: 14px;
+}
+[class*="st-key-passeiocard_"] .passeio-topo { font-size: .74rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: #0b7a6b; }
+[class*="st-key-passeiocard_"] .passeio-pontos { color: #0f9d8a; letter-spacing: 3px; font-size: .9rem; }
+[class*="st-key-passeiocard_"] .passeio-titulo { font-family: 'Manrope', sans-serif; font-weight: 700; color: #134e48;
+    font-size: 1.05rem; margin: 2px 0 6px; }
+[class*="st-key-passeiocard_"] p { color: #1f3d3a; }
+[class*="st-key-passeiocard_"] .stButton button { border-radius: 8px; background: #ffffff; border: 1px solid #99e0d6;
+    color: #0b7a6b; font-weight: 600; min-height: 0; padding: 5px 10px; }
+[class*="st-key-passeiocard_"] .stButton button:hover { background: #ccf3ec; border-color: #0f9d8a; color: #0b5d52; }
+[class*="st-key-passeiocard_"] [class*="st-key-pbtn_seguir"] button { background: #0f9d8a; border-color: #0f9d8a; color: #ffffff; }
+[class*="st-key-passeiocard_"] [class*="st-key-pbtn_seguir"] button:hover { background: #0b7a6b; color: #ffffff; }
 @media (prefers-reduced-motion: reduce) {
     .lia-rosto, [class*="st-key-lia_balao"], [class*="st-key-lia_balao"] > div { animation: none; }
     [class*="st-key-lia_balao"]::after { display: none; }
@@ -354,7 +373,13 @@ def lia_mostrar(resposta):
     lia_estado["atual"] = resposta
     lia_estado["falas"] = lia_estado.get("falas", 0) + 1  # balão novo -> animação
     st.session_state["lia_fechada"] = True
-    destino = resposta.destino or {}
+    aplicar_destino(resposta.destino)
+
+
+def aplicar_destino(destino):
+    """Leva o painel até o gráfico de uma resposta (aba, câncer,
+    medida, camadas). Usado pela Lia e pelo Passeio."""
+    destino = destino or {}
     if destino.get("aba") in ABAS:
         definir("aba", destino["aba"])
     if destino.get("cancer") in codigos:
@@ -379,6 +404,14 @@ def lia_voltar():
     if lia_estado["pilha"]:
         lia_estado["atual"] = lia_estado["pilha"].pop()
         lia_estado["falas"] = lia_estado.get("falas", 0) + 1
+
+
+def passeio_ir(indice):
+    """Vai para a parada `indice` do Passeio (None = sair)."""
+    st.session_state["passeio"] = indice
+    if indice is not None:
+        st.session_state["lia_fechada"] = True  # o passeio substitui as boas-vindas do centro
+        aplicar_destino(passeio_parada(ctx_lia, indice)["destino"])
 
 
 def balao(nome):
@@ -822,6 +855,43 @@ política, e — até a população do IBGE entrar no banco — comparação jus
 """)
 
 
+def desenhar_passeio(indice):
+    """PASSEIO PELO ESCUDO (algoritimos/passeio.py): interação a mais,
+    com cor e forma próprias; só cliques. A key muda a cada parada."""
+    try:
+        cartao = st.container(key=f"passeiocard_{'convite' if indice is None else indice}")
+    except TypeError:  # Streamlit antigo: container com borda
+        cartao = st.container(border=True)
+    with cartao:
+        if indice is None:
+            st.markdown('<div class="passeio-topo">🧭 Passeio pelo Escudo</div>'
+                        f'<div class="passeio-titulo">O essencial em {len(PARADAS)} paradas</div>'
+                        'A Lia conduz, na ordem, e o painel vai mostrando cada gráfico. Só clicar.',
+                        unsafe_allow_html=True)
+            st.button("Começar o passeio", key="pbtn_seguir_comecar", on_click=passeio_ir, args=(0,),
+                      use_container_width=True)
+        else:
+            p = passeio_parada(ctx_lia, indice)
+            pontos = "●" * p["numero"] + "○" * (p["total"] - p["numero"])
+            st.markdown(f'<div class="passeio-topo">🧭 Passeio · parada {p["numero"]} de {p["total"]}</div>'
+                        f'<div class="passeio-pontos">{pontos}</div>'
+                        f'<div class="passeio-titulo">{p["titulo"]}</div>', unsafe_allow_html=True)
+            st.markdown(p["fala"])
+            if p["destino"].get("aba"):
+                st.caption(f"O painel está na aba {p['destino']['aba']}"
+                           + (f" · {nome_doenca(p['destino']['cancer'])}" if p["destino"].get("cancer") else "")
+                           + ".")
+            c_ant, c_seg = st.columns(2)
+            if indice > 0:
+                c_ant.button("← anterior", key="pbtn_anterior", on_click=passeio_ir, args=(indice - 1,),
+                             use_container_width=True)
+            ultima = indice == len(PARADAS) - 1
+            c_seg.button("terminar ✓" if ultima else "próxima parada →", key="pbtn_seguir",
+                         on_click=passeio_ir, args=(None if ultima else indice + 1,), use_container_width=True)
+            if not ultima:
+                st.button("sair do passeio", key="pbtn_sair", on_click=passeio_ir, args=(None,))
+
+
 # ============================================================
 # LIA NA LATERAL (atravessa todas as abas)
 # ============================================================
@@ -834,6 +904,10 @@ with st.sidebar:
     with c_nome:
         st.markdown('<div class="lia-nome">Lia</div><div class="lia-cargo">Pesquisadora do Escudo Feminino'
                     f'<br>{nome_cidade}</div>', unsafe_allow_html=True)
+
+    # Passeio ativo: o cartão dele fica aqui, logo abaixo do rosto (a
+    # Lia conduz); o convite, quando inativo, fica no fim da lateral.
+    lugar_do_passeio = st.container()
 
     # Tudo o que é dela fica DENTRO do balão, preso ao rosto: fala,
     # números, próximos passos. Antes os botões soltos na lateral
@@ -860,5 +934,12 @@ with st.sidebar:
             if lia_estado["pilha"]:
                 c_voltar.button("← Voltar", key="lia_discreto_voltar", on_click=lia_voltar)
             c_inicio.button("Começar de novo", key="lia_discreto_inicio", on_click=lia_clicar, args=(INICIO,))
+
+    indice_passeio = st.session_state.get("passeio")
+    if indice_passeio is None:
+        desenhar_passeio(None)  # convite, no fim da lateral
+    else:
+        with lugar_do_passeio:  # passeio ativo: logo abaixo do rosto
+            desenhar_passeio(indice_passeio)
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")
