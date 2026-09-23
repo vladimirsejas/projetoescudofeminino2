@@ -21,7 +21,8 @@ import carga_todas_bases as carga
 #   B. Contagem pela data da internação (DT_INTER): o salto continua?
 #      (2025 por DT_INTER fica incompleto: parte das internações do
 #      fim de 2025 só é processada em 2026.)
-#   C. Meses: 2025 tem mais competências (MES_CMPT) que 12?
+#   C. Meses: 2025 tem mais competências (MES_CMPT) que 12, ou os
+#      anos anteriores têm MENOS (meses que a fonte não oferece)?
 #   D. Tipo de AIH (IDENT): 1 = normal, 5 = longa permanência
 #      (continuação da mesma internação). Mais "5" = a mesma
 #      internação contada mais vezes.
@@ -100,9 +101,17 @@ def veredito(tabela, contagem_inter, ano=ANO_ALVO):
 
     comparar("pct_de_anos_anteriores", "A. AIHs de internações de anos anteriores")
     if "meses" in tabela:
+        # Os dois lados: mais de 12 no ano-alvo (reprocessamento) OU menos
+        # de 12 nos anos anteriores -- foi o caso real: o DATASUS não
+        # oferece todos os meses (docs/FONTE_DOS_DADOS.md), e o ano
+        # completo parecia "saltar" sobre anos incompletos.
         meses = int(alvo["meses"])
+        incompletos = [f"{int(a)} ({int(m)})" for a, m in zip(outros["ano_cmpt"], outros["meses"]) if m < 12]
         frases.append(f"C. Competências em {ano}: {meses}"
-                      + (" -> MAIS DE 12: há meses extras/reprocessados." if meses > 12 else " -> normal."))
+                      + (" -> MAIS DE 12: há meses extras/reprocessados." if meses > 12 else "")
+                      + (f" -> ANOS ANTERIORES COM MESES FALTANDO: {', '.join(incompletos)}. O salto pode ser "
+                         f"só {ano} ter mais meses; compare por mês (py etl\\completude_meses.py)."
+                         if incompletos and meses >= 12 else (" -> normal." if meses <= 12 else "")))
     comparar("pct_longa_permanencia", "D. AIHs de longa permanência (IDENT 5)", folga=2.0)
     comparar("pct_aih_repetida", "E. N_AIH repetido no ano", folga=2.0)
 

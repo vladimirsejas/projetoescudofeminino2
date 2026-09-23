@@ -43,6 +43,14 @@ def main():
     assert "MUITO ACIMA" in frases[0] and "normal" in frases[1], frases
     print("[OK] veredito aponta o atraso de 2025 e não inventa meses extras")
 
+    # o caso REAL: 2025 completo, anos anteriores com meses faltando na fonte
+    import pandas as pd
+    real = pd.DataFrame({"ano_cmpt": [2022, 2023, 2024, 2025], "aihs": [100, 110, 80, 150],
+                         "pct_de_anos_anteriores": [4.0, 4.0, 4.0, 3.0], "meses": [10, 11, 8, 12]})
+    frase_c = [f for f in inv.veredito(real, pd.Series(dtype=int)) if f.startswith("C.")][0]
+    assert "ANOS ANTERIORES COM MESES FALTANDO" in frase_c and "2024 (8)" in frase_c, frase_c
+    print("[OK] veredito aponta os anos anteriores com meses faltando (o caso real)")
+
     sem = os.path.join(base, "sem_dt.csv")
     with open(sem, "w", encoding="latin1") as f:
         f.write("ANO_CMPT;MUNIC_RES\n2024;355030\n2025;355030\n")

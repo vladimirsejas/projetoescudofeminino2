@@ -161,26 +161,26 @@ Estado atual:
   (EVOLUCAO sem câncer citado deveria comparar todos); ano futuro
   além dos dados ("em 2030?") não cai em PROJECAO (só 2026-2028 são
   palavras-chave).
-- **O "salto de 2025" é falta de meses nos anos anteriores
-  (confirmado no banco real, 23/09/2026).** `investigar_2025.py`
-  mostrou que no Estado só 2025 tem os 12 meses de competência
-  (MES_CMPT); 2024 tem 8, 2022 tem 10, 2021 e 2023 têm 11. Por mês,
-  o crescimento é suave em todos os cânceres (mama: 1.387, 1.557,
-  1.794, 1.908, 1.982 AIHs/mês de 2021 a 2025); atraso de registro,
-  IDENT e N_AIH repetido foram descartados. Totais anuais de anos com
-  mês faltando saem menores e distorcem tendência, anos fora do
-  padrão, projeção e radar. O aviso "2025 em investigação / mudança
-  de registro" aponta a causa errada. `completude_meses.py` rodou no
-  banco real: faltam 35 dos 156 meses, OS MESMOS nos 7 cânceres (só
-  2025 tem 12/12; 2018 só 6). Causa: os scripts antigos de download
-  (pysus) faziam `except: print; continue` e salvavam o CSV mesmo com
-  mês faltando. Decisão do autor: baixar de novo os 7 cânceres de SP,
-  2013-2025, com `py etl\baixar_sih_sp.py` (um download por mês para
-  os 7 cânceres, mesmos filtros -- SEXO 3, MUNIC_RES 35..., CID lido
-  do CSV atual --, tentativas, retoma de onde parou, só troca os CSVs
-  se vierem os 156 meses, com backup). Depois: completude (12/12?),
-  carga, e só então corrigir o aviso de 2025, investigar_2025 (só
-  olhava > 12 meses) e o que mais depender disso.
+- **O DATASUS não oferece todos os meses (confirmado 23/09/2026;
+  ver `docs/FONTE_DOS_DADOS.md`).** Faltam 35 dos 156 meses de
+  competência do SIH/RD de SP (2013-2025), os mesmos nos 7 cânceres;
+  só 2025 tem 12/12 (2018 só 6). **Não foi falha de download** (o autor
+  sabia; `baixar_sih_sp.py` mostra "NÃO LISTADO pelo DATASUS"). Por
+  mês, o crescimento é suave; o "salto de 2025" era só 2025 ter os 12
+  meses. Regra do Escudo: a carga guarda `mes`; `carregar_serie` usa
+  `ajustar_meses` -- para comparar anos, média dos meses disponíveis
+  x 12 (colunas internacoes, obitos, valor_total, dias_permanencia);
+  o registrado fica em `<coluna>_reg` e é o que entra nos totais do
+  período (`resumo_doencas`, `ficha_cancer`, letalidade; use
+  `registrado()` em qualquer soma nova). Meses por ano vêm do
+  Estado. `anos_incompletos()` alimenta o aviso de confiabilidade, a
+  nota da Lia e o marcador vazado na Evolução. Banco antigo sem `mes`:
+  aviso para recarregar, sem ajuste. **Precisa rodar a carga de novo
+  no Windows** para o ajuste valer. Efeito nos dados reais: 2025 deixa
+  de ser atípico no Estado, colorretal 2023 deixa de ser fora do
+  padrão, ritmos menores (mama 6,9% -> 5,3%), colo do útero vira
+  alerta; mama 2019 (7 meses) aparece fora do padrão -- estimativa
+  menos firme.
 - **Coerência passado x projeção (09/2026):** 2025 ficou muito acima
   da reta em vários cânceres e a projeção de 2028 aparecia ABAIXO de
   2025 com "cresce X% ao ano". Agora a projeção sai da reta
