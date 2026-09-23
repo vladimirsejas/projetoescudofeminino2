@@ -1,7 +1,8 @@
 @echo off
 REM ============================================================
 REM  ABRIR O ESCUDO FEMININO (com a Lia) -- basta dar dois cliques.
-REM  1. baixa a versao mais nova do GitHub (se nao der, segue assim mesmo)
+REM  1. baixa a versao mais nova do GitHub (se nao der, segue assim mesmo);
+REM     se veio codigo novo e o painel ja estava aberto, reinicia o painel
 REM  2. liga o painel numa janela minimizada (nao feche essa janela)
 REM  3. espera o painel ficar pronto e abre o navegador
 REM  Para fechar o painel: feche a janela "Escudo Feminino - painel".
@@ -10,7 +11,16 @@ title Escudo Feminino - abrindo a Lia
 cd /d "%~dp0"
 
 echo Atualizando o Escudo Feminino...
+set antes=
+for /f %%h in ('git rev-parse HEAD 2^>nul') do set antes=%%h
 git pull --quiet 2>nul || echo Nao deu para atualizar agora - abrindo a versao deste computador.
+set depois=
+for /f %%h in ('git rev-parse HEAD 2^>nul') do set depois=%%h
+
+REM Painel aberto de antes continua com o codigo VELHO na memoria
+REM (o Streamlit nao recarrega algoritimos\lia.py, conversa.py...):
+REM se o git pull trouxe versao nova, fecha o painel antigo.
+if not "%antes%"=="%depois%" call :desligar_painel_antigo
 
 REM Sem curl (Windows antigo): liga o painel, espera 10 s e abre.
 where curl >nul 2>nul || goto sem_curl
@@ -38,6 +48,13 @@ echo Ligando o painel...
 start "Escudo Feminino - painel" /min cmd /k py -m streamlit run dashboard\app.py --server.port 8600 --server.headless true
 timeout /t 10 /nobreak >nul
 goto abrir
+
+:desligar_painel_antigo
+echo Versao nova baixada: reiniciando o painel...
+taskkill /f /t /fi "WINDOWTITLE eq Escudo Feminino - painel*" >nul 2>nul
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8600" ^| findstr "LISTENING"') do taskkill /f /pid %%p >nul 2>nul
+timeout /t 2 /nobreak >nul
+goto :eof
 
 :demorou
 echo.

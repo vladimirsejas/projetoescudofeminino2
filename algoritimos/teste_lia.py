@@ -126,10 +126,41 @@ checar("D. IA lenta: responde em menos de 2 s, direto com os números",
        demorou < 2 and not bruto["usou_ia"] and "Mama" in r.fala)
 
 from conversa import entender
-exemplos = modulo_lia.exemplos_de_pergunta(ctx, "MAMA", 2025)
-esperado = ["MORTALIDADE", "EVOLUCAO", "PROJECAO"]
-checar("D. os exemplos da caixa de texto caem no assunto certo",
-       [entender(e, set(codigos.values()), "MAMA")["assunto"] for e in exemplos] == esperado)
+# Toda pergunta sugerida, para todo câncer, cai no assunto certo e no
+# câncer certo -- mesmo com OUTRO câncer em foco no painel -- e volta
+# com resposta de verdade (nenhum botão que leva ao silêncio).
+disponiveis = set(codigos.values())
+erros_sugestao = []
+for foco in codigos.values():
+    outro_foco = "OVARIO" if foco != "OVARIO" else "MAMA"
+    sug = modulo_lia.sugestoes_de_pergunta(ctx, foco)
+    for (rotulo, pergunta), (_, _, assunto) in zip(sug["do_cancer"], modulo_lia.PERGUNTAS_DO_CANCER):
+        e = entender(pergunta, disponiveis, outro_foco)
+        r, _ = responder_texto(ctx, pergunta, cancer_em_foco=outro_foco, explicar=sem_ia)
+        if e["assunto"] != assunto or e["cancer"] != foco or not r.fala.strip() or r.destino.get("cancer") != foco:
+            erros_sugestao.append(f"{pergunta} -> {e['assunto']}/{e['cancer']}")
+for (rotulo, pergunta), (_, _, assunto) in zip(sug["gerais"], modulo_lia.PERGUNTAS_GERAIS):
+    e = entender(pergunta, disponiveis, None)
+    r, _ = responder_texto(ctx, pergunta, explicar=sem_ia)
+    if e["assunto"] != assunto or e["cancer"] is not None or not r.fala.strip():
+        erros_sugestao.append(f"{pergunta} -> {e['assunto']}/{e['cancer']}")
+checar("D. todas as perguntas sugeridas caem no assunto e no câncer certos " + str(erros_sugestao),
+       not erros_sugestao)
+checar("D. sugestões sem câncer em foco usam o maior",
+       modulo_lia.sugestoes_de_pergunta(ctx, None)["cancer"] == "MAMA")
+checar("D. rótulos das sugestões são curtos (cabem no botão da lateral)",
+       all(len(r) <= 20 for r, _, _ in modulo_lia.PERGUNTAS_DO_CANCER + modulo_lia.PERGUNTAS_GERAIS))
+
+# o que os dados não respondem: a Lia diz o limite antes
+r, _ = responder_texto(ctx, "Por que o câncer de mama aumentou?", explicar=sem_ia)
+checar("D. 'por que' avisa que os dados não mostram causa", r.fala.startswith("**Um limite antes:**")
+       and "não **por que**" in r.fala and "mama" in r.fala.lower())
+r, _ = responder_texto(ctx, "Qual tratamento devemos oferecer?", explicar=sem_ia)
+checar("D. tratamento: avisa que não é orientação médica", "não é orientação médica" in r.fala)
+r, _ = responder_texto(ctx, "Quantas mulheres terão câncer de mama em 2030?", explicar=sem_ia)
+checar("D. casos futuros: avisa que internação não é caso novo", "internação não é caso novo" in r.fala)
+r, _ = responder_texto(ctx, "Como evoluiu o câncer de mama?", explicar=sem_ia)
+checar("D. pergunta dentro do alcance não recebe aviso de limite", "Um limite antes" not in r.fala)
 
 r, _ = responder_texto(ctx, "O que esperar para 2028?", explicar=sem_ia)
 checar("D. pergunta sobre o futuro liga a projeção no gráfico",

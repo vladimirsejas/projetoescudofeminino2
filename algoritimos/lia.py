@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 
 from inteligencia import (
@@ -502,15 +503,74 @@ def explicar_com_limite(segundos=LIMITE_IA_SEGUNDOS):
     return explicar
 
 
-def exemplos_de_pergunta(ctx, cancer_em_foco, ano_fim):
-    """Perguntas de exemplo para a caixa de texto -- só as que o motor
-    de conversa entende bem (testadas em teste_lia.py)."""
+# ---------- vocabulário de perguntas da caixa de texto ----------
+#
+# Quem abre o Escudo não sabe o que perguntar a uma IA; em vez de
+# "pergunte qualquer coisa", a Lia oferece perguntas que o motor de
+# conversa.py responde bem. Cada uma é (rótulo curto do botão,
+# pergunta completa, assunto que o motor deve entender). O rótulo
+# cabe no botão; a pergunta completa é a que vai para o motor e
+# aparece no balão -- assim a pessoa aprende a perguntar do seu jeito.
+# teste_lia.py confere que TODAS caem no assunto certo e no câncer
+# certo, para todos os cânceres: nenhuma sugestão pode levar a uma
+# resposta sobre outra coisa.
+
+PERGUNTAS_DO_CANCER = [
+    ("Como evoluiu?", "Como evoluiu o {cancer}?", "EVOLUCAO"),
+    ("E no Estado de SP?", "Como o {cancer} se compara ao Estado de SP?", "ESTADO"),
+    ("Quantas morrem?", "Quantas mulheres morrem na internação por {cancer}?", "MORTALIDADE"),
+    ("Próximos anos", "O que esperar do {cancer} nos próximos anos?", "PROJECAO"),
+    ("Anos fora do padrão", "O {cancer} teve ano fora do padrão?", "FORA_PADRAO"),
+    ("Tempo internada", "Quanto tempo ficam internadas por {cancer}?", "PERMANENCIA"),
+    ("Valor registrado", "Qual o valor hospitalar registrado do {cancer}?", "CUSTO"),
+]
+
+PERGUNTAS_GERAIS = [
+    ("O que mais aparece?", "Quais cânceres mais levam as mulheres ao hospital?", "PANORAMA"),
+    ("Onde mais morrem?", "Em quais cânceres mais mulheres morrem na internação?", "MORTALIDADE"),
+    ("Ritmo x Estado", "Como a cidade se compara ao Estado de SP?", "ESTADO"),
+    ("Anos fora do padrão", "Algum câncer teve ano fora do padrão?", "FORA_PADRAO"),
+    ("Planejamento", "O que merece atenção no planejamento?", "ATENCAO"),
+    ("De onde vêm?", "De onde vêm esses dados?", "METODO"),
+]
+
+
+def sugestoes_de_pergunta(ctx, cancer_em_foco):
+    """Perguntas prontas para a caixa de texto: primeiro sobre o
+    câncer em foco no painel, depois sobre todos. Devolve
+    {"cancer": código, "do_cancer": [(rótulo, pergunta)], "gerais": [...]}."""
     canceres = _canceres(ctx)
     foco = cancer_em_foco if cancer_em_foco in canceres else canceres[0]
-    outro = next(c for c in canceres if c != foco) if len(canceres) > 1 else foco
-    return [f"Qual a mortalidade do {cancer_de(foco)}?",
-            f"Como evoluiu o {cancer_de(outro)}?",
-            f"O que esperar para {ano_fim + 3}?"]
+    return {
+        "cancer": foco,
+        "do_cancer": [(r, p.format(cancer=cancer_de(foco))) for r, p, _ in PERGUNTAS_DO_CANCER],
+        "gerais": [(r, p) for r, p, _ in PERGUNTAS_GERAIS],
+    }
+
+
+# ---------- o que os dados NÃO respondem ----------
+#
+# Sem isto, "por que aumentou?" ou "qual tratamento?" recebiam uma
+# resposta sobre outra coisa, sem aviso -- a pessoa achava que a Lia
+# não tinha entendido. Agora ela diz o limite primeiro e depois
+# mostra o que os dados mostram. Detectar não é explicar.
+
+FORA_DO_ALCANCE = [
+    (["POR QUE", "PORQUE", "CAUSA", "MOTIVO", "RAZAO"],
+     "estes dados mostram **o que** mudou, não **por que** mudou: com internações não dá para apontar causa."),
+    (["TRATAMENTO", "TRATAR", "REMEDIO", "MEDICAMENTO", "SINTOMA", "DIAGNOSTIC", "CURA"],
+     "não oriento tratamento, sintomas nem diagnóstico: o Escudo lê internações do SUS, não é orientação médica."),
+    (["CASOS NOVOS", "CASO NOVO", "INCIDENCIA", "TERAO", "VAO TER"],
+     "internação não é caso novo: estes dados não dizem quantas mulheres têm ou terão câncer."),
+]
+
+
+def limites_da_pergunta(pergunta):
+    """Avisos para o que a pergunta pede e os dados não respondem."""
+    from conversa import normalizar
+    texto = normalizar(pergunta)
+    return [aviso for termos, aviso in FORA_DO_ALCANCE
+            if any(re.search(r"(?<![A-Z0-9])" + re.escape(t), texto) for t in termos)]
 
 
 # O gráfico certo para cada assunto: quem pergunta do futuro quer ver
@@ -540,11 +600,16 @@ def responder_texto(ctx, pergunta, cancer_em_foco=None, perfil="SIMPLES", explic
     expressao = {"METODO": "pensativa", "ATENCAO": "atenta"}.get(r["assunto"], "explicando")
     if cancer and _pequeno(ctx, cancer):
         expressao = "cautelosa"
+    limites = limites_da_pergunta(pergunta)
+    fala = r["texto"]
+    if limites:
+        fala = ("**Um limite antes:** " + " E ".join(limites) + " O que os dados mostram:\n\n" + fala)
+        expressao = "pensativa"
     botoes = (_mais(cancer, "evolucao", "projecao", "porque") if cancer
               else [("Onde prestar atenção?", caminho("atencao")), ("O que mais aparece?", caminho("mais_aparece"))])
     destino = {"aba": ASSUNTO_PARA_ABA.get(r["assunto"], "Panorama")}
     destino.update(DETALHE_DO_DESTINO.get(r["assunto"], {}))
     if cancer:
         destino["cancer"] = cancer
-    return Resposta(fala=r["texto"], expressao=expressao, botoes=botoes + [("Começar de novo", INICIO)],
+    return Resposta(fala=fala, expressao=expressao, botoes=botoes + [("Começar de novo", INICIO)],
                     destino=destino, numeros=r["fatos"] + avisos), r

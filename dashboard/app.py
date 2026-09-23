@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
 from configuracao_geografica import listar_municipios_disponiveis, obter_municipio, UF_REFERENCIA
 from conversa import registrar_pergunta
-from lia import INICIO, Contexto, Resposta, exemplos_de_pergunta, responder as lia_responder, responder_texto as lia_texto
+from lia import INICIO, Contexto, Resposta, sugestoes_de_pergunta, responder as lia_responder, responder_texto as lia_texto
 from lia_rosto import img as rosto_lia
 from inteligencia import (
     anos_fora_do_padrao,
@@ -747,10 +747,49 @@ with st.sidebar:
         st.markdown('<div class="lia-nome">Lia</div><div class="lia-cargo">Pesquisadora do Escudo Feminino'
                     f'<br>{nome_cidade}</div>', unsafe_allow_html=True)
 
+    # A caixa fica NO ALTO, logo abaixo do rosto, e a resposta aparece
+    # embaixo dela. Antes a caixa ficava no fim da lateral e a resposta
+    # no topo, fora da tela de quem acabou de perguntar: parecia que a
+    # Lia "não respondia".
+    perfil = "SIMPLES" if st.session_state.get("linguagem", "Simples") == "Simples" else "TECNICO"
+    sugestoes = sugestoes_de_pergunta(ctx_lia, doenca)
+    with st.form("form_lia", clear_on_submit=True):
+        digitada = st.text_area(f"O que você quer descobrir sobre a saúde da mulher em {nome_cidade}?",
+                                height=80, placeholder=f"Escreva do seu jeito. Ex.: {sugestoes['do_cancer'][0][1]}")
+        enviar = st.form_submit_button("Perguntar à Lia", use_container_width=True, type="primary")
+    if enviar and digitada.strip():
+        with st.spinner("A Lia está lendo os dados..."):
+            resposta = lia_perguntar(digitada.strip(), perfil)
+        # A navegação já foi desenhada nesta execução e o Streamlit não
+        # deixa mudar um widget depois disso: a resposta é aplicada no
+        # começo da próxima execução.
+        st.session_state["lia_pendente"] = (resposta, digitada.strip())
+        recarregar()
+
+    # Para quem não sabe o que perguntar: perguntas que o motor responde
+    # bem (lia.PERGUNTAS_*, testadas em teste_lia.py). O botão mostra o
+    # rótulo curto; a pergunta completa vai para o balão, e a pessoa
+    # aprende a perguntar do seu jeito. Um clique já pergunta.
+    def botoes_de_sugestao(onde, lista, prefixo):
+        colunas = onde.columns(2)
+        for i, (rotulo, texto) in enumerate(lista):
+            colunas[i % 2].button(rotulo, key=f"{prefixo}_{i}_{texto}", help=texto, on_click=lia_perguntar_exemplo,
+                                  args=(texto, perfil), use_container_width=True)
+
+    st.caption(f"Ou comece por uma destas, sobre o {cancer_de(sugestoes['cancer'])}:")
+    botoes_de_sugestao(st, sugestoes["do_cancer"][:4], "sug_cancer")
+    with st.expander("Mais perguntas"):
+        botoes_de_sugestao(st, sugestoes["do_cancer"][4:], "sug_cancer_mais")
+        st.caption("Sobre todos os cânceres:")
+        botoes_de_sugestao(st, sugestoes["gerais"], "sug_geral")
+        st.caption("A Lia responde com as internações do SUS (SIH/SUS): o que aconteceu, como mudou e para "
+                   "onde a tendência aponta. Causas, tratamento e casos novos esses dados não mostram.")
+
+    st.divider()
     boas_vindas_aberta = not st.session_state.get("lia_fechada")
     if boas_vindas_aberta:
         # a saudação já está no centro da tela: aqui não se repete
-        st.markdown("Escolha um caminho ali no centro, ou escreva sua pergunta aqui embaixo.")
+        st.markdown("Escolha um caminho ali no centro, ou pergunte aqui em cima.")
     if getattr(atual, "pergunta", None):
         st.markdown(f'<div class="lia-pergunta">{atual.pergunta}</div>', unsafe_allow_html=True)
     if not boas_vindas_aberta:
@@ -768,26 +807,6 @@ with st.sidebar:
         st.button("← Voltar", key="lia_voltar", on_click=lia_voltar)
 
     st.divider()
-    linguagem = st.radio("Linguagem", ["Simples", "Técnica"], horizontal=True, key="linguagem")
-    perfil = "SIMPLES" if linguagem == "Simples" else "TECNICO"
-    exemplos = exemplos_de_pergunta(ctx_lia, doenca, ano_fim)
-    with st.form("form_lia", clear_on_submit=True):
-        digitada = st.text_area("Ou escreva sua pergunta", height=80, placeholder=f"Ex.: {exemplos[0]}")
-        enviar = st.form_submit_button("Perguntar à Lia", use_container_width=True, type="primary")
-    if enviar and digitada.strip():
-        with st.spinner("A Lia está lendo os dados..."):
-            resposta = lia_perguntar(digitada.strip(), perfil)
-        # A navegação já foi desenhada nesta execução e o Streamlit não
-        # deixa mudar um widget depois disso: a resposta é aplicada no
-        # começo da próxima execução.
-        st.session_state["lia_pendente"] = (resposta, digitada.strip())
-        recarregar()
-
-    # Para quem não sabe o que escrever: perguntas que o motor entende
-    # bem, montadas com o câncer em foco. Um clique já pergunta.
-    st.caption("Não sabe o que perguntar? Experimente:")
-    for i, exemplo in enumerate(exemplos):
-        st.button(exemplo, key=f"exemplo_{i}_{exemplo}", on_click=lia_perguntar_exemplo,
-                  args=(exemplo, perfil), use_container_width=True)
+    st.radio("Linguagem das respostas escritas", ["Simples", "Técnica"], horizontal=True, key="linguagem")
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")

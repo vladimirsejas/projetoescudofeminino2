@@ -134,7 +134,12 @@ Estado atual:
   do dado (acolhedora / explicando / atenta / cautelosa / pensativa);
   texto livre passa por `conversa.py` e volta no formato dela. O
   painel acompanha a Lia (aba, câncer, medida, camadas). Testado por
-  `teste_lia.py`. **Armadilha do Streamlit resolvida no painel:**
+  `teste_lia.py`. Caixa de texto no alto da lateral, com vocabulário
+  de perguntas testado (`lia.PERGUNTAS_DO_CANCER`/`PERGUNTAS_GERAIS`)
+  e aviso de limite para "por quê?", tratamento e casos novos
+  (`lia.FORA_DO_ALCANCE`). O atalho `Abrir Escudo Feminino.bat`
+  reinicia o painel quando o `git pull` traz código novo (o Streamlit
+  não recarrega `algoritimos/` sozinho). **Armadilha do Streamlit resolvida no painel:**
   widgets que somem e voltam (abas desenhadas só quando abertas)
   devolviam o valor antigo; por isso cada widget tem chave atrelada
   ao valor (`chave_widget`) e o estado real fica em chaves próprias
@@ -150,6 +155,16 @@ Estado atual:
   cópias locais (`sinais_de_atencao`, `LINHAS_DE_ACAO` em
   `conversa.py`), para chat e painel não divergirem; usar
   `inteligencia.cancer_de()` ("câncer colorretal", sem "de").
+  Achados ao testar a caixa da Lia (09/2026), para `conversa.py`:
+  "Quais cânceres estão aumentando?" responde só o câncer em foco
+  (EVOLUCAO sem câncer citado deveria comparar todos); ano futuro
+  além dos dados ("em 2030?") não cai em PROJECAO (só 2026-2028 são
+  palavras-chave).
+- **Aviso de 2025 sumiu (a decidir com o autor):** o commit
+  `aedda21` deixou de testar o primeiro e o último ano em
+  `anos_fora_do_padrao`; com isso `ano_atipico_no_estado(serie, 2025)`
+  dá sempre 0 e o aviso "2025 está em investigação" não aparece mais
+  na Lia nem no chat (falham `teste_lia` B e `teste_conversa` B).
 - **Contagem em dobro de Rio Claro: confirmada e corrigida.** No
   banco real havia 1.668 internações de Rio Claro com origem
   RIO_CLARO e as mesmas 1.668 com origem SP (a pasta estadual já traz
