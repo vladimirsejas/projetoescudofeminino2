@@ -9,7 +9,7 @@ import streamlit as st
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
 from configuracao_geografica import listar_municipios_disponiveis, obter_municipio, UF_REFERENCIA
-from chat_servico import responder_pergunta
+from conversa import registrar_pergunta, responder
 from inteligencia import (
     ano_atipico_no_estado,
     anos_fora_do_padrao,
@@ -72,6 +72,7 @@ h1, h2, h3 { font-family: 'Manrope', sans-serif; color: #292541; letter-spacing:
 .escudo-leitura li { margin: 5px 0; }
 .escudo-alerta { background: #fff7ef; border: 1px solid #f6d9c2; border-radius: 16px; padding: 12px 18px; margin-top: 10px; color: #6b3d1e; font-size: .93rem; }
 div[data-baseweb="select"] > div { border-radius: 12px; background: #fff; }
+section[data-testid="stSidebar"] { min-width: 400px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -345,28 +346,51 @@ with st.expander("Como ler estes dados"):
 # CHAT (painel lateral, sabe a cidade e o câncer em foco)
 # ============================================================
 
+SUGESTOES = [
+    "O que merece atenção?",
+    f"Como evoluiu o câncer de {nome.lower()}?",
+    "O que esperar até 2028?",
+    "Qual câncer mais mata?",
+    "Estamos crescendo mais que o Estado?",
+    "Houve algum ano fora do padrão?",
+]
+
 with st.sidebar:
     st.markdown("### Pergunte ao Escudo")
-    st.caption(f"Em foco: {nome_cidade} · {nome}")
+    st.caption(f"Em foco: {nome_cidade} · {nome}. Os números vêm dos mesmos cálculos dos gráficos.")
+
+    linguagem = st.radio("Linguagem", ["Simples", "Técnica"], horizontal=True, key="linguagem")
+    perfil = "SIMPLES" if linguagem == "Simples" else "TECNICO"
 
     chave_chat = f"chat_{ORIGEM}"
     historico = st.session_state.setdefault(chave_chat, [])
 
     with st.form("form_chat", clear_on_submit=True):
-        pergunta = st.text_area("Sua pergunta", height=90, label_visibility="collapsed",
-                                placeholder=f"Ex.: por que {nome.lower()} cresceu em {nome_cidade}?")
-        enviar = st.form_submit_button("Perguntar", use_container_width=True)
+        digitada = st.text_area("Sua pergunta", height=90, label_visibility="collapsed",
+                                placeholder=f"Ex.: o que merece atenção em {nome_cidade}?")
+        enviar = st.form_submit_button("Perguntar", use_container_width=True, type="primary")
 
-    if enviar and pergunta.strip():
-        try:
-            resposta, _ = responder_pergunta(pergunta.strip(), ORIGEM, doenca, None)
-        except Exception:
-            resposta = "Não consegui responder agora. Os dados continuam disponíveis no painel."
-        historico.insert(0, (pergunta.strip(), resposta))
+    st.caption("Ou experimente:")
+    sugerida = None
+    for i, sugestao in enumerate(SUGESTOES):
+        if st.button(sugestao, key=f"sugestao_{i}", use_container_width=True):
+            sugerida = sugestao
+
+    pergunta = sugerida or (digitada.strip() if enviar else "")
+    if pergunta:
+        resultado = responder(pergunta, serie, nome_cidade, cancer_em_foco=doenca, perfil=perfil)
+        registrar_pergunta(BANCO, pergunta, resultado["assunto"])
+        historico.insert(0, (pergunta, resultado))
 
     for p, r in historico:
         st.markdown(f"**{p}**")
-        st.markdown(r)
+        st.markdown(r["texto"])
+        # Só quando a IA redigiu: aí os números de origem acrescentam
+        # algo. Sem IA, a resposta já É a lista de números.
+        if r["usou_ia"]:
+            with st.expander("Números usados nesta resposta"):
+                st.markdown("\n".join(f"- {f}" for f in r["fatos"]))
+                st.caption("O texto acima foi redigido pela IA a partir destes números, calculados pelo sistema.")
         st.divider()
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")

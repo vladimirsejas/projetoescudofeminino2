@@ -120,12 +120,20 @@ Estado atual:
   moradoras de Rio Claro passam a ter `origem = 'SP'` como as de
   qualquer cidade; nenhum script dependia de `origem = 'RIO_CLARO'`.
   Precisa rodar a carga + cadeia de novo no Windows.
+- **Chat do painel: `algoritimos/conversa.py`** (substituiu
+  `chat_servico.py`). Entender (assunto por PONTUAÇÃO de palavras-
+  chave, não "primeiro if que der match"; câncer por sinônimos com
+  palavra inteira) -> calcular (fatos de `inteligencia.py`, nunca das
+  13 tabelas antigas) -> explicar (Gemini via `ia_linguagem`; se
+  falhar, resposta direta com os fatos). Perguntas de orçamento
+  recebem sinais de atenção com evidência, nunca valores em R$.
+  Testado por `teste_conversa.py`. O chat de terminal
+  (`chat_escudo.py`) ainda usa o motor antigo.
 - Próximos passos combinados, nesta ordem: investigar 2025
-  (`ANO_CMPT` x `DT_INTER` nos CSVs brutos); repensar o chat para ler de
-  `inteligencia.py` (hoje há dois classificadores de intenção,
-  em `chat_escudo.py` e `chat_servico.py`, e ele depende das 13
-  tabelas antigas); população do IBGE para comparar cidades (gráfico
-  de funil); tela de Planejamento.
+  (`ANO_CMPT` x `DT_INTER` nos CSVs brutos); população do IBGE para
+  comparar cidades (gráfico de funil); tela de Planejamento; decidir
+  o destino de `chat_escudo.py`/`motor_raciocinio.py` e das 13
+  tabelas antigas.
 
 ## Notas de contexto do domínio
 

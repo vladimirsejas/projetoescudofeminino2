@@ -127,12 +127,15 @@ tela só, organizada por perguntas:
    fora do padrão e projeção exploratória)
 
 Embaixo de cada gráfico vem a leitura em texto, e o chat fica no
-painel lateral. A tela não calcula nada: tudo vem de
+painel lateral (`algoritimos\conversa.py`: entende a pergunta,
+calcula os fatos com a mesma inteligência dos gráficos e pede ao
+Gemini só a redação; sem Gemini, responde direto com os fatos). A tela não calcula nada: tudo vem de
 `algoritimos\inteligencia.py`, que lê `internacoes` direto (não
 depende da cadeia de scripts acima) e é testado sem o banco:
 
 ```powershell
 python algoritimos\teste_inteligencia.py
+python algoritimos\teste_conversa.py
 py -m streamlit run dashboard\app.py
 ```
 
