@@ -170,11 +170,17 @@ Estado atual:
   IDENT e N_AIH repetido foram descartados. Totais anuais de anos com
   mês faltando saem menores e distorcem tendência, anos fora do
   padrão, projeção e radar. O aviso "2025 em investigação / mudança
-  de registro" aponta a causa errada. Próximo passo combinado:
-  `py etl\completude_meses.py` (grade ano x mês por câncer + lista do
-  que baixar de novo no DATASUS), baixar os meses faltantes, recarregar;
-  só então corrigir aviso, investigar_2025 (só olhava > 12 meses) e
-  o que mais depender disso.
+  de registro" aponta a causa errada. `completude_meses.py` rodou no
+  banco real: faltam 35 dos 156 meses, OS MESMOS nos 7 cânceres (só
+  2025 tem 12/12; 2018 só 6). Causa: os scripts antigos de download
+  (pysus) faziam `except: print; continue` e salvavam o CSV mesmo com
+  mês faltando. Decisão do autor: baixar de novo os 7 cânceres de SP,
+  2013-2025, com `py etl\baixar_sih_sp.py` (um download por mês para
+  os 7 cânceres, mesmos filtros -- SEXO 3, MUNIC_RES 35..., CID lido
+  do CSV atual --, tentativas, retoma de onde parou, só troca os CSVs
+  se vierem os 156 meses, com backup). Depois: completude (12/12?),
+  carga, e só então corrigir o aviso de 2025, investigar_2025 (só
+  olhava > 12 meses) e o que mais depender disso.
 - **Coerência passado x projeção (09/2026):** 2025 ficou muito acima
   da reta em vários cânceres e a projeção de 2028 aparecia ABAIXO de
   2025 com "cresce X% ao ano". Agora a projeção sai da reta
