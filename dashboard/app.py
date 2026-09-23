@@ -9,7 +9,9 @@ import streamlit as st
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
 from configuracao_geografica import listar_municipios_disponiveis, obter_municipio, UF_REFERENCIA
-from conversa import registrar_pergunta, responder
+from conversa import registrar_pergunta
+from lia import INICIO, Contexto, responder as lia_responder, responder_texto as lia_texto
+from lia_rosto import img as rosto_lia
 from inteligencia import (
     anos_fora_do_padrao,
     anos_fora_todos,
@@ -46,7 +48,8 @@ from inteligencia import (
 # Portas (abas): Panorama (o que está acontecendo), Evolução (como
 # mudou e para onde vai), Investigar (o que merece ser pesquisado),
 # Planejamento (que evidências entram na discussão), Método. O chat
-# (lateral) atravessa todas. Dinheiro aparece sempre como "valor
+# (lateral) atravessa todas -- agora como a Lia (algoritimos/lia.py,
+# docs/LIA.md), que conduz a conversa e leva o painel até o gráfico. Dinheiro aparece sempre como "valor
 # hospitalar registrado no SIH/SUS", nunca como orçamento.
 # O painel antigo continua no histórico do git (commit 273fbe5).
 # ============================================================
@@ -93,6 +96,12 @@ section[data-testid="stSidebar"] { min-width: 400px; }
 .escudo-cartao h4 { margin: 0 0 6px 0; font-family: 'Manrope', sans-serif; color: #292541; }
 .escudo-cartao li { margin: 3px 0; color: #3d3852; }
 .escudo-cartao .acao { color: #4d4863; font-size: .92rem; margin-top: 6px; }
+.lia-nome { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 1.25rem; color: #292541; }
+.lia-nome span { font-weight: 500; font-size: .95rem; color: #706b82; }
+.lia-cargo { color: #706b82; font-size: .85rem; line-height: 1.3; }
+.lia-fala-grande { color: #3d3852; font-size: 1.08rem; margin: 6px 0 12px; }
+.lia-pergunta { background: #efe9f7; border-radius: 12px; padding: 8px 12px; margin: 8px 0; color: #4d4863; font-size: .92rem; }
+div[data-testid="stRadio"]:has(input[value="Panorama"]) > div { gap: 4px; border-bottom: 1px solid #e6e3ef; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -219,16 +228,129 @@ if resumo.empty:
     st.info(f"Ainda não há internações registradas para {nome_cidade}.")
     st.stop()
 
+# ------------------------------------------------------------
+# ESTADO DA TELA
+#
+# Aba, câncer em foco, medida e camadas ficam em chaves próprias do
+# session_state, e cada widget tem uma chave que inclui o valor atual
+# (ex.: "w_doenca_PULMAO"). Motivo: o Streamlit apaga o estado de um
+# widget que sai da tela, e quando ele volta o navegador pode devolver
+# o valor ANTIGO, desfazendo o que a Lia escolheu (foi o que aconteceu
+# nos testes: pulmão virava mama ao trocar de aba). Com a chave
+# atrelada ao valor, todo valor mudado por fora cria um widget novo,
+# sem lembrança velha. definir() é como a Lia "leva" o painel.
+# ------------------------------------------------------------
+
+ABAS = ["Panorama", "Evolução", "Investigar", "Planejamento", "Método"]
+PADROES = {"aba": "Panorama", "medida": "Internações",
+           "ver_estado": True, "ver_fora": True, "ver_projecao": False}
+for chave, valor in PADROES.items():
+    st.session_state.setdefault(chave, valor)
+
+
+def definir(chave, valor):
+    st.session_state[chave] = valor
+
+
+def chave_widget(chave):
+    return f"w_{chave}_{st.session_state[chave]}"
+
+
+def sincronizar(chave, chave_do_widget):
+    st.session_state[chave] = st.session_state[chave_do_widget]
+
+
+def seletor(onde, rotulo, chave, opcoes, **kwargs):
+    """st.radio preso à chave persistente (ver ESTADO DA TELA)."""
+    k = chave_widget(chave)
+    return onde.radio(rotulo, opcoes, index=opcoes.index(st.session_state[chave]), key=k,
+                      on_change=sincronizar, args=(chave, k), **kwargs)
+
+
+def chave_liga(onde, rotulo, chave, **kwargs):
+    """st.toggle preso à chave persistente (ver ESTADO DA TELA)."""
+    k = chave_widget(chave)
+    return onde.toggle(rotulo, value=st.session_state[chave], key=k,
+                       on_change=sincronizar, args=(chave, k), **kwargs)
+
+
 # Câncer em foco: começa pelo maior; se trocar de cidade e ele não
 # existir lá, volta para o maior. Vale para todas as abas.
 codigos = resumo["tipo_cancer"].tolist()
 if st.session_state.get("doenca") not in codigos:
-    st.session_state["doenca"] = codigos[0]
+    definir("doenca", codigos[0])
     st.session_state.pop("ultimo_clique", None)
+doenca = st.session_state["doenca"]
+nome = nome_doenca(doenca)
 
-aba_panorama, aba_evolucao, aba_investigar, aba_planejamento, aba_metodo = st.tabs([
-    "Panorama", "Evolução", "Investigar", "Planejamento", "Método",
-])
+ctx_lia = Contexto(serie=serie, cidade=nome_cidade, faixas=faixas_municipio(ORIGEM),
+                   duplicados=tuple(duplicados_municipio(ORIGEM)))
+st.session_state.setdefault("lia", {"cidade": None, "atual": None, "pilha": []})
+lia_estado = st.session_state["lia"]
+if lia_estado["cidade"] != ORIGEM:  # trocou de cidade: a Lia recomeça
+    lia_estado.update({"cidade": ORIGEM, "atual": lia_responder(ctx_lia, INICIO), "pilha": []})
+
+
+def lia_mostrar(resposta, pergunta_digitada=None):
+    """Guarda a resposta e leva o painel até o gráfico dela."""
+    if lia_estado["atual"] is not None:
+        lia_estado["pilha"].append(lia_estado["atual"])
+    resposta.pergunta = pergunta_digitada
+    lia_estado["atual"] = resposta
+    st.session_state["lia_fechada"] = True
+    destino = resposta.destino or {}
+    if destino.get("aba") in ABAS:
+        definir("aba", destino["aba"])
+    if destino.get("cancer") in codigos:
+        definir("doenca", destino["cancer"])
+        st.session_state["ultimo_clique"] = destino["cancer"]
+    if destino.get("medida"):
+        definir("medida", destino["medida"])
+    for camada, valor in (destino.get("camadas") or {}).items():
+        definir(camada, valor)
+
+
+if "lia_pendente" in st.session_state:  # pergunta digitada na execução anterior
+    lia_mostrar(*st.session_state.pop("lia_pendente"))
+    # a resposta pode ter trocado o câncer em foco: relê
+    doenca = st.session_state["doenca"]
+    nome = nome_doenca(doenca)
+
+
+def lia_clicar(acao):
+    lia_mostrar(lia_responder(ctx_lia, acao))
+
+
+def lia_voltar():
+    if lia_estado["pilha"]:
+        lia_estado["atual"] = lia_estado["pilha"].pop()
+
+
+# ------------------------------------------------------------
+# BOAS-VINDAS DA LIA (primeiro acesso)
+# ------------------------------------------------------------
+
+if not st.session_state.get("lia_fechada"):
+    boas_vindas = lia_responder(ctx_lia, INICIO)
+    st.markdown('<div class="lia-boasvindas">', unsafe_allow_html=True)
+    c_rosto, c_fala = st.columns([1, 4.2])
+    with c_rosto:
+        st.markdown(rosto_lia("acolhedora", 150), unsafe_allow_html=True)
+    with c_fala:
+        st.markdown(f'<div class="lia-nome">Lia <span>· pesquisadora do Escudo Feminino</span></div>'
+                    f'<div class="lia-fala-grande">{boas_vindas.fala.replace("**", "")}</div>',
+                    unsafe_allow_html=True)
+        # 4 portas de entrada (docs/LIA.md); os 8 caminhos ficam na lateral
+        principais = {"mais_aparece", "aumentando", "atencao", "futuro"}
+        colunas = st.columns(4)
+        for i, (rotulo, acao) in enumerate(a for a in boas_vindas.botoes if a[1].get("id") in principais):
+            colunas[i].button(rotulo, key=f"bv_{i}", on_click=lia_clicar, args=(acao,),
+                              use_container_width=True)
+        st.button("Prefiro explorar sozinha", key="bv_fechar",
+                  on_click=lambda: st.session_state.update(lia_fechada=True))
+    st.markdown('</div>', unsafe_allow_html=True)
+
+aba = seletor(st, "Navegação", "aba", ABAS, horizontal=True, label_visibility="collapsed")
 
 
 # ============================================================
@@ -243,8 +365,8 @@ MEDIDAS = {
     "Dias de internação": ("dias_permanencia", "Quais cânceres ocupam mais dias de internação em {c}?", formatar_numero),
 }
 
-with aba_panorama:
-    medida = st.radio("Medir por", list(MEDIDAS), horizontal=True, key="medida")
+if aba == "Panorama":
+    medida = seletor(st, "Medir por", "medida", list(MEDIDAS), horizontal=True)
     coluna, titulo, formato = MEDIDAS[medida]
     pergunta(titulo.format(c=nome_cidade))
     st.markdown('<div class="escudo-dica">Total no período. Clique numa barra para pôr aquele câncer em foco.'
@@ -257,7 +379,7 @@ with aba_panorama:
         x=barras[coluna], y=barras["doenca"], orientation="h",
         text=[formato(v) for v in barras[coluna]],
         textposition="outside", cliponaxis=False,
-        marker={"color": [AZUL if c == st.session_state["doenca"] else CINZA for c in barras["tipo_cancer"]],
+        marker={"color": [AZUL if c == doenca else CINZA for c in barras["tipo_cancer"]],
                 "line": {"width": 0}},
         customdata=barras[["tipo_cancer"]].values,
         hovertemplate="<b>%{y}</b><br>%{text}<extra></extra>",
@@ -284,11 +406,10 @@ with aba_panorama:
                    or dict(zip(resumo["doenca"], resumo["tipo_cancer"])).get(pontos[0].get("y")))
         if clicado and clicado != st.session_state.get("ultimo_clique"):
             st.session_state["ultimo_clique"] = clicado
-            st.session_state["doenca"] = clicado
+            definir("doenca", clicado)
             st.rerun()
 
-    doenca = st.radio("Câncer em foco", codigos, key="doenca", format_func=nome_doenca, horizontal=True)
-    nome = nome_doenca(doenca)
+    seletor(st, "Câncer em foco", "doenca", codigos, format_func=nome_doenca, horizontal=True)
     ficha = ficha_cancer(serie, doenca)
 
     pergunta(f"O que chama atenção no {cancer_de(doenca)}?")
@@ -314,17 +435,17 @@ with aba_panorama:
 
 mun = serie_doenca(serie, doenca)
 
-with aba_evolucao:
+if aba == "Evolução":
     pergunta(f"Como as internações por {cancer_de(doenca)} mudaram de {ano_ini} a {ano_fim}?")
     st.markdown(f'<div class="escudo-dica">Câncer em foco: {nome}. Troque na aba Panorama.</div>',
                 unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns(3)
-    ver_estado = c1.toggle("Comparar com o Estado de SP", value=True,
+    ver_estado = chave_liga(c1, "Comparar com o Estado de SP", "ver_estado",
                            help="Linha cinza: o ritmo do Estado redimensionado para o tamanho da cidade.")
-    ver_fora = c2.toggle("Destacar anos fora do padrão", value=True,
+    ver_fora = chave_liga(c2, "Destacar anos fora do padrão", "ver_fora",
                          help="Anos que ficaram longe do esperado pela tendência dos outros anos.")
-    ver_projecao = c3.toggle("Projeção de tendência até " + str(ano_fim + 3), value=False,
+    ver_projecao = chave_liga(c3, "Projeção de tendência até " + str(ano_fim + 3), "ver_projecao",
                              help="Continuação da tendência histórica, com faixa de incerteza. "
                                   "Não é previsão clínica nem IA preditiva.")
 
@@ -406,7 +527,7 @@ with aba_evolucao:
 # INVESTIGAR — o que merece ser pesquisado?
 # ============================================================
 
-with aba_investigar:
+if aba == "Investigar":
     pergunta(f"Em que anos algum câncer saiu do padrão em {nome_cidade}?")
     st.markdown('<div class="escudo-dica">Todos os cânceres de uma vez. "Esperado" = tendência calculada com os '
                 'outros anos. Detectar não explica a causa.</div>', unsafe_allow_html=True)
@@ -489,7 +610,7 @@ with aba_investigar:
 # PLANEJAMENTO — que evidências entram na discussão?
 # ============================================================
 
-with aba_planejamento:
+if aba == "Planejamento":
     pergunta(f"Que evidências de {nome_cidade} merecem entrar na discussão de planejamento?")
     st.markdown('<div class="escudo-dica">O Escudo reúne evidências e a pressão projetada se a tendência continuar. '
                 'Não define quanto investir: a decisão é da gestão, que conhece orçamento, filas e capacidade.</div>',
@@ -561,7 +682,7 @@ with aba_planejamento:
 # MÉTODO
 # ============================================================
 
-with aba_metodo:
+if aba == "Método":
     pergunta("Como ler estes dados")
     st.markdown(f"""
 - **Fonte:** internações do SUS (SIH/SUS, DATASUS) de mulheres residentes em {nome_cidade}, {ano_ini}–{ano_fim}, para 7 tipos de câncer.
@@ -586,54 +707,52 @@ política, e — até a população do IBGE entrar no banco — comparação jus
 
 
 # ============================================================
-# CHAT (painel lateral, sabe a cidade e o câncer em foco)
+# LIA NA LATERAL (atravessa todas as abas)
 # ============================================================
 
-SUGESTOES = [
-    "O que merece atenção?",
-    f"Como evoluiu o câncer de {nome.lower()}?",
-    "O que esperar até 2028?",
-    "Qual câncer mais mata?",
-    "Estamos crescendo mais que o Estado?",
-    "Houve algum ano fora do padrão?",
-]
-
 with st.sidebar:
-    st.markdown("### Pergunte ao Escudo")
-    st.caption(f"Em foco: {nome_cidade} · {nome}. Os números vêm dos mesmos cálculos dos gráficos.")
+    atual = lia_estado["atual"]
+    c_rosto, c_nome = st.columns([1, 2.6])
+    with c_rosto:
+        st.markdown(rosto_lia(atual.expressao, 76), unsafe_allow_html=True)
+    with c_nome:
+        st.markdown('<div class="lia-nome">Lia</div><div class="lia-cargo">Pesquisadora do Escudo Feminino'
+                    f'<br>{nome_cidade}</div>', unsafe_allow_html=True)
 
+    boas_vindas_aberta = not st.session_state.get("lia_fechada")
+    if boas_vindas_aberta:
+        # a saudação já está no centro da tela: aqui não se repete
+        st.markdown("Escolha um caminho ali no centro, ou escreva sua pergunta aqui embaixo.")
+    if getattr(atual, "pergunta", None):
+        st.markdown(f'<div class="lia-pergunta">{atual.pergunta}</div>', unsafe_allow_html=True)
+    if not boas_vindas_aberta:
+        st.markdown(atual.fala)
+    if atual.destino and atual.destino.get("aba") and lia_estado["pilha"]:
+        st.caption(f"O painel foi para a aba {atual.destino['aba']}"
+                   + (f" · {nome_doenca(atual.destino['cancer'])}" if atual.destino.get("cancer") else "") + ".")
+    if atual.numeros:
+        with st.expander("Os números por trás"):
+            st.markdown("\n".join(f"- {n}" for n in atual.numeros))
+
+    for i, (rotulo, acao) in enumerate([] if boas_vindas_aberta else atual.botoes):
+        st.button(rotulo, key=f"lia_{i}_{rotulo}", on_click=lia_clicar, args=(acao,), use_container_width=True)
+    if lia_estado["pilha"]:
+        st.button("← Voltar", key="lia_voltar", on_click=lia_voltar)
+
+    st.divider()
     linguagem = st.radio("Linguagem", ["Simples", "Técnica"], horizontal=True, key="linguagem")
     perfil = "SIMPLES" if linguagem == "Simples" else "TECNICO"
-
-    chave_chat = f"chat_{ORIGEM}"
-    historico = st.session_state.setdefault(chave_chat, [])
-
-    with st.form("form_chat", clear_on_submit=True):
-        digitada = st.text_area("Sua pergunta", height=90, label_visibility="collapsed",
-                                placeholder=f"Ex.: o que merece atenção em {nome_cidade}?")
-        enviar = st.form_submit_button("Perguntar", use_container_width=True, type="primary")
-
-    st.caption("Ou experimente:")
-    sugerida = None
-    for i, sugestao in enumerate(SUGESTOES):
-        if st.button(sugestao, key=f"sugestao_{i}", use_container_width=True):
-            sugerida = sugestao
-
-    pergunta = sugerida or (digitada.strip() if enviar else "")
-    if pergunta:
-        resultado = responder(pergunta, serie, nome_cidade, cancer_em_foco=doenca, perfil=perfil)
-        registrar_pergunta(BANCO, pergunta, resultado["assunto"])
-        historico.insert(0, (pergunta, resultado))
-
-    for p, r in historico:
-        st.markdown(f"**{p}**")
-        st.markdown(r["texto"])
-        # Só quando a IA redigiu: aí os números de origem acrescentam
-        # algo. Sem IA, a resposta já É a lista de números.
-        if r["usou_ia"]:
-            with st.expander("Números usados nesta resposta"):
-                st.markdown("\n".join(f"- {f}" for f in r["fatos"]))
-                st.caption("O texto acima foi redigido pela IA a partir destes números, calculados pelo sistema.")
-        st.divider()
+    with st.form("form_lia", clear_on_submit=True):
+        digitada = st.text_area("Ou escreva sua pergunta", height=80,
+                                placeholder=f"Ex.: e o pulmão? Isso está piorando?")
+        enviar = st.form_submit_button("Perguntar à Lia", use_container_width=True, type="primary")
+    if enviar and digitada.strip():
+        resposta, bruto = lia_texto(ctx_lia, digitada.strip(), cancer_em_foco=doenca, perfil=perfil)
+        registrar_pergunta(BANCO, digitada.strip(), bruto["assunto"])
+        # A navegação já foi desenhada nesta execução e o Streamlit não
+        # deixa mudar um widget depois disso: a resposta é aplicada no
+        # começo da próxima execução.
+        st.session_state["lia_pendente"] = (resposta, digitada.strip())
+        st.rerun()
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")

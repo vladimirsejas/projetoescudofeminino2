@@ -122,9 +122,23 @@ Estado atual:
   (VAL_TOT das AIHs): não é orçamento municipal nem custo total do
   tratamento. Projeção sempre como **"projeção de tendência"**, nunca
   "IA preditiva". Óbitos não são projetados (poucos por ano).
+- **Lia** (`algoritimos/lia.py`, `dashboard/lia_rosto.py`,
+  `docs/LIA.md`): guia do Escudo, pesquisadora negra madura (não
+  médica, sem marca de instituição real). Árvore de 3 níveis
+  (caminhos -> câncer -> ação), falas determinísticas montadas com
+  `inteligencia.py`, expressão do rosto escolhida pela confiabilidade
+  do dado (acolhedora / explicando / atenta / cautelosa / pensativa);
+  texto livre passa por `conversa.py` e volta no formato dela. O
+  painel acompanha a Lia (aba, câncer, medida, camadas). Testado por
+  `teste_lia.py`. **Armadilha do Streamlit resolvida no painel:**
+  widgets que somem e voltam (abas desenhadas só quando abertas)
+  devolviam o valor antigo; por isso cada widget tem chave atrelada
+  ao valor (`chave_widget`) e o estado real fica em chaves próprias
+  (`definir`). Não voltar a usar `key="doenca"` direto.
 - **Divisão de trabalho (09/2026):** o ChatGPT cuida de
   `conversa.py`/`teste_conversa.py`; Claude cuida de `inteligencia.py`
-  e do painel. Pendências do chat para acompanhar o painel: trocar
+  e do painel (o autor passou a Lia para o Claude). Pendências do
+  chat para acompanhar o painel: trocar
   "valor pago pelo SUS" por "valor hospitalar registrado no SIH/SUS";
   trocar "Projeção exploratória" por "Projeção de tendência" nos
   textos de "onde ver"; usar `inteligencia.evidencias_planejamento`,

@@ -1,0 +1,501 @@
+from dataclasses import dataclass, field
+
+from inteligencia import (
+    anos_fora_do_padrao,
+    anos_fora_todos,
+    ano_atipico_no_estado,
+    cancer_de,
+    comparar_com_estado,
+    comparar_faixas,
+    confiabilidade,
+    destaques_cancer,
+    evidencias_planejamento,
+    ficha_cancer,
+    formatar_numero,
+    leitura_faixas,
+    MEDIA_PEQUENA,
+    nome_doenca,
+    pressao_projetada,
+    resumo_doencas,
+    serie_doenca,
+    testar_projecao,
+)
+
+# =====================================
+# LIA — a guia do Escudo Feminino (ver docs/LIA.md)
+#
+# Árvore de conversa com 3 níveis: caminhos -> câncer -> ação. Cada
+# nó devolve uma Resposta com a fala, a expressão do rosto, os
+# próximos botões, o destino no painel e os números usados ("por
+# quê?"). As falas guiadas são DETERMINÍSTICAS: montadas com os
+# números de inteligencia.py, sem IA -- rápidas, sem custo e sempre
+# iguais para os mesmos dados. A IA de linguagem só entra na caixa
+# de texto livre, via conversa.py.
+#
+# A expressão vem dos dados: "cautelosa" quando a confiabilidade
+# pede cuidado, "atenta" quando há sinal, "explicando" no resto.
+# =====================================
+
+EXPRESSOES = ("acolhedora", "explicando", "atenta", "cautelosa", "pensativa")
+
+
+@dataclass
+class Resposta:
+    fala: str
+    expressao: str = "explicando"
+    botoes: list = field(default_factory=list)   # [(rótulo, ação)]
+    destino: dict = None                         # {"aba":..., "cancer":..., "medida":..., "camadas": {...}}
+    numeros: list = field(default_factory=list)  # o "por quê?"
+
+
+@dataclass
+class Contexto:
+    serie: object
+    cidade: str
+    faixas: object = None      # DataFrame de inteligencia.carregar_faixas (opcional)
+    duplicados: tuple = ()
+
+
+# ---------- ações (o que um botão faz) ----------
+
+def caminho(nome):
+    return {"tipo": "caminho", "id": nome}
+
+
+def escolher_cancer(acao_seguinte):
+    return {"tipo": "escolher_cancer", "depois": acao_seguinte}
+
+
+def sobre(cancer, acao):
+    return {"tipo": "cancer", "cancer": cancer, "acao": acao}
+
+
+INICIO = {"tipo": "inicio"}
+
+CAMINHOS = [
+    ("O que mais aparece?", "mais_aparece"),
+    ("Está aumentando?", "aumentando"),
+    ("Onde prestar atenção?", "atencao"),
+    ("Valores hospitalares", "valores"),
+    ("Comparar com São Paulo", "estado"),
+    ("Olhar para frente", "futuro"),
+    ("Anos fora do padrão", "fora_padrao"),
+    ("Como esses dados funcionam?", "metodo"),
+]
+
+ACOES_CANCER = [
+    ("Evolução", "evolucao"),
+    ("Óbitos", "obitos"),
+    ("Valores", "valores"),
+    ("Tempo de internação", "tempo"),
+    ("Idade", "idade"),
+    ("Comparar com SP", "estado"),
+    ("Projeção", "projecao"),
+    ("Por quê?", "porque"),
+]
+
+
+def _mais(cancer, *acoes):
+    """Botões de próximo passo sobre um câncer."""
+    rotulos = dict((a, r) for r, a in ACOES_CANCER)
+    return [(rotulos[a], sobre(cancer, a)) for a in acoes]
+
+
+def _canceres(ctx):
+    return list(resumo_doencas(ctx.serie)["tipo_cancer"])
+
+
+def _pequeno(ctx, cancer):
+    return serie_doenca(ctx.serie, cancer)["internacoes"].mean() < MEDIA_PEQUENA
+
+
+def _ano_em_investigacao(ctx):
+    ano = int(ctx.serie["ano"].max())
+    fora, total = ano_atipico_no_estado(ctx.serie, ano)
+    return ano if total and fora >= total / 2 else None
+
+
+def _nota_2025(ctx):
+    ano = _ano_em_investigacao(ctx)
+    return (f"\n\n*Um cuidado: {ano} está em investigação — vários cânceres saltaram juntos no Estado "
+            f"inteiro nesse ano, o que parece mudança de registro.*") if ano else ""
+
+
+# ---------- nível 0 ----------
+
+def saudacao(ctx):
+    return Resposta(
+        fala=(f"Olá, eu sou a **Lia**, pesquisadora do Escudo Feminino. Vamos olhar juntas os dados de "
+              f"câncer em mulheres de **{ctx.cidade}**? O que você quer descobrir?"),
+        expressao="acolhedora",
+        botoes=[(r, caminho(c)) for r, c in CAMINHOS],
+    )
+
+
+def menu_cancer(ctx, acao_seguinte):
+    rotulo = {"futuro": "olhar para frente"}.get(acao_seguinte, "")
+    return Resposta(
+        fala=f"Sobre qual câncer você quer {rotulo or 'saber mais'}?",
+        expressao="acolhedora",
+        botoes=[(nome_doenca(c), sobre(c, "projecao" if acao_seguinte == "futuro" else "menu"))
+                for c in _canceres(ctx)],
+    )
+
+
+def menu_do_cancer(ctx, cancer):
+    return Resposta(
+        fala=f"Vamos olhar o **{cancer_de(cancer)}** em {ctx.cidade}. O que você gostaria de saber?",
+        expressao="acolhedora",
+        botoes=[(r, sobre(cancer, a)) for r, a in ACOES_CANCER],
+        destino={"aba": "Panorama", "cancer": cancer},
+    )
+
+
+# ---------- nível 1: caminhos ----------
+
+def mais_aparece(ctx):
+    resumo = resumo_doencas(ctx.serie)
+    total = resumo["internacoes"].sum()
+    top = resumo.head(3)
+    partes = [f"**{l['doenca']}** ({formatar_numero(l['internacoes'])} internações, "
+              f"{formatar_numero(l['internacoes'] / total * 100)}%)" for _, l in top.iterrows()]
+    primeiro = top.iloc[0]["tipo_cancer"]
+    return Resposta(
+        fala=(f"De {int(ctx.serie['ano'].min())} a {int(ctx.serie['ano'].max())}, as mulheres de {ctx.cidade} "
+              f"tiveram **{formatar_numero(total)} internações** pelos cânceres que acompanho. Os que mais "
+              f"aparecem são " + ", ".join(partes[:-1]) + " e " + partes[-1] + "."),
+        botoes=[(f"Ver {nome_doenca(primeiro).lower()}", sobre(primeiro, "menu")),
+                ("Onde prestar atenção?", caminho("atencao")),
+                ("Valores hospitalares", caminho("valores"))],
+        destino={"aba": "Panorama", "cancer": primeiro, "medida": "Internações"},
+        numeros=[f"{l['doenca']}: {formatar_numero(l['internacoes'])} internações" for _, l in resumo.iterrows()],
+    )
+
+
+def aumentando(ctx):
+    linhas = []
+    for c in _canceres(ctx):
+        comp = comparar_com_estado(ctx.serie, c)
+        linhas.append((comp["ritmo_municipio"], comp["ritmo_estado"] or 0, c))
+    linhas.sort(reverse=True)
+    crescem = [l for l in linhas if l[0] >= 3]
+    mais_que_sp = [nome_doenca(c) for r, e, c in linhas if r - e > 1.5]
+    if crescem:
+        topo = crescem[0]
+        fala = (f"Sim, na maioria dos casos. {len(crescem)} dos {len(linhas)} cânceres crescem pelo menos 3% ao ano. "
+                f"O que mais cresce é o **{cancer_de(topo[2])}**: {formatar_numero(topo[0], 1)}% ao ano.")
+    else:
+        topo = linhas[0]
+        fala = "Não há crescimento forte: nenhum câncer cresce 3% ao ano ou mais."
+    if mais_que_sp:
+        fala += f" Crescem mais rápido que no Estado de SP: {', '.join(mais_que_sp)}."
+    pequenos = any(_pequeno(ctx, c) for _, _, c in crescem[:1])
+    return Resposta(
+        fala=fala + _nota_2025(ctx),
+        expressao="cautelosa" if pequenos else ("atenta" if mais_que_sp else "explicando"),
+        botoes=_mais(topo[2], "evolucao", "projecao") + [("Comparar com São Paulo", caminho("estado"))],
+        destino={"aba": "Evolução", "cancer": topo[2], "camadas": {"ver_estado": True}},
+        numeros=[f"{nome_doenca(c)}: {formatar_numero(r, 1)}% ao ano (Estado: {formatar_numero(e, 1)}%)"
+                 for r, e, c in linhas],
+    )
+
+
+def atencao(ctx):
+    evid = evidencias_planejamento(ctx.serie)
+    com_sinal = [e for e in evid if e["sinais"]]
+    if not com_sinal:
+        return Resposta(
+            fala=f"Pelos critérios do Escudo, nenhum câncer de {ctx.cidade} mostra sinal de alerta agora.",
+            botoes=[("Está aumentando?", caminho("aumentando")), ("Olhar para frente", caminho("futuro"))],
+            destino={"aba": "Planejamento"},
+        )
+    topo = com_sinal[0]
+    outros = [e["doenca"] for e in com_sinal[1:4]]
+    fala = (f"Encontrei sinais que merecem entrar na discussão de planejamento. O que mais reúne sinais é o "
+            f"**{cancer_de(topo['tipo_cancer'])}**: " + "; ".join(topo["sinais"]) + ".")
+    if outros:
+        fala += f" Também aparecem: {', '.join(outros)}."
+    fala += " Eu aponto evidências; a decisão de quanto investir é da gestão."
+    return Resposta(
+        fala=fala,
+        expressao="atenta",
+        botoes=_mais(topo["tipo_cancer"], "porque", "projecao", "valores"),
+        destino={"aba": "Planejamento", "cancer": topo["tipo_cancer"]},
+        numeros=[f"{e['doenca']}: " + ("; ".join(e["sinais"]) or "sem sinal") for e in evid],
+    )
+
+
+def valores(ctx):
+    resumo = resumo_doencas(ctx.serie)
+    total_v, total_i = resumo["valor_total"].sum(), resumo["internacoes"].sum()
+    resumo = resumo.assign(pv=resumo["valor_total"] / total_v * 100, pi=resumo["internacoes"] / total_i * 100)
+    maior = resumo.sort_values("valor_total", ascending=False).iloc[0]
+    desprop = resumo.assign(d=resumo["pv"] - resumo["pi"]).sort_values("d", ascending=False).iloc[0]
+    fala = (f"No período, as internações por câncer de mulheres de {ctx.cidade} somaram "
+            f"**R$ {formatar_numero(total_v)}** em valores hospitalares registrados no SIH/SUS. "
+            f"O maior valor é do **{cancer_de(maior['tipo_cancer'])}** ({formatar_numero(maior['pv'])}% do total).")
+    if desprop["pv"] - desprop["pi"] > 3:
+        fala += (f" Chama atenção o **{cancer_de(desprop['tipo_cancer'])}**: é {formatar_numero(desprop['pi'])}% "
+                 f"das internações, mas {formatar_numero(desprop['pv'])}% do valor.")
+    fala += " Isso não é o orçamento do município nem o custo total do tratamento."
+    return Resposta(
+        fala=fala,
+        expressao="explicando",
+        botoes=_mais(desprop["tipo_cancer"], "valores", "tempo") + [("Onde prestar atenção?", caminho("atencao"))],
+        destino={"aba": "Panorama", "cancer": desprop["tipo_cancer"], "medida": "Valor hospitalar registrado"},
+        numeros=[f"{l['doenca']}: R$ {formatar_numero(l['valor_total'])} ({formatar_numero(l['pv'], 1)}% do valor, "
+                 f"{formatar_numero(l['pi'], 1)}% das internações)" for _, l in resumo.iterrows()],
+    )
+
+
+def estado(ctx):
+    linhas = []
+    for c in _canceres(ctx):
+        comp = comparar_com_estado(ctx.serie, c)
+        linhas.append((comp["ritmo_municipio"] - (comp["ritmo_estado"] or 0), c, comp))
+    linhas.sort(reverse=True)
+    acima = [nome_doenca(c) for d, c, _ in linhas if d > 1.5]
+    abaixo = [nome_doenca(c) for d, c, _ in linhas if d < -1.5]
+    fala = f"Comparando o ritmo de crescimento de {ctx.cidade} com o do Estado de SP: "
+    fala += (f"crescem mais rápido aqui {', '.join(acima)}" if acima else "nenhum câncer cresce claramente mais rápido aqui")
+    fala += (f"; mais devagar, {', '.join(abaixo)}." if abaixo else ".")
+    fala += " Comparo ritmo, não volume, porque ainda não tenho a população de cada cidade."
+    topo = linhas[0][1]
+    return Resposta(
+        fala=fala,
+        expressao="atenta" if acima else "explicando",
+        botoes=_mais(topo, "estado", "evolucao") + [("Está aumentando?", caminho("aumentando"))],
+        destino={"aba": "Evolução", "cancer": topo, "camadas": {"ver_estado": True}},
+        numeros=[f"{nome_doenca(c)}: {formatar_numero(comp['ritmo_municipio'], 1)}% x "
+                 f"{formatar_numero(comp['ritmo_estado'] or 0, 1)}% ao ano no Estado" for _, c, comp in linhas],
+    )
+
+
+def fora_padrao(ctx):
+    todos = anos_fora_todos(ctx.serie)
+    if todos.empty:
+        return Resposta(fala=f"Não encontrei anos fora do padrão em {ctx.cidade}.",
+                        botoes=[("Está aumentando?", caminho("aumentando"))],
+                        destino={"aba": "Investigar"})
+    itens = [f"{l['doenca']} em {l['ano']} ({l['direcao']} do esperado"
+             + (", poucos casos" if l["numeros_pequenos"] else "") + ")" for _, l in todos.iterrows()]
+    fala = "Encontrei estes anos fora do padrão: " + "; ".join(itens) + "."
+    repetido = todos["ano"].value_counts()
+    if repetido.iloc[0] >= 2:
+        fala += (f" {repetido.index[0]} aparece para vários cânceres ao mesmo tempo — quando muitos mudam juntos, "
+                 f"vale checar o registro antes de concluir.")
+    fala += " Eu detecto; a causa precisa ser investigada."
+    primeiro = todos.iloc[-1]
+    codigo = dict((nome_doenca(c), c) for c in _canceres(ctx))[primeiro["doenca"]]
+    return Resposta(
+        fala=fala,
+        expressao="cautelosa" if todos["numeros_pequenos"].any() or repetido.iloc[0] >= 2 else "atenta",
+        botoes=_mais(codigo, "evolucao", "porque") + [("Como esses dados funcionam?", caminho("metodo"))],
+        destino={"aba": "Investigar"},
+        numeros=[f"{l['doenca']} {l['ano']}: {formatar_numero(l['observado'])} internações, esperado "
+                 f"~{formatar_numero(l['esperado'])}" for _, l in todos.iterrows()],
+    )
+
+
+def metodo(ctx):
+    return Resposta(
+        fala=("Eu leio internações de mulheres no SUS (SIH/SUS, DATASUS). **Internação não é caso novo**: a mesma "
+              "mulher pode ser internada mais de uma vez, e quem se trata só no ambulatório ou pelo plano não "
+              "aparece. O ano é o do processamento da internação. Minhas tendências são retas calculadas sobre "
+              "todos os anos, e a projeção só prolonga essa reta — com faixa de incerteza e teste de acerto. "
+              "Os dados **não** permitem dizer causas, casos novos, orçamento ideal nem comparar cidades de "
+              "tamanhos diferentes (falta a população)."),
+        expressao="pensativa",
+        botoes=[("O que mais aparece?", caminho("mais_aparece")), ("Anos fora do padrão", caminho("fora_padrao"))],
+        destino={"aba": "Método"},
+    )
+
+
+# ---------- nível 3: ações sobre um câncer ----------
+
+def _evolucao(ctx, c):
+    mun = serie_doenca(ctx.serie, c)
+    comp = comparar_com_estado(ctx.serie, c)
+    ano_fim, ultimo = int(mun["ano"].max()), mun["internacoes"].iloc[-1]
+    ritmo = comp["ritmo_municipio"]
+    verbo = "crescem" if ritmo > 1 else ("caem" if ritmo < -1 else "ficam estáveis")
+    fala = (f"**O que aconteceu:** em {ano_fim} foram {formatar_numero(ultimo)} internações por {cancer_de(c)}. "
+            f"**O que está acontecendo:** desde {int(mun['ano'].min())}, as internações {verbo} "
+            f"{formatar_numero(abs(ritmo), 1)}% ao ano em média")
+    if comp["ritmo_estado"] is not None:
+        fala += f" (no Estado, {formatar_numero(comp['ritmo_estado'], 1)}%)"
+    fala += "."
+    fora = anos_fora_do_padrao(mun)
+    if not fora.empty:
+        fala += " Anos fora do padrão: " + ", ".join(f"{a} ({d})" for a, d in zip(fora["ano"], fora["direcao"])) + "."
+    if _pequeno(ctx, c):
+        fala += " São poucas internações por ano, então variações podem ser acaso."
+    return Resposta(
+        fala=fala + _nota_2025(ctx),
+        expressao="cautelosa" if _pequeno(ctx, c) else ("atenta" if ritmo - (comp["ritmo_estado"] or 0) > 1.5 else "explicando"),
+        botoes=_mais(c, "projecao", "estado", "obitos"),
+        destino={"aba": "Evolução", "cancer": c, "camadas": {"ver_estado": True, "ver_fora": True}},
+    )
+
+
+def _obitos(ctx, c):
+    f = ficha_cancer(ctx.serie, c)
+    fala = (f"Das {formatar_numero(f['internacoes'])} internações por {cancer_de(c)}, "
+            f"**{formatar_numero(f['obitos'])} terminaram em óbito** — {formatar_numero(f['letalidade'], 1)}%. "
+            f"No Estado, {formatar_numero(f['letalidade_estado'], 1)}%.")
+    poucos = f["obitos"] < 10
+    if poucos:
+        fala += " São poucos óbitos, então a comparação é frágil."
+    fala += " Isso mede óbitos no hospital, não a mortalidade da doença na população."
+    acima = f["obitos"] >= 5 and f["letalidade"] > f["letalidade_estado"] * 1.2
+    return Resposta(fala=fala, expressao="cautelosa" if poucos else ("atenta" if acima else "explicando"),
+                    botoes=_mais(c, "evolucao", "idade", "porque"),
+                    destino={"aba": "Panorama", "cancer": c, "medida": "Óbitos na internação"})
+
+
+def _valores(ctx, c):
+    f = ficha_cancer(ctx.serie, c)
+    fala = (f"As internações por {cancer_de(c)} somaram **R$ {formatar_numero(f['valor'])}** em valores "
+            f"hospitalares registrados no SIH/SUS — {formatar_numero(f['pct_valor'], 1)}% do valor de todos os "
+            f"cânceres, para {formatar_numero(f['pct_internacoes'], 1)}% das internações. Em média, "
+            f"R$ {formatar_numero(f['valor_medio'])} por internação (no Estado, R$ {formatar_numero(f['valor_medio_estado'])}). "
+            f"Não é o orçamento do município nem o custo total do tratamento.")
+    return Resposta(fala=fala, expressao="explicando", botoes=_mais(c, "tempo", "projecao", "evolucao"),
+                    destino={"aba": "Panorama", "cancer": c, "medida": "Valor hospitalar registrado"})
+
+
+def _tempo(ctx, c):
+    f = ficha_cancer(ctx.serie, c)
+    fala = (f"As internações por {cancer_de(c)} somaram **{formatar_numero(f['dias'])} dias** no hospital: "
+            f"em média {formatar_numero(f['permanencia'], 1)} dias por internação "
+            f"(no Estado, {formatar_numero(f['permanencia_estado'], 1)}).")
+    return Resposta(fala=fala, expressao="explicando", botoes=_mais(c, "valores", "projecao", "evolucao"),
+                    destino={"aba": "Panorama", "cancer": c, "medida": "Dias de internação"})
+
+
+def _idade(ctx, c):
+    if ctx.faixas is None:
+        return Resposta(fala="Não tenho as idades carregadas agora.", expressao="cautelosa",
+                        botoes=_mais(c, "evolucao"), destino={"aba": "Investigar", "cancer": c})
+    tabela, periodos = comparar_faixas(ctx.faixas, c)
+    if periodos is None:
+        return Resposta(fala=f"Não há idade registrada para {cancer_de(c)}.", expressao="cautelosa",
+                        botoes=_mais(c, "evolucao"), destino={"aba": "Investigar", "cancer": c})
+    frases = leitura_faixas(tabela, periodos)
+    return Resposta(fala=f"Comparei a idade das mulheres internadas por {cancer_de(c)} em {periodos[0]} e "
+                         f"{periodos[1]}. " + " ".join(frases),
+                    expressao="cautelosa" if len(frases) > 1 else "explicando",
+                    botoes=_mais(c, "evolucao", "obitos"),
+                    destino={"aba": "Investigar", "cancer": c})
+
+
+def _estado_cancer(ctx, c):
+    comp = comparar_com_estado(ctx.serie, c)
+    dif = comp["ritmo_municipio"] - (comp["ritmo_estado"] or 0)
+    situacao = "mais rápido que" if dif > 1.5 else ("mais devagar que" if dif < -1.5 else "no mesmo ritmo que")
+    fala = (f"Em {ctx.cidade}, as internações por {cancer_de(c)} variam {formatar_numero(comp['ritmo_municipio'], 1)}% "
+            f"ao ano; no Estado de SP, {formatar_numero(comp['ritmo_estado'] or 0, 1)}%. Ou seja, a cidade anda "
+            f"**{situacao}** o Estado. No gráfico, a linha cinza é o Estado na escala da cidade.")
+    return Resposta(fala=fala, expressao="atenta" if dif > 1.5 else "explicando",
+                    botoes=_mais(c, "evolucao", "projecao"),
+                    destino={"aba": "Evolução", "cancer": c, "camadas": {"ver_estado": True}})
+
+
+def _projecao(ctx, c):
+    mun = serie_doenca(ctx.serie, c)
+    p = pressao_projetada(ctx.serie, c)
+    comp = comparar_com_estado(ctx.serie, c)
+    i = p["internacoes"]
+    ano_fim = int(mun["ano"].max())
+    fala = (f"**O que aconteceu:** em {ano_fim}, {formatar_numero(i['atual'])} internações por {cancer_de(c)}. "
+            f"**O que está acontecendo:** a tendência é de {formatar_numero(comp['ritmo_municipio'], 1)}% ao ano. "
+            f"**O que pode acontecer:** se esse comportamento continuar, {i['ano']} deve ficar entre "
+            f"**{formatar_numero(i['minimo'])} e {formatar_numero(i['maximo'])} internações** (em torno de "
+            f"{formatar_numero(i['previsto'])}), com cerca de {formatar_numero(p['dias_permanencia']['previsto'])} dias "
+            f"de internação e R$ {formatar_numero(p['valor_total']['previsto'])} em valores hospitalares registrados.")
+    teste = testar_projecao(mun)
+    fragil = not i["tendencia_acerta_mais"] or _pequeno(ctx, c)
+    if teste:
+        fala += (f" Testei o método prevendo anos que já conheço: ele errou "
+                 f"{'menos' if i['tendencia_acerta_mais'] else 'mais'} do que simplesmente repetir a média.")
+    fala += (" É uma **projeção de tendência**, não previsão de casos novos. Serve de sinal para discutir "
+             "planejamento e acompanhar a demanda.")
+    return Resposta(
+        fala=fala + _nota_2025(ctx),
+        expressao="cautelosa" if fragil or _ano_em_investigacao(ctx) else "explicando",
+        botoes=_mais(c, "porque", "valores") + [("Onde prestar atenção?", caminho("atencao"))],
+        destino={"aba": "Evolução", "cancer": c, "camadas": {"ver_projecao": True}},
+        numeros=[f"{nome}: {formatar_numero(v['minimo'])} a {formatar_numero(v['maximo'])} em {v['ano']} "
+                 f"(atual: {formatar_numero(v['atual'])})"
+                 for nome, v in (("Internações", p["internacoes"]), ("Dias", p["dias_permanencia"]),
+                                 ("Valor registrado (R$)", p["valor_total"]))],
+    )
+
+
+def _porque(ctx, c):
+    destaques = destaques_cancer(ctx.serie, c)
+    avisos = [t for nivel, t in confiabilidade(ctx.serie, c, ctx.duplicados) if nivel == "atencao"]
+    fala = (f"Destaquei o **{cancer_de(c)}** por estes números: " + " ".join(destaques))
+    if avisos:
+        fala += " Cuidados com esta informação: " + " ".join(avisos)
+    return Resposta(fala=fala, expressao="pensativa",
+                    botoes=_mais(c, "evolucao", "projecao") + [("Como esses dados funcionam?", caminho("metodo"))],
+                    destino={"aba": "Panorama", "cancer": c}, numeros=destaques)
+
+
+ACOES = {"evolucao": _evolucao, "obitos": _obitos, "valores": _valores, "tempo": _tempo, "idade": _idade,
+         "estado": _estado_cancer, "projecao": _projecao, "porque": _porque}
+
+CAMINHOS_FUNCOES = {"mais_aparece": mais_aparece, "aumentando": aumentando, "atencao": atencao,
+                    "valores": valores, "estado": estado, "fora_padrao": fora_padrao, "metodo": metodo}
+
+
+def responder(ctx, acao):
+    """Executa um botão. Toda resposta termina com [Começar de novo]."""
+    tipo = acao.get("tipo")
+    if tipo == "inicio":
+        return saudacao(ctx)
+    if tipo == "caminho":
+        if acao["id"] == "futuro":
+            r = menu_cancer(ctx, "futuro")
+        else:
+            r = CAMINHOS_FUNCOES[acao["id"]](ctx)
+    elif tipo == "escolher_cancer":
+        r = menu_cancer(ctx, acao.get("depois"))
+    elif tipo == "cancer":
+        if acao["cancer"] not in _canceres(ctx):
+            return saudacao(ctx)  # câncer que não existe nesta cidade: volta ao começo
+        r = menu_do_cancer(ctx, acao["cancer"]) if acao["acao"] == "menu" else ACOES[acao["acao"]](ctx, acao["cancer"])
+    else:
+        return saudacao(ctx)
+    r.botoes = r.botoes + [("Começar de novo", INICIO)]
+    return r
+
+
+# ---------- texto livre (passa por conversa.py) ----------
+
+ASSUNTO_PARA_ABA = {"PANORAMA": "Panorama", "EVOLUCAO": "Evolução", "ESTADO": "Evolução",
+                    "FORA_PADRAO": "Investigar", "PROJECAO": "Evolução", "MORTALIDADE": "Panorama",
+                    "CUSTO": "Panorama", "PERMANENCIA": "Panorama", "ATENCAO": "Planejamento",
+                    "METODO": "Método"}
+
+
+def responder_texto(ctx, pergunta, cancer_em_foco=None, perfil="SIMPLES", explicar=None):
+    """Pergunta digitada: o motor de conversa.py responde, e a Lia
+    devolve no formato dela (expressão, botões, destino)."""
+    from conversa import responder as responder_conversa
+    r = responder_conversa(pergunta, ctx.serie, ctx.cidade, cancer_em_foco=cancer_em_foco,
+                           perfil=perfil, explicar=explicar)
+    cancer = r.get("cancer")
+    avisos = [t for nivel, t in confiabilidade(ctx.serie, cancer, ctx.duplicados)
+              if nivel == "atencao"] if cancer else []
+    expressao = {"METODO": "pensativa", "ATENCAO": "atenta"}.get(r["assunto"], "explicando")
+    if cancer and _pequeno(ctx, cancer):
+        expressao = "cautelosa"
+    botoes = (_mais(cancer, "evolucao", "projecao", "porque") if cancer
+              else [("Onde prestar atenção?", caminho("atencao")), ("O que mais aparece?", caminho("mais_aparece"))])
+    destino = {"aba": ASSUNTO_PARA_ABA.get(r["assunto"], "Panorama")}
+    if cancer:
+        destino["cancer"] = cancer
+    return Resposta(fala=r["texto"], expressao=expressao, botoes=botoes + [("Começar de novo", INICIO)],
+                    destino=destino, numeros=r["fatos"] + avisos), r

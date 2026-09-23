@@ -135,8 +135,11 @@ só:
   registrado) e linhas de ação do INCA. Sem valores de orçamento.
 - **Método** — como ler e o que os dados não permitem responder.
 
-Embaixo de cada gráfico vem a leitura em texto, e o chat fica no
-painel lateral (`algoritimos\conversa.py`: entende a pergunta,
+Quem conduz a conversa é a **Lia**, a guia do Escudo (ver
+`docs\LIA.md`): no primeiro acesso ela aparece no centro com 4
+portas de entrada; depois fica na lateral com os 8 caminhos, e o
+painel acompanha cada resposta dela. Embaixo de cada gráfico vem a
+leitura em texto, e a caixa de texto livre da Lia usa o chat (`algoritimos\conversa.py`: entende a pergunta,
 calcula os fatos com a mesma inteligência dos gráficos e pede ao
 Gemini só a redação; sem Gemini, responde direto com os fatos). A tela não calcula nada: tudo vem de
 `algoritimos\inteligencia.py`, que lê `internacoes` direto (não
@@ -145,6 +148,7 @@ depende da cadeia de scripts acima) e é testado sem o banco:
 ```powershell
 python algoritimos\teste_inteligencia.py
 python algoritimos\teste_conversa.py
+python algoritimos\teste_lia.py
 py -m streamlit run dashboard\app.py
 ```
 
