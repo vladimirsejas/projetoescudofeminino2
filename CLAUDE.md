@@ -6,7 +6,11 @@ relacionadas a câncer feminino no município de Rio Claro (SP), comparado
 ao Estado de São Paulo. Trabalho acadêmico de graduação em Inteligência
 Artificial — Fatec Rio Claro, 3º semestre.
 
-Veja o `README.md` para a ordem obrigatória de execução dos scripts em
+O `README.md` é **informativo, não diretriz**: é o último passo do
+trabalho, só registra o que já foi decidido e feito. Não se prender a
+ele nem tratá-lo como guia; se divergir da conversa com o autor ou do
+código, valem a conversa e o código (e o README é atualizado depois).
+Ele traz, como registro, a ordem de execução dos scripts antigos em
 `algoritimos/` (cada um lê o resultado do anterior).
 
 ## Autorização permanente de git

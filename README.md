@@ -1,5 +1,14 @@
 # Escudo Feminino
 
+> **Aviso: este README é informativo, não é diretriz.** Ele é o
+> último passo do nosso trabalho: só recebe o registro do que já foi
+> decidido e feito, para quem chega ao projeto. Não é guia nem regra
+> para o desenvolvimento. As decisões vêm da conversa com o autor
+> (Vladimir) e do próprio código; se o README estiver desatualizado
+> ou divergir disso, vale a conversa e o código, e o README é que
+> deve ser corrigido depois. Isso vale para qualquer IA que ajude no
+> projeto (Claude, ChatGPT etc.).
+
 Sistema de inteligência analítica sobre saúde da mulher, construído a partir
 de dados de internações hospitalares do SUS relacionadas a câncer feminino
 no município de Rio Claro (SP), comparado ao Estado de São Paulo.
