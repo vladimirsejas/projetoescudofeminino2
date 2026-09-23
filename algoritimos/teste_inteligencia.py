@@ -16,6 +16,7 @@ from inteligencia import (
     nome_doenca,
     ponta_fora_da_tendencia,
     projetar,
+    radar_futuro,
     resumo_doencas,
     ritmo_estadual_na_escala,
     serie_doenca,
@@ -246,6 +247,24 @@ checar("I. planejamento: quem cresce vem primeiro, com sinal de crescimento e li
        and "mamografia" in ev[0]["linha_de_acao"])
 checar("I. planejamento: nenhuma evidência traz valor de orçamento",
        not any("orçamento" in s.lower() for e in ev for s in e["sinais"]))
+
+# ---- R. radar do futuro ----
+cresce_liso = [40 + 4 * i for i in range(13)]           # cresce firme, reta perfeita
+estado_lento = [1000 + 20 * i for i in range(13)]        # Estado cresce ~1,6% ao ano
+estavel_r = [50, 52, 49, 51, 50, 53, 48, 50, 52, 49, 51, 50, 52]
+pouco = [2, 3, 2, 4, 3, 4, 5, 4, 6, 5, 6, 7, 7]          # cresce, mas com poucas internações
+base_r = pd.concat([serie(cresce_liso, estado_lento, "MAMA"), serie(estavel_r, [1000] * 13, "OVARIO"),
+                    serie(pouco, [500 + 10 * i for i in range(13)], "TIREOIDE")], ignore_index=True)
+radar = {r["tipo_cancer"]: r for r in radar_futuro(base_r)}
+checar("R. cresce firme, confiável e mais rápido que o Estado: alerta", radar["MAMA"]["nivel"] == "alerta")
+checar("R. série estável: estável, sem sinal", radar["OVARIO"]["nivel"] == "estavel" and not radar["OVARIO"]["sinais"])
+checar("R. poucas internações nunca viram alerta (no máximo observar, com cuidado escrito)",
+       radar["TIREOIDE"]["nivel"] != "alerta" and any("poucas internações" in c for c in radar["TIREOIDE"]["cuidados"]))
+checar("R. alerta vem antes de estável na ordem", [r["nivel"] for r in radar_futuro(base_r)][0] == "alerta")
+checar("R. nenhum sinal fala em orçamento ou R$",
+       not any("R$" in t or "orçamento" in t for r in radar.values() for t in r["sinais"] + r["cuidados"]))
+checar("R. futuro comparado com o nível da tendência (não com o último ano)",
+       abs(radar["MAMA"]["internacoes_hoje"] - cresce_liso[-1]) < 0.5 and radar["MAMA"]["internacoes_a_mais"] > 0)
 
 print()
 if falhas:

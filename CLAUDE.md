@@ -118,9 +118,11 @@ Estado atual:
   projeção de tendência + caixa de confiabilidade), **Investigar**
   (anos fora do padrão de todos os cânceres, "quando cada câncer
   aparece", faixa etária em dois períodos, download CSV),
-  **Planejamento** (quadrante crescimento x letalidade relativa +
-  evidências por câncer com pressão projetada em internações, dias e
-  valor registrado, e linha de ação do INCA), **Método**. Lia na
+  **Planejamento** = **radar do futuro** ("Se nada mudar, onde a
+  cidade pode ter problema até <ano+3>?": `inteligencia.radar_futuro`,
+  níveis alerta / observar / estável com os sinais, dias de leito a
+  mais, cuidados e linha de ação do INCA; quadrante crescimento x
+  letalidade colorido pelo nível), **Método**. Lia na
   lateral (só botões).
 - Dinheiro sempre como **"valor hospitalar registrado no SIH/SUS"**
   (VAL_TOT das AIHs): não é orçamento municipal nem custo total do
@@ -159,11 +161,18 @@ Estado atual:
   (EVOLUCAO sem câncer citado deveria comparar todos); ano futuro
   além dos dados ("em 2030?") não cai em PROJECAO (só 2026-2028 são
   palavras-chave).
-- **Aviso de 2025 sumiu (a decidir com o autor):** o commit
-  `aedda21` deixou de testar o primeiro e o último ano em
-  `anos_fora_do_padrao`; com isso `ano_atipico_no_estado(serie, 2025)`
-  dá sempre 0 e o aviso "2025 está em investigação" não aparece mais
-  na Lia nem no chat (falham `teste_lia` B e `teste_conversa` B).
+- **Coerência passado x projeção (09/2026):** 2025 ficou muito acima
+  da reta em vários cânceres e a projeção de 2028 aparecia ABAIXO de
+  2025 com "cresce X% ao ano". Agora a projeção sai da reta
+  (`tendencia_no_periodo`, desenhada no gráfico), `leitura_ponta_projecao`
+  explica quando último ano e projeção parecem se contradizer, e o
+  futuro do radar é comparado com o nível da tendência, nunca com o
+  último ano. `anos_fora_do_padrao` continua sem testar as pontas
+  (aedda21); o último ano do ESTADO é avaliado por
+  `ponta_fora_da_tendencia` (um passo, esperado >= MEDIA_PEQUENA), e
+  o aviso "2025 em investigação" voltou. Para decidir 2025 de vez:
+  `py etl\investigar_2025.py` (ANO_CMPT x DT_INTER, IDENT, N_AIH,
+  MES_CMPT nos CSVs brutos) -- falta rodar no Windows.
 - **Contagem em dobro de Rio Claro: confirmada e corrigida.** No
   banco real havia 1.668 internações de Rio Claro com origem
   RIO_CLARO e as mesmas 1.668 com origem SP (a pasta estadual já traz

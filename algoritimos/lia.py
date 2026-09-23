@@ -9,7 +9,6 @@ from inteligencia import (
     comparar_faixas,
     confiabilidade,
     destaques_cancer,
-    evidencias_planejamento,
     ficha_cancer,
     formatar_numero,
     leitura_faixas,
@@ -17,6 +16,7 @@ from inteligencia import (
     MEDIA_PEQUENA,
     nome_doenca,
     pressao_projetada,
+    radar_futuro,
     resumo_doencas,
     serie_doenca,
     testar_projecao,
@@ -77,7 +77,7 @@ INICIO = {"tipo": "inicio"}
 CAMINHOS = [
     ("O que mais aparece?", "mais_aparece"),
     ("Está aumentando?", "aumentando"),
-    ("Onde prestar atenção?", "atencao"),
+    ("Onde podemos ter problema?", "atencao"),
     ("Valores hospitalares", "valores"),
     ("Comparar com São Paulo", "estado"),
     ("Olhar para frente", "futuro"),
@@ -167,7 +167,7 @@ def mais_aparece(ctx):
               f"tiveram **{formatar_numero(total)} internações** pelos cânceres que acompanho. Os que mais "
               f"aparecem são " + ", ".join(partes[:-1]) + " e " + partes[-1] + "."),
         botoes=[(f"Ver {nome_doenca(primeiro).lower()}", sobre(primeiro, "menu")),
-                ("Onde prestar atenção?", caminho("atencao")),
+                ("Onde podemos ter problema?", caminho("atencao")),
                 ("Valores hospitalares", caminho("valores"))],
         destino={"aba": "Panorama", "cancer": primeiro, "medida": "Internações"},
         numeros=[f"{l['doenca']}: {formatar_numero(l['internacoes'])} internações" for _, l in resumo.iterrows()],
@@ -203,27 +203,38 @@ def aumentando(ctx):
 
 
 def atencao(ctx):
-    evid = evidencias_planejamento(ctx.serie)
-    com_sinal = [e for e in evid if e["sinais"]]
-    if not com_sinal:
+    """Onde podemos ter problema? O radar do futuro (inteligencia.radar_futuro)."""
+    radar = radar_futuro(ctx.serie)
+    alerta = [r for r in radar if r["nivel"] == "alerta"]
+    observar = [r for r in radar if r["nivel"] == "observar"]
+    ano = radar[0]["ano"] if radar else int(ctx.serie["ano"].max()) + 3
+    if not alerta and not observar:
         return Resposta(
-            fala=f"Pelos critérios do Escudo, nenhum câncer de {ctx.cidade} mostra sinal de alerta agora.",
+            fala=(f"Se nada mudar, não vejo onde {ctx.cidade} possa ter problema até {ano} pelos critérios do "
+                  f"Escudo: nenhum câncer mostra sinal de alerta."),
             botoes=[("Está aumentando?", caminho("aumentando")), ("Olhar para frente", caminho("futuro"))],
             destino={"aba": "Planejamento"},
         )
-    topo = com_sinal[0]
-    outros = [e["doenca"] for e in com_sinal[1:4]]
-    fala = (f"Encontrei sinais que merecem entrar na discussão de planejamento. O que mais reúne sinais é o "
-            f"**{cancer_de(topo['tipo_cancer'])}**: " + "; ".join(topo["sinais"]) + ".")
-    if outros:
-        fala += f" Também aparecem: {', '.join(outros)}."
-    fala += " Eu aponto evidências; a decisão de quanto investir é da gestão."
+    topo = (alerta or observar)[0]
+    if alerta:
+        fala = (f"Se nada mudar, é aqui que {ctx.cidade} pode ter problema até {ano}: "
+                + ", ".join(f"**{r['doenca']}**" for r in alerta) + ". "
+                f"O que mais reúne sinais é o **{cancer_de(topo['tipo_cancer'])}**: " + "; ".join(topo["sinais"]) + ".")
+    else:
+        fala = (f"Nenhum câncer chega a alerta, mas há sinais a acompanhar até {ano}. O primeiro é o "
+                f"**{cancer_de(topo['tipo_cancer'])}**: " + "; ".join(topo["sinais"]) + ".")
+    if observar and alerta:
+        fala += f"\n\nPara acompanhar: {', '.join(r['doenca'] for r in observar)}."
+    if topo["linha_de_acao"]:
+        fala += f"\n\nOnde dá para agir antes: {topo['linha_de_acao']} (INCA)."
+    fala += ("\n\nEu aponto onde preparar a rede, com as evidências; a decisão de quanto investir é da gestão."
+             + _nota_2025(ctx))
     return Resposta(
         fala=fala,
         expressao="atenta",
-        botoes=_mais(topo["tipo_cancer"], "porque", "projecao", "valores"),
+        botoes=_mais(topo["tipo_cancer"], "porque", "projecao", "tempo"),
         destino={"aba": "Planejamento", "cancer": topo["tipo_cancer"]},
-        numeros=[f"{e['doenca']}: " + ("; ".join(e["sinais"]) or "sem sinal") for e in evid],
+        numeros=[f"{r['doenca']} ({r['nivel']}): " + ("; ".join(r["sinais"]) or "sem sinal") for r in radar],
     )
 
 
@@ -243,7 +254,7 @@ def valores(ctx):
     return Resposta(
         fala=fala,
         expressao="explicando",
-        botoes=_mais(desprop["tipo_cancer"], "valores", "tempo") + [("Onde prestar atenção?", caminho("atencao"))],
+        botoes=_mais(desprop["tipo_cancer"], "valores", "tempo") + [("Onde podemos ter problema?", caminho("atencao"))],
         destino={"aba": "Panorama", "cancer": desprop["tipo_cancer"], "medida": "Valor hospitalar registrado"},
         numeros=[f"{l['doenca']}: R$ {formatar_numero(l['valor_total'])} ({formatar_numero(l['pv'], 1)}% do valor, "
                  f"{formatar_numero(l['pi'], 1)}% das internações)" for _, l in resumo.iterrows()],
@@ -438,7 +449,7 @@ def _projecao(ctx, c):
     return Resposta(
         fala=fala + _nota_2025(ctx),
         expressao="cautelosa" if fragil or _ano_em_investigacao(ctx) else "explicando",
-        botoes=_mais(c, "porque", "valores") + [("Onde prestar atenção?", caminho("atencao"))],
+        botoes=_mais(c, "porque", "valores") + [("Onde podemos ter problema?", caminho("atencao"))],
         destino={"aba": "Evolução", "cancer": c, "camadas": {"ver_projecao": True}},
         numeros=[f"{nome}: {formatar_numero(v['minimo'])} a {formatar_numero(v['maximo'])} em {v['ano']} "
                  f"(atual: {formatar_numero(v['atual'])})"

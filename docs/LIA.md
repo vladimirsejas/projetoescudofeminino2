@@ -65,7 +65,7 @@ sinais), não é enfeite.
 |---|---|---|
 | O que mais aparece? | os 3 cânceres com mais internações e a participação de cada um | Panorama (internações) |
 | Está aumentando? | quais cânceres crescem, quanto, e quais crescem mais que o Estado | Evolução |
-| Onde prestar atenção? | os cânceres com mais sinais nos dados, com o número de cada sinal | Planejamento |
+| Onde podemos ter problema? | o radar do futuro: cânceres em alerta / observar, com os sinais, onde agir antes (INCA) e "a decisão é da gestão" | Planejamento |
 | Valores hospitalares | onde se concentra o valor registrado e quem pesa mais no valor do que nas internações | Panorama (valor) |
 | Comparar com São Paulo | ritmo da cidade x ritmo do Estado, câncer a câncer | Evolução (linha do Estado) |
 | Olhar para frente | pede o câncer → projeção de tendência | Evolução (projeção) |
@@ -120,7 +120,7 @@ animação, memória entre visitas, personalidade gerada pela IA.
 - `dashboard/lia_rosto.py` — o rosto (ilustração vetorial) nas 5
   expressões.
 - `dashboard/app.py` — boas-vindas no centro no primeiro acesso (com
-  4 portas: o que mais aparece, está aumentando, onde prestar atenção,
+  4 portas: o que mais aparece, está aumentando, onde podemos ter problema,
   olhar para frente), Lia na lateral depois disso (os 8 caminhos), e a
   navegação que ela consegue controlar. As abas viraram um seletor
   (o `st.tabs` do Streamlit não pode ser trocado pelo código), e aba,

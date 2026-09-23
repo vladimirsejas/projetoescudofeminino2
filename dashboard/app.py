@@ -12,6 +12,7 @@ from configuracao_geografica import listar_municipios_disponiveis, obter_municip
 from lia import INICIO, Contexto, responder as lia_responder
 from lia_rosto import img as rosto_lia
 from inteligencia import (
+    ano_atipico_no_estado,
     anos_fora_do_padrao,
     anos_fora_todos,
     cancer_de,
@@ -21,7 +22,6 @@ from inteligencia import (
     comparar_faixas,
     confiabilidade,
     destaques_cancer,
-    evidencias_planejamento,
     ficha_cancer,
     formatar_numero,
     leitura_evolucao,
@@ -30,6 +30,7 @@ from inteligencia import (
     nome_doenca,
     projetar,
     quando_aparece,
+    radar_futuro,
     resumo_doencas,
     ritmo_estadual_na_escala,
     serie_doenca,
@@ -97,6 +98,18 @@ section[data-testid="stSidebar"] { min-width: 400px; }
 .escudo-cartao h4 { margin: 0 0 6px 0; font-family: 'Manrope', sans-serif; color: #292541; }
 .escudo-cartao li { margin: 3px 0; color: #3d3852; }
 .escudo-cartao .acao { color: #4d4863; font-size: .92rem; margin-top: 6px; }
+.radar-cartao { border-left: 6px solid #b9b7c4; }
+.radar-alerta { border-left-color: #eb6834; }
+.radar-observar { border-left-color: #7565a8; }
+.radar-selo { display: inline-block; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+              border-radius: 999px; padding: 2px 10px; margin-left: 8px; vertical-align: middle; }
+.radar-selo.alerta { background: #fde8dd; color: #a2400f; }
+.radar-selo.observar { background: #ece7f7; color: #4d3f7a; }
+.radar-selo.estavel { background: #efeef3; color: #625d72; }
+.radar-faixa { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; }
+.radar-faixa div { flex: 1 1 200px; background: #fff; border: 1px solid #ebe8f2; border-radius: 16px; padding: 10px 14px; }
+.radar-faixa b { font-family: 'Manrope', sans-serif; font-size: 1.5rem; }
+.radar-faixa span { color: #706b82; font-size: .9rem; }
 .lia-nome { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 1.25rem; color: #292541; }
 .lia-nome span { font-weight: 500; font-size: .95rem; color: #706b82; }
 .lia-cargo { color: #706b82; font-size: .85rem; line-height: 1.3; }
@@ -185,8 +198,8 @@ def faixas_municipio(origem):
 
 
 @st.cache_data
-def evidencias(origem):
-    return evidencias_planejamento(serie_municipio(origem))
+def radar(origem):
+    return radar_futuro(serie_municipio(origem))
 
 
 def reais(valor, compacto=False):
@@ -679,71 +692,93 @@ if aba == "Investigar":
 # ============================================================
 
 if aba == "Planejamento":
-    pergunta(f"Que evidências de {nome_cidade} merecem entrar na discussão de planejamento?")
-    st.markdown('<div class="escudo-dica">O Escudo reúne evidências e a pressão projetada se a tendência continuar. '
-                'Não define quanto investir: a decisão é da gestão, que conhece orçamento, filas e capacidade.</div>',
-                unsafe_allow_html=True)
-    lista = evidencias(ORIGEM)
+    lista = radar(ORIGEM)
+    ano_h = lista[0]["ano"] if lista else ano_fim + 3
+    pergunta(f"Se nada mudar, onde {nome_cidade} pode ter problema até {ano_h}?")
+    st.markdown('<div class="escudo-dica">O radar junta, para cada câncer, o que já aconteceu e para onde a tendência '
+                'aponta. Alerta = cresce, a tendência passou no teste de acerto e há um agravante (cresce mais que o '
+                'Estado, letalidade acima do Estado, mais dias de leito pela frente ou o maior volume). Não define '
+                'quanto investir: aponta onde preparar a rede; a decisão é da gestão.</div>', unsafe_allow_html=True)
 
-    pontos_q = [e for e in lista if e["letalidade_relativa"] is not None]
+    ROTULO_NIVEL = {"alerta": "Alerta", "observar": "Observar", "estavel": "Estável"}
+    DESCRICAO_NIVEL = {"alerta": "podem virar problema se nada mudar", "observar": "sinais a acompanhar",
+                       "estavel": "sem sinal pelos critérios do Escudo"}
+    faixa = "".join(
+        f'<div><b>{sum(r["nivel"] == n for r in lista)}</b> <span class="radar-selo {n}">{ROTULO_NIVEL[n]}</span><br>'
+        f'<span>{DESCRICAO_NIVEL[n]}: {", ".join(r["doenca"] for r in lista if r["nivel"] == n) or "nenhum"}</span></div>'
+        for n in ("alerta", "observar", "estavel"))
+    st.markdown(f'<div class="radar-faixa">{faixa}</div>', unsafe_allow_html=True)
+    fora_est, total_est = ano_atipico_no_estado(serie, ano_fim)
+    if total_est and fora_est >= total_est / 2:
+        st.markdown(f'<div class="escudo-alerta">{ano_fim} está em investigação (vários cânceres saltaram juntos no '
+                    f'Estado inteiro). Se for mudança de registro, parte dos sinais de crescimento pode diminuir.</div>',
+                    unsafe_allow_html=True)
+
+    for r in lista:
+        p = r["pressao"]
+        sinais = "".join(f"<li>{t}</li>" for t in r["sinais"]) or "<li>Nenhum sinal pelos critérios do Escudo.</li>"
+        dias = p["dias_permanencia"]
+        dias_txt = (f"poucos (faixa de {formatar_numero(dias['minimo'])} a {formatar_numero(dias['maximo'])})"
+                    if dias["previsto"] < 1 else f"cerca de {formatar_numero(dias['previsto'])}")
+        futuro = (
+            f"<li>Internações: cerca de {formatar_numero(p['internacoes']['previsto'])} por ano "
+            f"(entre {formatar_numero(p['internacoes']['minimo'])} e {formatar_numero(p['internacoes']['maximo'])}); "
+            f"hoje a tendência está em ~{formatar_numero(r['internacoes_hoje'])}</li>"
+            f"<li>Dias de leito: {dias_txt} por ano; hoje ~{formatar_numero(r['dias_hoje'])}</li>"
+            f"<li>Valor hospitalar registrado: cerca de {reais(p['valor_total']['previsto'])} por ano</li>"
+        )
+        cuidados = "".join(f'<div class="acao">Cuidado: {c}.</div>' for c in r["cuidados"])
+        st.markdown(
+            f'<div class="escudo-cartao radar-cartao radar-{r["nivel"]}"><h4>{r["doenca"]}'
+            f'<span class="radar-selo {r["nivel"]}">{ROTULO_NIVEL[r["nivel"]]}</span></h4>'
+            f'<b>Por quê</b><ul>{sinais}</ul>'
+            f'<b>Se nada mudar, em {r["ano"]}</b><ul>{futuro}</ul>'
+            + (f'<div class="acao">{r["ponta"]}</div>' if r["ponta"] else "")
+            + cuidados
+            + (f'<div class="acao">Onde agir antes (linha de ação do INCA): {r["linha_de_acao"]}.</div>'
+               if r["linha_de_acao"] and r["nivel"] != "estavel" else "")
+            + '</div>',
+            unsafe_allow_html=True,
+        )
+
+    pontos_q = [r for r in lista if r["letalidade_relativa"] is not None]
     if pontos_q:
-        pergunta("Onde olhar primeiro?")
+        pergunta("Crescimento x gravidade: onde fica cada câncer?")
+        COR_NIVEL = {"alerta": LARANJA, "observar": "#7565a8", "estavel": CINZA}
         fig = go.Figure(go.Scatter(
-            x=[e["crescimento"] for e in pontos_q], y=[e["letalidade_relativa"] for e in pontos_q],
-            mode="markers+text", text=[e["doenca"] for e in pontos_q], textposition="top center",
-            marker={"size": [max(12, min(46, e["internacoes"] ** 0.5 * 1.6)) for e in pontos_q],
-                    "color": AZUL, "opacity": 0.75, "line": {"color": "#ffffff", "width": 2}},
-            customdata=[[e["internacoes"]] for e in pontos_q],
-            hovertemplate="<b>%{text}</b><br>cresce %{x:.1f}% ao ano<br>letalidade %{y:.2f}× a do Estado"
-                          "<br>%{customdata[0]:,.0f} internações<extra></extra>",
+            x=[r["crescimento"] for r in pontos_q], y=[r["letalidade_relativa"] for r in pontos_q],
+            mode="markers+text", text=[r["doenca"] for r in pontos_q], textposition="top center",
+            marker={"size": [max(12, min(46, r["internacoes"] ** 0.5 * 1.6)) for r in pontos_q],
+                    "color": [COR_NIVEL[r["nivel"]] for r in pontos_q], "opacity": 0.8,
+                    "line": {"color": "#ffffff", "width": 2}},
+            customdata=[[r["internacoes"], ROTULO_NIVEL[r["nivel"]]] for r in pontos_q],
+            hovertemplate="<b>%{text}</b> (%{customdata[1]})<br>cresce %{x:.1f}% ao ano<br>letalidade %{y:.2f}× "
+                          "a do Estado<br>%{customdata[0]:,.0f} internações<extra></extra>",
             showlegend=False,
         ))
         fig.add_hline(y=1, line={"color": CINZA, "width": 1})
         fig.add_vline(x=0, line={"color": CINZA, "width": 1})
-        # rótulo na própria linha de referência, longe dos pontos
         fig.add_annotation(xref="paper", x=0.01, y=1, xanchor="left", yanchor="bottom", showarrow=False,
                            text="letalidade igual à do Estado", font={"size": 11, "color": TINTA_SUAVE})
-        ys = [e["letalidade_relativa"] for e in pontos_q]
-        xs = [e["crescimento"] for e in pontos_q]
-        fig.update_yaxes(range=[min(min(ys), 1) - 0.1, max(max(ys), 1) + 0.12])
-        fig.update_xaxes(range=[min(min(xs), 0) - 1, max(xs) + 1.5])
-        fig.update_xaxes(title="Crescimento das internações (% ao ano)", ticksuffix="%", zeroline=False)
-        fig.update_yaxes(title="Letalidade hospitalar ÷ a do Estado", zeroline=False)
+        ys = [r["letalidade_relativa"] for r in pontos_q]
+        xs = [r["crescimento"] for r in pontos_q]
+        fig.update_yaxes(range=[min(min(ys), 1) - 0.1, max(max(ys), 1) + 0.12],
+                         title="Letalidade hospitalar ÷ a do Estado", zeroline=False)
+        fig.update_xaxes(range=[min(min(xs), 0) - 1, max(xs) + 1.5],
+                         title="Crescimento das internações (% ao ano)", ticksuffix="%", zeroline=False)
         estilizar(fig, altura=420)
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, use_container_width=True, theme=None, config=CONFIG_GRAFICO)
-        fora_q = [e["doenca"] for e in lista if e["letalidade_relativa"] is None]
-        st.caption("Tamanho da bolha = número de internações. Linha horizontal = letalidade igual à do Estado."
-                   + (f" Fora do gráfico por ter menos de 5 óbitos: {', '.join(fora_q)}." if fora_q else ""))
+        canto = [r["doenca"] for r in pontos_q if r["crescimento"] >= 3 and r["letalidade_relativa"] > 1]
+        fora_q = [r["doenca"] for r in lista if r["letalidade_relativa"] is None]
+        leitura("Como ler", [
+            "Cor = nível do radar (laranja: alerta; roxo: observar; cinza: estável). Tamanho = internações.",
+            (f"No canto de cima à direita (cresce e morre mais no hospital que no Estado): {', '.join(canto)}."
+             if canto else "Nenhum câncer cresce e tem letalidade acima do Estado ao mesmo tempo."),
+        ] + ([f"Fora do gráfico por ter menos de 5 óbitos: {', '.join(fora_q)}."] if fora_q else []))
 
-    pergunta("Evidências por câncer")
-    for e in lista:
-        p = e["pressao"]
-        ano_p = p["internacoes"]["ano"]
-        sinais = "".join(f"<li>{s}</li>" for s in e["sinais"]) or "<li>Sem sinal de alerta pelos critérios do Escudo.</li>"
-        fragil = [nomecol for nomecol, chave in (("internações", "internacoes"), ("dias", "dias_permanencia"),
-                                                  ("valor", "valor_total")) if not p[chave]["tendencia_acerta_mais"]]
-        pressao = (
-            f"<li>Internações: cerca de {formatar_numero(p['internacoes']['previsto'])} "
-            f"(entre {formatar_numero(p['internacoes']['minimo'])} e {formatar_numero(p['internacoes']['maximo'])}; "
-            f"em {ano_fim}: {formatar_numero(p['internacoes']['atual'])})</li>"
-            f"<li>Dias de internação: cerca de {formatar_numero(p['dias_permanencia']['previsto'])} "
-            f"(entre {formatar_numero(p['dias_permanencia']['minimo'])} e {formatar_numero(p['dias_permanencia']['maximo'])})</li>"
-            f"<li>Valor hospitalar registrado: cerca de {reais(p['valor_total']['previsto'])} "
-            f"(entre {reais(p['valor_total']['minimo'])} e {reais(p['valor_total']['maximo'])})</li>"
-        )
-        st.markdown(
-            f'<div class="escudo-cartao"><h4>{e["doenca"]}</h4>'
-            f'<b>Sinais nos dados</b><ul>{sinais}</ul>'
-            f'<b>Se a tendência continuar, em {ano_p}</b><ul>{pressao}</ul>'
-            + (f'<div class="acao">Baixa confiança na projeção de {", ".join(fragil)}: no teste de acerto, a '
-               f'tendência não errou menos que repetir a média.</div>' if fragil else "")
-            + (f'<div class="acao">Linha de ação conhecida (INCA): {e["linha_de_acao"]}.</div>' if e["linha_de_acao"] else "")
-            + '</div>',
-            unsafe_allow_html=True,
-        )
-    st.caption(f"Valores em R$ nominais registrados no SIH/SUS, sem correção de inflação. {ano_fim} está em "
-               f"investigação e entra na tendência; leia a projeção como ordem de grandeza.")
+    st.caption(f"Projeção de tendência (não é previsão clínica). Valores em R$ nominais registrados no SIH/SUS, sem "
+               f"correção de inflação, só como ordem de grandeza da pressão -- não é orçamento.")
 
 
 # ============================================================

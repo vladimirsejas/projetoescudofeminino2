@@ -772,3 +772,108 @@ def evidencias_planejamento(serie):
             "linha_de_acao": LINHAS_DE_ACAO.get(cancer),
         })
     return sorted(linhas, key=lambda l: -len(l["sinais"]))
+
+
+# =====================================
+# RADAR DO FUTURO: onde podemos ter problema?
+# =====================================
+
+NIVEIS_RADAR = ("alerta", "observar", "estavel")
+
+
+def radar_futuro(serie, horizonte=3):
+    """Se nada mudar, onde a cidade pode ter problema? Para cada câncer
+    um nível -- "alerta", "observar" ou "estavel" -- com os sinais que
+    o sustentam, a pressão projetada e a confiança.
+
+    alerta   = cresce (>= 3% ao ano) E a tendência passou no teste de
+               acerto E pelo menos um agravante: cresce mais rápido que
+               o Estado, letalidade acima do Estado, mais dias de leito
+               pela frente (>= 10% sobre o nível atual), ou é o câncer
+               que mais soma internações até o fim do horizonte
+               (volume pesa no planejamento mesmo no ritmo do Estado).
+    observar = algum sinal sem o conjunto do alerta, ou números
+               pequenos (nunca vira alerta com poucas internações).
+    estavel  = nenhum sinal.
+
+    A comparação do futuro é com o NÍVEL DA TENDÊNCIA hoje (a reta no
+    último ano), não com o último ano -- a mesma regra do gráfico,
+    para não ler um pico como base. "Investimento" aparece como
+    capacidade (dias de leito), nunca como orçamento em reais."""
+    ano_fim = int(serie["ano"].max())
+    canceres = list(resumo_doencas(serie)["tipo_cancer"])
+
+    def a_mais(cancer, coluna="internacoes"):
+        """Projeção no fim do horizonte menos o nível da tendência hoje."""
+        mun = serie_doenca(serie, cancer)
+        hoje = float(tendencia_no_periodo(mun, coluna).iloc[-1][coluna])
+        return float(projetar(mun, horizonte, coluna).iloc[-1][coluna]) - hoje, hoje
+
+    maior_volume = max(canceres, key=lambda c: a_mais(c)[0]) if canceres else None
+    linhas = []
+    for cancer in canceres:
+        mun = serie_doenca(serie, cancer)
+        f = ficha_cancer(serie, cancer)
+        comp = comparar_com_estado(serie, cancer)
+        pressao = pressao_projetada(serie, cancer, horizonte)
+        teste = testar_projecao(mun)
+        confiavel = bool(teste and teste["erro_tendencia"] <= teste["erro_media"])
+        pequeno = mun["internacoes"].mean() < MEDIA_PEQUENA
+
+        mais_intern, hoje_intern = a_mais(cancer)
+        mais_dias, hoje_dias = a_mais(cancer, "dias_permanencia")
+
+        cresce = comp["ritmo_municipio"] >= 3
+        agravantes, sinais = [], []
+        if cresce:
+            sinais.append(f"internações crescem {formatar_numero(comp['ritmo_municipio'], 1)}% ao ano")
+        if comp["ritmo_estado"] is not None and comp["ritmo_municipio"] - comp["ritmo_estado"] > 1.5:
+            agravantes.append(f"cresce mais rápido que o Estado ({formatar_numero(comp['ritmo_estado'], 1)}% ao ano)")
+        if f["obitos"] >= 5 and f["letalidade"] > f["letalidade_estado"] * 1.2:
+            agravantes.append(f"letalidade hospitalar de {formatar_numero(f['letalidade'], 1)}%, acima do Estado "
+                              f"({formatar_numero(f['letalidade_estado'], 1)}%)")
+        if cancer == maior_volume and mais_intern >= DIFERENCA_MINIMA:
+            agravantes.append(f"é o que mais soma internações até {ano_fim + horizonte}: cerca de "
+                              f"{formatar_numero(mais_intern)} a mais por ano (hoje, pela tendência, "
+                              f"~{formatar_numero(hoje_intern)})")
+        if hoje_dias > 0 and mais_dias >= max(0.10 * hoje_dias, DIFERENCA_MINIMA):
+            agravantes.append(f"cerca de {formatar_numero(mais_dias)} dias de leito a mais por ano em "
+                              f"{ano_fim + horizonte} (hoje, pela tendência, ~{formatar_numero(hoje_dias)})")
+        sinais += agravantes
+
+        if cresce and confiavel and agravantes and not pequeno:
+            nivel = "alerta"
+        elif sinais:
+            nivel = "observar"
+        else:
+            nivel = "estavel"
+
+        cuidados = []
+        if pequeno:
+            cuidados.append("poucas internações por ano: sinais podem ser acaso")
+        if not confiavel:
+            cuidados.append("no teste de acerto, a tendência não errou menos que repetir a média")
+        ponta = leitura_ponta_projecao(mun, horizonte)
+
+        linhas.append({
+            "tipo_cancer": cancer,
+            "doenca": nome_doenca(cancer),
+            "nivel": nivel,
+            "sinais": sinais,
+            "cuidados": cuidados,
+            "confiavel": confiavel,
+            "ano": ano_fim + horizonte,
+            "internacoes_hoje": hoje_intern,
+            "internacoes_a_mais": mais_intern,
+            "dias_hoje": hoje_dias,
+            "dias_a_mais": mais_dias,
+            "pressao": pressao,
+            "ponta": ponta,
+            "linha_de_acao": LINHAS_DE_ACAO.get(cancer),
+            "crescimento": comp["ritmo_municipio"],
+            "letalidade_relativa": _razao(f["letalidade"], f["letalidade_estado"]) if f["obitos"] >= 5 else None,
+            "internacoes": f["internacoes"],
+        })
+    ordem = {n: i for i, n in enumerate(NIVEIS_RADAR)}
+    return sorted(linhas, key=lambda l: (ordem[l["nivel"]], -len(l["sinais"]), -l["internacoes"]))
+
