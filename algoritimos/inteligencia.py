@@ -492,8 +492,10 @@ def confiabilidade(serie, cancer, duplicados=()):
     mun = serie_doenca(serie, cancer)
     avisos = []
     if cancer in duplicados:
-        avisos.append(("atencao", "O banco tem estas internações em duplicidade (arquivo da cidade + "
-                                  "arquivo estadual). O Escudo usa uma fonte só, mas é preciso recarregar os dados."))
+        avisos.append(("atencao", "O banco deste computador ainda tem estas internações em duplicidade (arquivo "
+                                  "da cidade + arquivo estadual). Os números da tela já estão certos: o Escudo "
+                                  "usa só o estadual. Para o aviso sumir, recarregue os dados: "
+                                  "py etl\\carga_todas_bases.py"))
     ano_fim = int(serie["ano"].max())
     fora, total = ano_atipico_no_estado(serie, ano_fim)
     if total and fora >= total / 2:
