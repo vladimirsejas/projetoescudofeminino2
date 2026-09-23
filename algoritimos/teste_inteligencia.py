@@ -111,11 +111,16 @@ teste = testar_projecao(serie_doenca(serie(crescente), "MAMA"))
 checar("F. teste de acerto: reta perfeita erra zero", teste["erro_tendencia"] < 1e-6)
 
 # ---- G. uma fonte por cidade (evita contar Rio Claro em dobro) ----
-linhas = pd.DataFrame({"origem": ["RIO_CLARO", "SP"], "internacoes": [10, 10]})
+linhas = pd.DataFrame({"tipo_cancer": ["MAMA", "MAMA"], "origem": ["RIO_CLARO", "SP"], "internacoes": [10, 10]})
 checar("G. cidade nas duas fontes: usa só a estadual",
        escolher_uma_fonte(linhas)["origem"].tolist() == ["SP"])
 checar("G. cidade só no arquivo próprio: usa ele",
        escolher_uma_fonte(linhas[linhas["origem"] == "RIO_CLARO"])["origem"].tolist() == ["RIO_CLARO"])
+misto = pd.DataFrame({"tipo_cancer": ["MAMA", "MAMA", "OVARIO"],
+                      "origem": ["RIO_CLARO", "SP", "RIO_CLARO"], "internacoes": [10, 10, 4]})
+escolhido = escolher_uma_fonte(misto)
+checar("G. escolha é por câncer: ovário só da pasta da cidade não some",
+       sorted(zip(escolhido["tipo_cancer"], escolhido["origem"])) == [("MAMA", "SP"), ("OVARIO", "RIO_CLARO")])
 
 caminho = os.path.join(tempfile.mkdtemp(), "teste.db")
 conn = sqlite3.connect(caminho)

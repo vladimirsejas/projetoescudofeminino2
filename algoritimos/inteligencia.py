@@ -114,12 +114,18 @@ def escolher_uma_fonte(linhas_municipio, uf_referencia="SP"):
     internações em dobro. Por isso usamos UMA fonte por cidade: a
     estadual, que é a mesma para todas as cidades (comparação
     justa); o arquivo próprio da cidade só entra se ela não estiver
-    no estadual."""
+    no estadual. A escolha é por câncer: um câncer sem arquivo
+    estadual continua valendo pelo arquivo da cidade.
+    (etl/carga_todas_bases.py já evita a duplicidade na carga; isto
+    protege bancos carregados antes da correção.)"""
     if linhas_municipio.empty:
         return linhas_municipio
-    fontes = linhas_municipio["origem"].unique()
-    fonte = uf_referencia if uf_referencia in fontes else fontes[0]
-    return linhas_municipio[linhas_municipio["origem"] == fonte]
+    partes = []
+    for _, linhas in linhas_municipio.groupby("tipo_cancer"):
+        fontes = linhas["origem"].unique()
+        fonte = uf_referencia if uf_referencia in fontes else fontes[0]
+        partes.append(linhas[linhas["origem"] == fonte])
+    return pd.concat(partes, ignore_index=True)
 
 
 def carregar_serie(conexao, municipio, uf_referencia="SP"):

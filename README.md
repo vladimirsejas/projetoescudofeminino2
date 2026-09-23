@@ -80,6 +80,13 @@ cabeçalho. Se nenhum dos dois separadores encontrar essa coluna, a
 carga avisa e mostra o cabeçalho real do arquivo, em vez de estourar
 um `KeyError` sem explicação.
 
+A carga **pula a pasta de uma cidade** (ex.: `cancer_mama_rio_claro`)
+quando existe a pasta estadual do mesmo câncer (`cancer_mama_sp`): o
+arquivo estadual já traz as mesmas internações, com o município de
+residência, e carregar os dois contava a cidade em dobro. A carga
+mostra `PULADA: ...` para cada pasta assim e, no fim, avisa se ainda
+sobrou alguma cidade com internações de duas fontes.
+
 Depois de trocar os arquivos, rode a carga e a cadeia inteira de novo
 (passos 1 a 7 acima) e confira os testes antes de considerar a troca
 concluída:

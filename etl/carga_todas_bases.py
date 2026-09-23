@@ -123,6 +123,56 @@ def encontrar_pastas_validas(base_dados):
     return pastas
 
 
+def pastas_para_carregar(pastas):
+    """
+    Tira da carga as pastas municipais (ex.: cancer_mama_rio_claro)
+    cujo câncer também tem a pasta estadual (cancer_mama_sp).
+
+    O arquivo estadual traz as internações de TODAS as moradoras de
+    SP, já com o município de residência -- inclusive as de Rio
+    Claro. Carregar os dois gravava as mesmas internações duas vezes
+    com municipio = 'RIO_CLARO' (confirmado no banco real em 09/2026:
+    1.668 linhas com origem RIO_CLARO e as mesmas 1.668 com origem
+    SP), e todo total de Rio Claro calculado por `municipio` saía em
+    dobro. Usar só o estadual também deixa todas as cidades vindas
+    da mesma fonte, o que torna a comparação entre elas justa.
+
+    Se faltar o arquivo estadual de algum câncer, a pasta municipal
+    desse câncer continua sendo carregada (senão a cidade ficaria
+    sem dado nenhum).
+    """
+
+    canceres_com_estadual = {
+        MAPA[pasta][0] for pasta in pastas if MAPA[pasta][1] == "SP"
+    }
+
+    carregar, puladas = [], []
+    for pasta in pastas:
+        tipo_cancer, origem = MAPA[pasta]
+        if origem != "SP" and tipo_cancer in canceres_com_estadual:
+            puladas.append(pasta)
+        else:
+            carregar.append(pasta)
+
+    return carregar, puladas
+
+
+def municipios_duplicados(conexao):
+    """
+    (Município, câncer) com internações vindas de mais de uma fonte
+    (origem). Depois de pastas_para_carregar() a lista deve vir
+    vazia; se não vier, esses totais estão contados em dobro. É por
+    câncer: mama do estadual + ovário da pasta da cidade é normal.
+    """
+
+    return conexao.execute("""
+        SELECT municipio, tipo_cancer, GROUP_CONCAT(DISTINCT origem)
+        FROM internacoes
+        GROUP BY municipio, tipo_cancer
+        HAVING COUNT(DISTINCT origem) > 1
+    """).fetchall()
+
+
 def detectar_separador(caminho_csv, encoding="latin1"):
     """
     Descobre se o CSV usa ';' (padrão do extrato bruto do DATASUS) ou
@@ -232,7 +282,17 @@ def carregar():
     total_registros = 0
     primeira_carga = True
 
-    for pasta in encontrar_pastas_validas(BASE_DADOS):
+    pastas, puladas = pastas_para_carregar(
+        encontrar_pastas_validas(BASE_DADOS)
+    )
+
+    for pasta in puladas:
+        print(
+            f"PULADA: {pasta} -- as mesmas internações já vêm no arquivo "
+            "estadual do mesmo câncer (evita contar a cidade em dobro)."
+        )
+
+    for pasta in pastas:
 
         caminho_pasta = os.path.join(BASE_DADOS, pasta)
 
@@ -288,7 +348,15 @@ def carregar():
 
         print("OK ->", len(dados), "registros")
 
+    duplicados = (
+        municipios_duplicados(conexao) if total_registros else []
+    )
+
     conexao.close()
+
+    if duplicados:
+        print("\nATENÇÃO: municípios com internações de mais de uma fonte "
+              "(totais em dobro):", duplicados)
 
     if total_registros == 0:
         raise RuntimeError(

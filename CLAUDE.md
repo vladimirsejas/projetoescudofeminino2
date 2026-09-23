@@ -109,9 +109,19 @@ Estado atual:
   frases de leitura). Testado por `teste_inteligencia.py`.
 - `dashboard/app.py`: uma tela (barras de cânceres + evolução do
   câncer escolhido, com camadas) e chat no painel lateral.
+- **Contagem em dobro de Rio Claro: confirmada e corrigida.** No
+  banco real havia 1.668 internações de Rio Claro com origem
+  RIO_CLARO e as mesmas 1.668 com origem SP (a pasta estadual já traz
+  todas as cidades). Todo total por `municipio = 'RIO_CLARO'` nos
+  scripts antigos saía dobrado (taxas e médias não). Correção na
+  carga: `pastas_para_carregar()` pula a pasta municipal quando existe
+  a estadual do mesmo câncer, e `municipios_duplicados()` confere no
+  fim (teste: `etl/teste_carga_duplicidade.py`). Com isso, as
+  moradoras de Rio Claro passam a ter `origem = 'SP'` como as de
+  qualquer cidade; nenhum script dependia de `origem = 'RIO_CLARO'`.
+  Precisa rodar a carga + cadeia de novo no Windows.
 - Próximos passos combinados, nesta ordem: investigar 2025
-  (`ANO_CMPT` x `DT_INTER` nos CSVs brutos); confirmar no banco real
-  a contagem em dobro de Rio Claro; repensar o chat para ler de
+  (`ANO_CMPT` x `DT_INTER` nos CSVs brutos); repensar o chat para ler de
   `inteligencia.py` (hoje há dois classificadores de intenção,
   em `chat_escudo.py` e `chat_servico.py`, e ele depende das 13
   tabelas antigas); população do IBGE para comparar cidades (gráfico
