@@ -6,6 +6,9 @@ import pandas as pd
 
 from inteligencia import (
     anos_fora_do_padrao,
+    anos_incompletos,
+    confiabilidade,
+    ficha_cancer,
     ano_atipico_no_estado,
     carregar_serie,
     completar_anos,
@@ -265,6 +268,40 @@ checar("R. nenhum sinal fala em orçamento ou R$",
        not any("R$" in t or "orçamento" in t for r in radar.values() for t in r["sinais"] + r["cuidados"]))
 checar("R. futuro comparado com o nível da tendência (não com o último ano)",
        abs(radar["MAMA"]["internacoes_hoje"] - cresce_liso[-1]) < 0.5 and radar["MAMA"]["internacoes_a_mais"] > 0)
+
+# ---- M. anos com meses que a fonte não oferece ----
+def banco_com_meses(meses_2018=6, com_coluna_mes=True):
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE internacoes (tipo_cancer, origem, municipio, ano, " + ("mes, " if com_coluna_mes else "")
+                 + "obito, valor_total, dias_permanencia)")
+    linhas = []
+    for ano in range(2013, 2025):
+        for mes in range(1, 13):
+            if ano == 2018 and mes > meses_2018:
+                continue  # o DATASUS não oferece estes meses
+            linhas += [("MAMA", "SP", "RIO_CLARO", ano, mes, 0, 100.0, 2)] * 5
+            linhas += [("MAMA", "SP", "OUTRA", ano, mes, 1, 100.0, 2)] * 95
+    if not com_coluna_mes:
+        linhas = [l[:4] + l[5:] for l in linhas]
+    conn.executemany("INSERT INTO internacoes VALUES (" + ",".join("?" * len(linhas[0])) + ")", linhas)
+    return conn
+
+sm = carregar_serie(banco_com_meses(), "RIO_CLARO", "SP")
+mama = serie_doenca(sm, "MAMA")
+checar("M. 2018 com 6 de 12 meses: vale a média mensal x 12 (60), não 30",
+       mama.loc[mama["ano"] == 2018, "internacoes"].iloc[0] == 60
+       and mama.loc[mama["ano"] == 2018, "internacoes_reg"].iloc[0] == 30)
+checar("M. com o ajuste, 2018 não vira 'ano fora do padrão' (a queda era falta de meses)",
+       anos_fora_do_padrao(mama).empty)
+checar("M. totais do período continuam os REGISTRADOS", resumo_doencas(sm).iloc[0]["internacoes"] == 5 * 12 * 11 + 5 * 6
+       and ficha_cancer(sm, "MAMA")["internacoes"] == 690)
+checar("M. anos incompletos identificados (pelo Estado)", anos_incompletos(sm) == {2018: 6})
+checar("M. confiabilidade avisa os meses que a fonte não oferece",
+       any("DATASUS não oferece" in t and "2018 (6 de 12)" in t for _, t in confiabilidade(sm, "MAMA")))
+sv = carregar_serie(banco_com_meses(com_coluna_mes=False), "RIO_CLARO", "SP")
+checar("M. banco antigo (sem coluna mes): sem ajuste e pede para recarregar",
+       serie_doenca(sv, "MAMA").loc[lambda d: d["ano"] == 2018, "internacoes"].iloc[0] == 30
+       and any("sem o mês" in t for _, t in confiabilidade(sv, "MAMA")))
 
 print()
 if falhas:

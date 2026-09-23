@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from inteligencia import (
     anos_fora_do_padrao,
+    anos_incompletos,
     anos_fora_todos,
     ano_atipico_no_estado,
     cancer_de,
@@ -117,10 +118,23 @@ def _ano_em_investigacao(ctx):
     return ano if total and fora >= total / 2 else None
 
 
+def _nota_meses(ctx):
+    """Anos com meses que o DATASUS não oferece (inteligencia.ajustar_meses)."""
+    incompletos = anos_incompletos(ctx.serie)
+    if not incompletos:
+        return ""
+    pior = min(incompletos, key=incompletos.get)
+    return (f"\n\n*Um cuidado: o DATASUS não oferece todos os meses de {len(incompletos)} anos "
+            f"({pior} tem só {incompletos[pior]} de 12). Para comparar os anos, uso a média dos meses "
+            f"disponíveis × 12.*")
+
+
 def _nota_2025(ctx):
+    """Cuidados que valem para toda fala que compara anos."""
     ano = _ano_em_investigacao(ctx)
-    return (f"\n\n*Um cuidado: {ano} está em investigação — vários cânceres saltaram juntos no Estado "
-            f"inteiro nesse ano, o que parece mudança de registro.*") if ano else ""
+    nota = (f"\n\n*Um cuidado: {ano} está em investigação — vários cânceres saltaram juntos no Estado "
+            f"inteiro nesse ano, o que parece vir do registro, não do adoecimento.*") if ano else ""
+    return nota + _nota_meses(ctx)
 
 
 # ---------- nível 0 ----------
@@ -314,7 +328,9 @@ def metodo(ctx):
     return Resposta(
         fala=("Eu leio internações de mulheres no SUS (SIH/SUS, DATASUS). **Internação não é caso novo**: a mesma "
               "mulher pode ser internada mais de uma vez, e quem se trata só no ambulatório ou pelo plano não "
-              "aparece. O ano é o do processamento da internação. Minhas tendências são retas calculadas sobre "
+              "aparece. O ano é o do processamento da internação. O DATASUS não oferece todos os meses de "
+              "alguns anos; para comparar anos, uso a média dos meses disponíveis × 12. Minhas tendências são "
+              "retas calculadas sobre "
               "todos os anos, e a projeção só prolonga essa reta — com faixa de incerteza e teste de acerto. "
               "Os dados **não** permitem dizer causas, casos novos, orçamento ideal nem comparar cidades de "
               "tamanhos diferentes (falta a população)."),

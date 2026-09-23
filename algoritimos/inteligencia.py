@@ -135,16 +135,87 @@ def escolher_uma_fonte(linhas_municipio, uf_referencia="SP"):
     return pd.concat(partes, ignore_index=True)
 
 
+# ---------- anos incompletos na fonte ----------
+#
+# O DATASUS não oferece todos os meses do SIH/RD de SP: faltam 35 dos
+# 156 meses de 2013 a 2025 (2018 tem só 6), os mesmos para todos os
+# cânceres -- ver docs/FONTE_DOS_DADOS.md. Um ano com meses faltando
+# tem total menor sem que menos mulheres tenham sido internadas, e
+# isso distorcia tendência, anos fora do padrão, projeção e radar
+# (o "salto de 2025" era só 2025 ter os 12 meses).
+#
+# Regra: para COMPARAR anos, cada ano vale a média dos meses
+# disponíveis x 12 (colunas internacoes, obitos, valor_total,
+# dias_permanencia). Os valores REGISTRADOS ficam em <coluna>_reg e
+# são os usados nos totais do período (resumo, ficha, letalidade).
+# O número de meses de cada ano vem do Estado (o arquivo mensal que
+# falta é o do Estado inteiro, então falta também para a cidade).
+
+COLUNAS_VALOR = ["internacoes", "obitos", "valor_total", "dias_permanencia"]
+MESES_NO_ANO = 12
+
+SQL_MESES = """
+SELECT ano, COUNT(DISTINCT mes) AS meses
+FROM internacoes
+WHERE origem = ? AND mes IS NOT NULL
+GROUP BY ano
+"""
+
+
+def meses_por_ano(conexao, uf_referencia="SP"):
+    """{ano: meses de competência disponíveis}. None se o banco foi
+    carregado antes de a carga guardar o mês (coluna `mes`)."""
+    try:
+        tabela = pd.read_sql(SQL_MESES, conexao, params=(uf_referencia,))
+    except Exception:  # banco antigo, sem a coluna mes
+        return None
+    if tabela.empty:
+        return None
+    return {int(a): int(m) for a, m in zip(tabela["ano"], tabela["meses"])}
+
+
+def ajustar_meses(serie, meses):
+    """Guarda os valores registrados em <coluna>_reg, anota os meses
+    de cada ano e, se `meses` for conhecido, põe em <coluna> a média
+    mensal x 12 (valor comparável entre anos)."""
+    serie = serie.copy()
+    serie["meses"] = serie["ano"].map(meses).astype(float) if meses else np.nan
+    for coluna in COLUNAS_VALOR:
+        serie[coluna + "_reg"] = serie[coluna]
+        if meses:
+            fator = (MESES_NO_ANO / serie["meses"]).where(serie["meses"] > 0, 1.0)
+            serie[coluna] = serie[coluna] * fator
+    return serie
+
+
+def registrado(dados, coluna):
+    """A coluna com o valor REGISTRADO (sem o ajuste de meses), para
+    somar totais do período. Séries sem ajuste: a própria coluna."""
+    return dados[coluna + "_reg"] if coluna + "_reg" in dados else dados[coluna]
+
+
+def anos_incompletos(serie):
+    """{ano: meses} dos anos com menos de 12 meses na fonte."""
+    if "meses" not in serie or serie["meses"].isna().all():
+        return {}
+    por_ano = serie.groupby("ano")["meses"].max()
+    return {int(a): int(m) for a, m in por_ano.items() if 0 < m < MESES_NO_ANO}
+
+
 def carregar_serie(conexao, municipio, uf_referencia="SP"):
     """Série anual por câncer do município e da referência
-    estadual. Tudo o que o dashboard mostra sai daqui."""
+    estadual. Tudo o que o dashboard mostra sai daqui. Os anos são
+    comparáveis (média mensal x 12, ver ajustar_meses); os valores
+    registrados ficam em <coluna>_reg."""
     mun = pd.read_sql(SQL_MUNICIPIO, conexao, params=(municipio,))
     mun = escolher_uma_fonte(mun, uf_referencia).drop(columns="origem")
     mun.insert(1, "grupo", GRUPO_MUNICIPIO)
     est = pd.read_sql(SQL_ESTADO, conexao, params=(uf_referencia,))
     serie = pd.concat([mun, est], ignore_index=True)
     serie = serie[serie["tipo_cancer"].notna()]
-    return completar_anos(serie) if not serie.empty else serie
+    if serie.empty:
+        return serie
+    return ajustar_meses(completar_anos(serie), meses_por_ano(conexao, uf_referencia))
 
 
 def completar_anos(serie):
@@ -174,8 +245,9 @@ def serie_doenca(serie, cancer, grupo=GRUPO_MUNICIPIO):
 def resumo_doencas(serie):
     """Totais do município por câncer no período, maior primeiro."""
     mun = serie[serie["grupo"] == GRUPO_MUNICIPIO]
-    resumo = (mun.groupby("tipo_cancer", as_index=False)
-                 [["internacoes", "obitos", "valor_total", "dias_permanencia"]].sum())
+    # totais do período: sempre o REGISTRADO (sem o ajuste de meses)
+    mun = mun.assign(**{c: registrado(mun, c) for c in COLUNAS_VALOR})
+    resumo = (mun.groupby("tipo_cancer", as_index=False)[COLUNAS_VALOR].sum())
     resumo = resumo[resumo["internacoes"] > 0]
     resumo["doenca"] = resumo["tipo_cancer"].map(nome_doenca)
     return resumo.sort_values("internacoes", ascending=False).reset_index(drop=True)
@@ -491,6 +563,8 @@ def ficha_cancer(serie, cancer):
     mun = serie_doenca(serie, cancer, GRUPO_MUNICIPIO)
     est = serie_doenca(serie, cancer, GRUPO_ESTADO)
     todos = serie[serie["grupo"] == GRUPO_MUNICIPIO]
+    # totais e razões do período: valores REGISTRADOS (ver ajustar_meses)
+    mun, est, todos = [d.assign(**{c: registrado(d, c) for c in COLUNAS_VALOR}) for d in (mun, est, todos)]
     intern, obitos = mun["internacoes"].sum(), mun["obitos"].sum()
     valor, dias = mun["valor_total"].sum(), mun["dias_permanencia"].sum()
     return {
@@ -570,15 +644,26 @@ def confiabilidade(serie, cancer, duplicados=()):
                                   "da cidade + arquivo estadual). Os números da tela já estão certos: o Escudo "
                                   "usa só o estadual. Para o aviso sumir, recarregue os dados: "
                                   "py etl\\carga_todas_bases.py"))
+    incompletos = anos_incompletos(serie)
+    if incompletos:
+        avisos.append(("atencao", "Anos com meses que o DATASUS não oferece: "
+                       + ", ".join(f"{a} ({m} de 12)" for a, m in sorted(incompletos.items()))
+                       + ". Para comparar anos, o Escudo usa a média dos meses disponíveis × 12; "
+                         "os totais do período são os registrados."))
+    elif "meses" in serie and serie["meses"].isna().all():
+        avisos.append(("atencao", "O banco deste computador foi carregado sem o mês das internações: o Escudo "
+                                  "não consegue corrigir os anos com meses faltando na fonte. Recarregue: "
+                                  "py etl\\carga_todas_bases.py"))
     ano_fim = int(serie["ano"].max())
     fora, total = ano_atipico_no_estado(serie, ano_fim)
     if total and fora >= total / 2:
-        avisos.append(("atencao", f"{ano_fim} está em investigação: {fora} dos {total} cânceres saltaram ao "
-                                  f"mesmo tempo no Estado, o que sugere mudança de registro."))
+        avisos.append(("atencao", f"{ano_fim} está em investigação: {fora} dos {total} cânceres ficaram muito acima "
+                                  f"da tendência ao mesmo tempo no Estado. Isso costuma vir do registro (por "
+                                  f"exemplo, anos anteriores com meses faltando na fonte), não do adoecimento."))
     if mun["internacoes"].mean() < MEDIA_PEQUENA:
         avisos.append(("atencao", f"Números pequenos: média de {formatar_numero(mun['internacoes'].mean(), 1)} "
                                   f"internações por ano. Variações podem ser acaso."))
-    if mun["obitos"].sum() < 10:
+    if registrado(mun, "obitos").sum() < 10:
         avisos.append(("info", "Menos de 10 óbitos no período: a letalidade é pouco estável."))
     anos_com_dado = int((mun["internacoes"] > 0).sum())
     if anos_com_dado < 8:

@@ -14,6 +14,7 @@ from lia_rosto import img as rosto_lia
 from inteligencia import (
     ano_atipico_no_estado,
     anos_fora_do_padrao,
+    anos_incompletos,
     anos_fora_todos,
     cancer_de,
     canceres_com_duplicidade,
@@ -552,11 +553,19 @@ if aba == "Evolução":
                 name=f"Ritmo do Estado de SP (na escala de {nome_cidade})",
                 hovertemplate="%{x}: Estado no ritmo equivalente a %{y:.0f}<extra></extra>",
             ))
+    # Anos com meses que o DATASUS não oferece: o ponto é a média mensal
+    # x 12 (comparável), com marcador vazado e o registrado no hover.
+    incompletos = anos_incompletos(serie)
+    registradas = mun["internacoes_reg"] if "internacoes_reg" in mun else mun["internacoes"]
     fig.add_trace(go.Scatter(
         x=mun["ano"], y=mun["internacoes"], mode="lines+markers",
-        line={"color": AZUL, "width": 2.5}, marker={"size": 8, "color": AZUL},
-        name=f"{nome_cidade}: internações registradas",
-        hovertemplate="%{x}: %{y:.0f} internações<extra></extra>",
+        line={"color": AZUL, "width": 2.5},
+        marker={"size": 8, "color": [("#ffffff" if a in incompletos else AZUL) for a in mun["ano"]],
+                "line": {"color": AZUL, "width": 2}},
+        name=f"{nome_cidade}: internações por ano",
+        customdata=[[f"estimado: {incompletos[a]} de 12 meses na fonte; registradas: {r:.0f}"
+                     if a in incompletos else "registradas"] for a, r in zip(mun["ano"], registradas)],
+        hovertemplate="%{x}: %{y:.0f} internações (%{customdata[0]})<extra></extra>",
     ))
     fora = anos_fora_do_padrao(mun)
     if ver_fora and not fora.empty:
@@ -576,6 +585,10 @@ if aba == "Evolução":
     estilizar(fig, altura=430)
     st.plotly_chart(fig, use_container_width=True, theme=None, config=CONFIG_GRAFICO)
 
+    if incompletos:
+        st.caption("Marcador vazado: ano com meses que o DATASUS não oferece ("
+                   + ", ".join(f"{a}: {m} de 12" for a, m in sorted(incompletos.items()))
+                   + "). O valor é a média dos meses disponíveis × 12, para os anos serem comparáveis.")
     leitura("O que o gráfico mostra", leitura_evolucao(serie, doenca))
 
     if ver_projecao:

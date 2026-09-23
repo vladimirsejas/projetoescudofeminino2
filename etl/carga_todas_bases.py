@@ -313,6 +313,9 @@ def carregar():
             "municipio": municipios,
             "codigo_ibge": codigos,
             "ano": df["ANO_CMPT"],
+            # mês de competência: o Escudo precisa dele para saber quais
+            # meses a fonte não oferece (inteligencia.ajustar_meses)
+            "mes": pd.to_numeric(df["MES_CMPT"], errors="coerce") if "MES_CMPT" in df else None,
             "idade": df["IDADE"],
             "dias_permanencia": df["DIAS_PERM"],
             "obito": df["MORTE"],
