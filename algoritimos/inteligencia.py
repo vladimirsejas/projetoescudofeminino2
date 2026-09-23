@@ -257,24 +257,38 @@ def comparar_com_estado(serie, cancer):
 # =====================================
 
 def anos_fora_do_padrao(dados):
-    """Para cada ano, o "esperado" é a tendência calculada com os
-    OUTROS anos (o próprio ano não entra, senão um pico puxaria a
-    reta para si e se esconderia). O ano é marcado quando a
-    diferença passa de LIMIAR_DESVIOS desvios -- o maior entre a
-    oscilação normal da série e a oscilação natural de contagens
-    (raiz do esperado) -- e tem pelo menos DIFERENCA_MINIMA
-    internações. Só detecta; não explica a causa."""
-    dados = dados.sort_values("ano")
+    """Detecta anos internos da série que se afastam da tendência.
+
+    O ano analisado é retirado do ajuste para não "puxar" a própria
+    reta. Mas o primeiro e o último ano da série NÃO são testados:
+    para eles a tendência ajustada aos outros anos precisaria ser
+    extrapolada para fora do intervalo observado, o que pode criar
+    esperados artificialmente próximos de zero e percentuais enormes
+    (por exemplo, 6 observadas contra 0,8 esperadas).
+
+    Assim, "fora do padrão" significa uma anomalia dentro do intervalo
+    histórico observado, não uma extrapolação nas pontas da série.
+    Só detecta; não explica a causa."""
+    dados = dados.sort_values("ano").reset_index(drop=True)
     if len(dados) < 6:
         return pd.DataFrame(columns=["ano", "observado", "esperado", "direcao", "numeros_pequenos"])
+
+    # Precisamos de anos dos dois lados para avaliar um ponto sem
+    # extrapolar. Por isso as pontas (primeiro/último) ficam fora.
+    anos_avaliados = dados["ano"].iloc[1:-1]
+
     linhas = []
-    for ano in dados["ano"]:
+    for ano in anos_avaliados:
         outros = dados[dados["ano"] != ano]
         modelo = ajustar_tendencia(outros["ano"], outros["internacoes"])
+
+        # Aqui o ano está dentro do intervalo dos dados usados no
+        # ajuste; portanto não há extrapolação.
         esperado = max(float(modelo["intercepto"] + modelo["inclinacao"] * ano), 0.0)
         observado = float(dados.loc[dados["ano"] == ano, "internacoes"].iloc[0])
         desvio = max(modelo["s"], math.sqrt(max(esperado, 1.0)))
         diferenca = observado - esperado
+
         if abs(diferenca) > LIMIAR_DESVIOS * desvio and abs(diferenca) >= DIFERENCA_MINIMA:
             linhas.append({
                 "ano": int(ano),
@@ -283,6 +297,7 @@ def anos_fora_do_padrao(dados):
                 "direcao": "acima" if diferenca > 0 else "abaixo",
                 "numeros_pequenos": esperado < MEDIA_PEQUENA,
             })
+
     return pd.DataFrame(linhas, columns=["ano", "observado", "esperado", "direcao", "numeros_pequenos"])
 
 
