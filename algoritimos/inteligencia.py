@@ -73,6 +73,13 @@ def nome_doenca(codigo):
     return texto[:1].upper() + texto[1:]
 
 
+def cancer_de(codigo):
+    """'MAMA' -> 'câncer de mama'; 'COLORRETAL' -> 'câncer colorretal'
+    (sem o "de", que fica errado em português)."""
+    nome = nome_doenca(codigo).lower()
+    return "câncer colorretal" if nome == "colorretal" else f"câncer de {nome}"
+
+
 def formatar_numero(valor, casas=0):
     """1234.5 -> '1.234,5' (padrão brasileiro)."""
     texto = f"{valor:,.{casas}f}"
@@ -168,7 +175,7 @@ def resumo_doencas(serie):
     """Totais do município por câncer no período, maior primeiro."""
     mun = serie[serie["grupo"] == GRUPO_MUNICIPIO]
     resumo = (mun.groupby("tipo_cancer", as_index=False)
-                 [["internacoes", "obitos", "valor_total"]].sum())
+                 [["internacoes", "obitos", "valor_total", "dias_permanencia"]].sum())
     resumo = resumo[resumo["internacoes"] > 0]
     resumo["doenca"] = resumo["tipo_cancer"].map(nome_doenca)
     return resumo.sort_values("internacoes", ascending=False).reset_index(drop=True)
@@ -295,19 +302,21 @@ def ano_atipico_no_estado(serie, ano):
 # PROJEÇÃO EXPLORATÓRIA
 # =====================================
 
-def projetar(dados, horizonte=3):
-    """Continuação da tendência histórica com faixa de ~90%.
-    Exploratória: descreve o que acontece SE o comportamento
-    passado continuar -- não é previsão clínica nem causal."""
+def projetar(dados, horizonte=3, coluna="internacoes"):
+    """Projeção de tendência: continuação da reta histórica com faixa
+    de ~90%. Descreve o que acontece SE o comportamento passado
+    continuar -- não é previsão clínica nem causal, e não deve ser
+    chamada de "IA preditiva". `coluna` permite projetar também os
+    valores hospitalares registrados e os dias de internação."""
     dados = dados.sort_values("ano")
     ultimo = int(dados["ano"].max())
     anos = list(range(ultimo + 1, ultimo + 1 + horizonte))
-    ponto, minimo, maximo = prever(ajustar_tendencia(dados["ano"], dados["internacoes"]), anos)
-    return pd.DataFrame({"ano": anos, "internacoes": ponto,
+    ponto, minimo, maximo = prever(ajustar_tendencia(dados["ano"], dados[coluna]), anos)
+    return pd.DataFrame({"ano": anos, coluna: ponto,
                          "minimo": minimo, "maximo": maximo})
 
 
-def testar_projecao(dados, anos_teste=3):
+def testar_projecao(dados, anos_teste=3, coluna="internacoes"):
     """Treina até (último - anos_teste) e compara o erro nos anos
     seguintes com o de simplesmente repetir a média dos 3 últimos
     anos de treino."""
@@ -316,11 +325,11 @@ def testar_projecao(dados, anos_teste=3):
     treino, teste = dados[dados["ano"] <= corte], dados[dados["ano"] > corte]
     if len(treino) < 3 or teste.empty:
         return None
-    ponto, minimo, maximo = prever(ajustar_tendencia(treino["ano"], treino["internacoes"]), teste["ano"])
-    real = teste["internacoes"].to_numpy(dtype=float)
+    ponto, minimo, maximo = prever(ajustar_tendencia(treino["ano"], treino[coluna]), teste["ano"])
+    real = teste[coluna].to_numpy(dtype=float)
     return {
         "erro_tendencia": float(np.abs(real - ponto).mean()),
-        "erro_media": float(np.abs(real - treino["internacoes"].tail(3).mean()).mean()),
+        "erro_media": float(np.abs(real - treino[coluna].tail(3).mean()).mean()),
         "dentro_da_faixa": int(((real >= minimo) & (real <= maximo)).sum()),
         "anos_testados": len(real),
     }
@@ -372,3 +381,303 @@ def leitura_evolucao(serie, cancer):
             "para outro podem ser acaso. Confirme antes de concluir."
         )
     return frases
+
+
+# =====================================
+# FICHA DE UM CÂNCER: "o que chama atenção?"
+#
+# Dinheiro aqui é "valor hospitalar registrado no SIH/SUS" (VAL_TOT
+# das AIHs): o que o SUS registrou pelas internações. NÃO é o
+# orçamento municipal nem o custo total do tratamento (quimioterapia
+# e radioterapia ambulatoriais ficam fora).
+# =====================================
+
+def _razao(num, den):
+    return num / den if den else 0.0
+
+
+def ficha_cancer(serie, cancer):
+    """Os quatro números da doença (internações, óbitos, valor
+    hospitalar registrado, dias), cada um com a sua referência."""
+    mun = serie_doenca(serie, cancer, GRUPO_MUNICIPIO)
+    est = serie_doenca(serie, cancer, GRUPO_ESTADO)
+    todos = serie[serie["grupo"] == GRUPO_MUNICIPIO]
+    intern, obitos = mun["internacoes"].sum(), mun["obitos"].sum()
+    valor, dias = mun["valor_total"].sum(), mun["dias_permanencia"].sum()
+    return {
+        "internacoes": float(intern),
+        "obitos": float(obitos),
+        "valor": float(valor),
+        "dias": float(dias),
+        "pct_internacoes": _razao(intern, todos["internacoes"].sum()) * 100,
+        "pct_valor": _razao(valor, todos["valor_total"].sum()) * 100,
+        "letalidade": _razao(obitos, intern) * 100,
+        "letalidade_estado": _razao(est["obitos"].sum(), est["internacoes"].sum()) * 100,
+        "valor_medio": _razao(valor, intern),
+        "valor_medio_estado": _razao(est["valor_total"].sum(), est["internacoes"].sum()),
+        "permanencia": _razao(dias, intern),
+        "permanencia_estado": _razao(est["dias_permanencia"].sum(), est["internacoes"].sum()),
+    }
+
+
+def destaques_cancer(serie, cancer):
+    """Frases de "o que chama atenção", só quando o número sustenta.
+    Nenhuma afirma causa."""
+    f = ficha_cancer(serie, cancer)
+    frases = [f"Concentra {formatar_numero(f['pct_internacoes'], 1)}% das internações e "
+              f"{formatar_numero(f['pct_valor'], 1)}% do valor hospitalar registrado entre os cânceres acompanhados."]
+    if f["pct_valor"] - f["pct_internacoes"] > 3:
+        frases.append(f"Pesa mais no valor registrado do que no número de internações: cada internação por "
+                      f"{cancer_de(cancer)} registra, em média, R$ {formatar_numero(f['valor_medio'])}.")
+    if f["obitos"] >= 5 and f["letalidade"] > f["letalidade_estado"] * 1.2:
+        frases.append(f"Letalidade hospitalar de {formatar_numero(f['letalidade'], 1)}%, acima da do Estado "
+                      f"({formatar_numero(f['letalidade_estado'], 1)}%).")
+    elif f["obitos"] >= 5 and f["letalidade"] < f["letalidade_estado"] * 0.8:
+        frases.append(f"Letalidade hospitalar de {formatar_numero(f['letalidade'], 1)}%, abaixo da do Estado "
+                      f"({formatar_numero(f['letalidade_estado'], 1)}%).")
+    if f["permanencia_estado"] and abs(f["permanencia"] - f["permanencia_estado"]) >= 1:
+        frases.append(f"Cada internação dura em média {formatar_numero(f['permanencia'], 1)} dias "
+                      f"(no Estado, {formatar_numero(f['permanencia_estado'], 1)}).")
+    comp = comparar_com_estado(serie, cancer)
+    if comp["ritmo_estado"] is not None and comp["ritmo_municipio"] - comp["ritmo_estado"] > 1.5:
+        frases.append(f"As internações crescem mais rápido que no Estado "
+                      f"({formatar_numero(comp['ritmo_municipio'], 1)}% x {formatar_numero(comp['ritmo_estado'], 1)}% ao ano).")
+    fora = anos_fora_do_padrao(serie_doenca(serie, cancer))
+    if not fora.empty:
+        anos = ", ".join(f"{a} ({d})" for a, d in zip(fora["ano"], fora["direcao"]))
+        frases.append(f"Anos fora do padrão: {anos}.")
+    return frases
+
+
+# =====================================
+# CONFIABILIDADE DA INFORMAÇÃO
+#
+# Antes de interpretar, dizer o que pode enganar. Cada aviso vem
+# de uma checagem nos dados, não de um texto fixo.
+# =====================================
+
+SQL_DUPLICIDADE = """
+SELECT tipo_cancer
+FROM internacoes
+WHERE municipio = ?
+GROUP BY tipo_cancer
+HAVING COUNT(DISTINCT origem) > 1
+"""
+
+
+def canceres_com_duplicidade(conexao, municipio):
+    """Cânceres cuja cidade tem internações vindas de duas fontes no
+    banco (a contagem em dobro de Rio Claro). O Escudo já usa uma
+    fonte só; o aviso diz que o banco precisa ser recarregado."""
+    return [linha[0] for linha in conexao.execute(SQL_DUPLICIDADE, (municipio,)).fetchall()]
+
+
+def confiabilidade(serie, cancer, duplicados=()):
+    """Lista de (nível, texto). nível: 'atencao' ou 'info'."""
+    mun = serie_doenca(serie, cancer)
+    avisos = []
+    if cancer in duplicados:
+        avisos.append(("atencao", "O banco tem estas internações em duplicidade (arquivo da cidade + "
+                                  "arquivo estadual). O Escudo usa uma fonte só, mas é preciso recarregar os dados."))
+    ano_fim = int(serie["ano"].max())
+    fora, total = ano_atipico_no_estado(serie, ano_fim)
+    if total and fora >= total / 2:
+        avisos.append(("atencao", f"{ano_fim} está em investigação: {fora} dos {total} cânceres saltaram ao "
+                                  f"mesmo tempo no Estado, o que sugere mudança de registro."))
+    if mun["internacoes"].mean() < MEDIA_PEQUENA:
+        avisos.append(("atencao", f"Números pequenos: média de {formatar_numero(mun['internacoes'].mean(), 1)} "
+                                  f"internações por ano. Variações podem ser acaso."))
+    if mun["obitos"].sum() < 10:
+        avisos.append(("info", "Menos de 10 óbitos no período: a letalidade é pouco estável."))
+    anos_com_dado = int((mun["internacoes"] > 0).sum())
+    if anos_com_dado < 8:
+        avisos.append(("info", f"Só {anos_com_dado} dos {len(mun)} anos têm internações: série curta para tendência."))
+    avisos.append(("info", "Sem população por município no banco: comparações são de ritmo, não de taxa "
+                           "por 100 mil mulheres."))
+    return avisos
+
+
+# =====================================
+# INVESTIGAÇÃO
+# =====================================
+
+def anos_fora_todos(serie, grupo=GRUPO_MUNICIPIO):
+    """Todos os anos fora do padrão, de todos os cânceres, numa
+    tabela só -- para quem quer procurar, não só olhar um câncer."""
+    partes = []
+    for cancer in serie["tipo_cancer"].unique():
+        fora = anos_fora_do_padrao(serie_doenca(serie, cancer, grupo))
+        if not fora.empty:
+            fora = fora.copy()
+            fora.insert(0, "doenca", nome_doenca(cancer))
+            fora["diferenca_pct"] = [(_razao(o - e, e) * 100 if e else float("nan"))
+                                     for o, e in zip(fora["observado"], fora["esperado"])]
+            partes.append(fora)
+    if not partes:
+        return pd.DataFrame(columns=["doenca", "ano", "observado", "esperado", "direcao",
+                                     "numeros_pequenos", "diferenca_pct"])
+    return pd.concat(partes, ignore_index=True).sort_values(["ano", "doenca"]).reset_index(drop=True)
+
+
+def quando_aparece(serie):
+    """Para cada câncer: primeiro ano com internação, ano de pico,
+    em quantos anos aparece (persistência) e o ritmo. Responde
+    "em que anos as doenças aparecem" nos seus vários sentidos."""
+    linhas = []
+    for cancer in resumo_doencas(serie)["tipo_cancer"]:
+        mun = serie_doenca(serie, cancer)
+        com = mun[mun["internacoes"] > 0]
+        anos_com, total = len(com), len(mun)
+        pico = mun.loc[mun["internacoes"].idxmax()]
+        persistencia = ("todos os anos" if anos_com == total else
+                        "quase todos os anos" if anos_com >= total * 0.75 else "episódica")
+        linhas.append({
+            "doenca": nome_doenca(cancer),
+            "primeiro_ano": int(com["ano"].min()) if anos_com else None,
+            "anos_com_internacao": f"{anos_com} de {total}",
+            "persistencia": persistencia,
+            "ano_de_pico": int(pico["ano"]),
+            "internacoes_no_pico": int(pico["internacoes"]),
+            "ritmo_anual_pct": round(ritmo_anual_pct(mun), 1),
+        })
+    return pd.DataFrame(linhas)
+
+
+# Faixas escolhidas pelas diretrizes: 50-69 é a faixa do rastreamento
+# de câncer de mama recomendado pelo INCA.
+FAIXAS = [("até 39 anos", 0, 39), ("40 a 49", 40, 49), ("50 a 69", 50, 69), ("70 ou mais", 70, 200)]
+
+SQL_FAIXAS = """
+SELECT tipo_cancer, origem, ano,
+       CASE WHEN idade < 40 THEN 'até 39 anos'
+            WHEN idade < 50 THEN '40 a 49'
+            WHEN idade < 70 THEN '50 a 69'
+            ELSE '70 ou mais' END AS faixa,
+       COUNT(*) AS internacoes
+FROM internacoes
+WHERE municipio = ? AND idade IS NOT NULL
+GROUP BY tipo_cancer, origem, ano, faixa
+"""
+
+
+def carregar_faixas(conexao, municipio, uf_referencia="SP"):
+    """Internações por câncer x ano x faixa etária, com a mesma regra
+    de uma fonte por cidade (não conta Rio Claro em dobro)."""
+    dados = pd.read_sql(SQL_FAIXAS, conexao, params=(municipio,))
+    if dados.empty:
+        return dados.drop(columns="origem")
+    return escolher_uma_fonte(dados, uf_referencia).drop(columns="origem")
+
+
+def comparar_faixas(faixas, cancer):
+    """Distribuição por faixa etária na primeira e na segunda metade
+    do período, para responder "a idade das internações mudou?"."""
+    dados = faixas[faixas["tipo_cancer"] == cancer]
+    if dados.empty:
+        return pd.DataFrame(columns=["faixa", "periodo", "internacoes", "pct"]), None
+    anos = sorted(dados["ano"].unique())
+    meio = anos[len(anos) // 2]
+    periodos = {f"{anos[0]}–{meio - 1}": dados[dados["ano"] < meio],
+                f"{meio}–{anos[-1]}": dados[dados["ano"] >= meio]}
+    linhas = []
+    for periodo, parte in periodos.items():
+        total = parte["internacoes"].sum()
+        for faixa, _, _ in FAIXAS:
+            n = parte[parte["faixa"] == faixa]["internacoes"].sum()
+            linhas.append({"faixa": faixa, "periodo": periodo, "internacoes": int(n),
+                           "pct": _razao(n, total) * 100})
+    tabela = pd.DataFrame(linhas)
+    return tabela, list(periodos)
+
+
+def leitura_faixas(tabela, periodos):
+    """A faixa que mais mudou de participação entre os dois períodos."""
+    if tabela.empty or periodos is None:
+        return []
+    antes = tabela[tabela["periodo"] == periodos[0]].set_index("faixa")["pct"]
+    depois = tabela[tabela["periodo"] == periodos[1]].set_index("faixa")["pct"]
+    variacao = (depois - antes).dropna()
+    faixa = variacao.abs().idxmax()
+    total = tabela["internacoes"].sum()
+    frases = []
+    if abs(variacao[faixa]) >= 5:
+        frases.append(f"A faixa de {faixa} passou de {formatar_numero(antes[faixa], 1)}% para "
+                      f"{formatar_numero(depois[faixa], 1)}% das internações entre {periodos[0]} e {periodos[1]}.")
+    else:
+        frases.append("A distribuição por idade ficou parecida entre os dois períodos "
+                      "(nenhuma faixa mudou 5 pontos ou mais).")
+    if total < 60:
+        frases.append("Poucas internações para dividir em faixas: leia como indício, não como conclusão.")
+    return frases
+
+
+# =====================================
+# PLANEJAMENTO: evidências, nunca valor de orçamento
+# =====================================
+
+# Linhas de ação conhecidas (diretrizes do INCA). Possibilidades para a
+# discussão da gestão, não recomendação de gasto.
+LINHAS_DE_ACAO = {
+    "MAMA": "rastreamento recomendado: mamografia de 50 a 69 anos",
+    "COLO_UTERO": "rastreamento recomendado (exame preventivo / DNA-HPV) e vacina contra HPV",
+    "COLORRETAL": "rastreamento possível: pesquisa de sangue oculto nas fezes",
+    "PELE_NAO_MELANOMA": "prevenção por fotoproteção e exame de lesões na atenção básica",
+    "PULMAO": "prevenção pelo controle do tabagismo",
+}
+
+
+def pressao_projetada(serie, cancer, horizonte=3):
+    """Se a tendência continuar: internações, dias de internação e
+    valor hospitalar registrado no último ano do horizonte, cada um
+    com faixa e com o resultado do teste de acerto. Óbitos não são
+    projetados: são poucos por ano e a reta seria enganosa."""
+    mun = serie_doenca(serie, cancer)
+    resultado = {}
+    for coluna in ("internacoes", "dias_permanencia", "valor_total"):
+        proj = projetar(mun, horizonte, coluna).iloc[-1]
+        teste = testar_projecao(mun, coluna=coluna)
+        resultado[coluna] = {
+            "ano": int(proj["ano"]),
+            "atual": float(mun[coluna].iloc[-1]),
+            "previsto": float(proj[coluna]),
+            "minimo": float(proj["minimo"]),
+            "maximo": float(proj["maximo"]),
+            "tendencia_acerta_mais": bool(teste and teste["erro_tendencia"] <= teste["erro_media"]),
+        }
+    return resultado
+
+
+def evidencias_planejamento(serie):
+    """Para cada câncer: sinais com o número que os sustenta, a
+    pressão projetada e a linha de ação conhecida. Ordenado por
+    quantidade de sinais. O Escudo não define quanto investir."""
+    ano_fim = int(serie["ano"].max())
+    linhas = []
+    for cancer in resumo_doencas(serie)["tipo_cancer"]:
+        f = ficha_cancer(serie, cancer)
+        comp = comparar_com_estado(serie, cancer)
+        sinais = []
+        if comp["ritmo_municipio"] >= 3:
+            sinais.append(f"internações crescem {formatar_numero(comp['ritmo_municipio'], 1)}% ao ano")
+        if comp["ritmo_estado"] is not None and comp["ritmo_municipio"] - comp["ritmo_estado"] > 1.5:
+            sinais.append(f"crescem mais rápido que no Estado ({formatar_numero(comp['ritmo_estado'], 1)}% ao ano)")
+        if f["obitos"] >= 5 and f["letalidade"] > f["letalidade_estado"] * 1.2:
+            sinais.append(f"letalidade hospitalar de {formatar_numero(f['letalidade'], 1)}%, acima do Estado "
+                          f"({formatar_numero(f['letalidade_estado'], 1)}%)")
+        if f["pct_valor"] >= 20:
+            sinais.append(f"responde por {formatar_numero(f['pct_valor'], 1)}% do valor hospitalar registrado")
+        fora = anos_fora_do_padrao(serie_doenca(serie, cancer))
+        recentes = fora[(fora["direcao"] == "acima") & (fora["ano"] >= ano_fim - 2) & (fora["ano"] < ano_fim)]
+        for ano in recentes["ano"]:
+            sinais.append(f"{ano} ficou acima do esperado")
+        linhas.append({
+            "tipo_cancer": cancer,
+            "doenca": nome_doenca(cancer),
+            "sinais": sinais,
+            "crescimento": comp["ritmo_municipio"],
+            "letalidade_relativa": _razao(f["letalidade"], f["letalidade_estado"]) if f["obitos"] >= 5 else None,
+            "internacoes": f["internacoes"],
+            "pressao": pressao_projetada(serie, cancer),
+            "linha_de_acao": LINHAS_DE_ACAO.get(cancer),
+        })
+    return sorted(linhas, key=lambda l: -len(l["sinais"]))

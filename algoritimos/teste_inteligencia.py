@@ -159,6 +159,66 @@ if os.path.exists(CSV_REAL):
 else:
     print("(pulado) H. base real não encontrada em " + CSV_REAL)
 
+# ---- I. ficha, confiabilidade, investigação, planejamento ----
+from inteligencia import (anos_fora_todos, cancer_de, comparar_faixas, confiabilidade,
+                          destaques_cancer, evidencias_planejamento, ficha_cancer,
+                          leitura_faixas, pressao_projetada, quando_aparece)
+
+checar("I. 'câncer colorretal' sem 'de'; 'câncer de mama' com", cancer_de("COLORRETAL") == "câncer colorretal"
+       and cancer_de("MAMA") == "câncer de mama")
+
+dois = pd.concat([
+    serie([10] * 13, [1000] * 13, cancer="MAMA"),
+    serie([10] * 13, [1000] * 13, cancer="OVARIO"),
+], ignore_index=True)
+dois.loc[dois["tipo_cancer"] == "OVARIO", "valor_total"] *= 3  # ovário: mesma quantidade, valor 3x
+f = ficha_cancer(dois, "OVARIO")
+checar("I. ficha: 50% das internações e 75% do valor registrado", abs(f["pct_internacoes"] - 50) < 1e-6
+       and abs(f["pct_valor"] - 75) < 1e-6)
+checar("I. destaque: 'pesa mais no valor' quando valor% > internações%",
+       any("Pesa mais no valor" in d for d in destaques_cancer(dois, "OVARIO")))
+checar("I. destaque não aparece para quem não pesa mais no valor",
+       not any("Pesa mais no valor" in d for d in destaques_cancer(dois, "MAMA")))
+
+avisos = dict((t[:20], n) for n, t in confiabilidade(serie(agudos), "MAMA", duplicados=["MAMA"]))
+textos = " ".join(t for _, t in confiabilidade(serie(agudos), "MAMA", duplicados=["MAMA"]))
+checar("I. confiabilidade avisa duplicidade, números pequenos e falta de população",
+       "duplicidade" in textos and "Números pequenos" in textos and "população" in textos)
+checar("I. série grande e sem duplicidade: sem aviso de números pequenos",
+       "Números pequenos" not in " ".join(t for _, t in confiabilidade(serie(crescente), "MAMA")))
+
+varios = pd.concat([serie(pico, cancer="MAMA"), serie(agudos, cancer="OVARIO")], ignore_index=True)
+todos = anos_fora_todos(varios)
+checar("I. investigação junta os anos fora do padrão de todos os cânceres",
+       sorted(zip(todos["doenca"], todos["ano"])) == [("Mama", 2021), ("Ovário", 2024)])
+
+aparece = quando_aparece(serie([0, 0, 3, 4, 0, 5, 6, 7, 8, 9, 10, 11, 12]))
+linha = aparece.iloc[0]
+checar("I. quando aparece: primeiro ano 2015, pico 2025, 10 de 13 anos",
+       linha["primeiro_ano"] == 2015 and linha["ano_de_pico"] == 2025 and linha["anos_com_internacao"] == "10 de 13")
+
+faixas = pd.DataFrame([
+    ("MAMA", ano, faixa, n) for ano in range(2013, 2025)
+    for faixa, n in (("até 39 anos", 10), ("40 a 49", 10), ("50 a 69", 10 if ano < 2019 else 30), ("70 ou mais", 10))
+], columns=["tipo_cancer", "ano", "faixa", "internacoes"])
+tabela, periodos = comparar_faixas(faixas, "MAMA")
+checar("I. faixas: dois períodos e 50-69 sobe de 25% para 50%",
+       periodos == ["2013–2018", "2019–2024"]
+       and abs(tabela[(tabela["faixa"] == "50 a 69") & (tabela["periodo"] == "2019–2024")]["pct"].iloc[0] - 50) < 1e-6)
+checar("I. leitura das faixas cita a faixa que mais mudou", "50 a 69" in leitura_faixas(tabela, periodos)[0])
+
+pressao = pressao_projetada(serie(crescente, [1000] * 13), "MAMA")
+checar("I. pressão projetada: internações, dias e valor registrado em 2028",
+       set(pressao) == {"internacoes", "dias_permanencia", "valor_total"}
+       and pressao["internacoes"]["ano"] == 2028 and abs(pressao["internacoes"]["previsto"] - 85) < 1e-6)
+ev = evidencias_planejamento(pd.concat([serie(crescente, [1000] * 13, cancer="MAMA"),
+                                        serie(estavel, [1000] * 13, cancer="OVARIO")], ignore_index=True))
+checar("I. planejamento: quem cresce vem primeiro, com sinal de crescimento e linha de ação do INCA",
+       ev[0]["tipo_cancer"] == "MAMA" and any("crescem" in s for s in ev[0]["sinais"])
+       and "mamografia" in ev[0]["linha_de_acao"])
+checar("I. planejamento: nenhuma evidência traz valor de orçamento",
+       not any("orçamento" in s.lower() for e in ev for s in e["sinais"]))
+
 print()
 if falhas:
     print(f"{len(falhas)} checagem(ns) falharam.")

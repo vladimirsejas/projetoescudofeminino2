@@ -107,8 +107,31 @@ Estado atual:
   (série anual cidade + Estado, anos fora do padrão, ritmo do Estado
   na escala da cidade, projeção exploratória com teste de acerto,
   frases de leitura). Testado por `teste_inteligencia.py`.
-- `dashboard/app.py`: uma tela (barras de cânceres + evolução do
-  câncer escolhido, com camadas) e chat no painel lateral.
+- `dashboard/app.py`: portas em abas, cada informação numa casa só --
+  **Panorama** (barras medidas por internações / valor hospitalar
+  registrado / óbitos / dias + ficha "o que chama atenção" do câncer
+  em foco), **Evolução** (linha com camadas Estado / fora do padrão /
+  projeção de tendência + caixa de confiabilidade), **Investigar**
+  (anos fora do padrão de todos os cânceres, "quando cada câncer
+  aparece", faixa etária em dois períodos, download CSV),
+  **Planejamento** (quadrante crescimento x letalidade relativa +
+  evidências por câncer com pressão projetada em internações, dias e
+  valor registrado, e linha de ação do INCA), **Método**. Chat na
+  lateral.
+- Dinheiro sempre como **"valor hospitalar registrado no SIH/SUS"**
+  (VAL_TOT das AIHs): não é orçamento municipal nem custo total do
+  tratamento. Projeção sempre como **"projeção de tendência"**, nunca
+  "IA preditiva". Óbitos não são projetados (poucos por ano).
+- **Divisão de trabalho (09/2026):** o ChatGPT cuida de
+  `conversa.py`/`teste_conversa.py`; Claude cuida de `inteligencia.py`
+  e do painel. Pendências do chat para acompanhar o painel: trocar
+  "valor pago pelo SUS" por "valor hospitalar registrado no SIH/SUS";
+  trocar "Projeção exploratória" por "Projeção de tendência" nos
+  textos de "onde ver"; usar `inteligencia.evidencias_planejamento`,
+  `ficha_cancer`, `destaques_cancer` e `LINHAS_DE_ACAO` em vez das
+  cópias locais (`sinais_de_atencao`, `LINHAS_DE_ACAO` em
+  `conversa.py`), para chat e painel não divergirem; usar
+  `inteligencia.cancer_de()` ("câncer colorretal", sem "de").
 - **Contagem em dobro de Rio Claro: confirmada e corrigida.** No
   banco real havia 1.668 internações de Rio Claro com origem
   RIO_CLARO e as mesmas 1.668 com origem SP (a pasta estadual já traz
@@ -131,7 +154,7 @@ Estado atual:
   (`chat_escudo.py`) ainda usa o motor antigo.
 - Próximos passos combinados, nesta ordem: investigar 2025
   (`ANO_CMPT` x `DT_INTER` nos CSVs brutos); população do IBGE para
-  comparar cidades (gráfico de funil); tela de Planejamento; decidir
+  comparar cidades (gráfico de funil, cidades semelhantes); decidir
   o destino de `chat_escudo.py`/`motor_raciocinio.py` e das 13
   tabelas antigas.
 

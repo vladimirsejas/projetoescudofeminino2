@@ -117,14 +117,23 @@ python algoritimos\serie_temporal.py
 ### Painel novo e inteligência central
 
 O dashboard (`dashboard\app.py`) foi reescrito do zero em 09/2026: o
-anterior tinha 7 abas que repetiam os mesmos números. O novo tem uma
-tela só, organizada por perguntas:
+anterior tinha 7 abas que repetiam os mesmos números. O novo é
+organizado por perguntas, em portas onde cada informação tem uma casa
+só:
 
-1. **Quais cânceres mais levam as mulheres da cidade ao hospital?**
-   (barras; clicar numa barra escolhe o câncer)
-2. **Como as internações desse câncer mudaram?** (linha de 2013 a
-   2025, com camadas que liga/desliga: ritmo do Estado de SP, anos
-   fora do padrão e projeção exploratória)
+- **Panorama** — o que está acontecendo? Barras por internações, valor
+  hospitalar registrado, óbitos ou dias, e a ficha "o que chama
+  atenção" do câncer em foco.
+- **Evolução** — como mudou? Linha 2013–2025 com camadas (ritmo do
+  Estado, anos fora do padrão, projeção de tendência) e a caixa de
+  confiabilidade da informação.
+- **Investigar** — o que merece ser pesquisado? Anos fora do padrão de
+  todos os cânceres, quando cada câncer aparece, faixa etária ao longo
+  do tempo, download dos dados.
+- **Planejamento** — que evidências entram na discussão? Sinais com
+  número, pressão projetada (internações, dias, valor hospitalar
+  registrado) e linhas de ação do INCA. Sem valores de orçamento.
+- **Método** — como ler e o que os dados não permitem responder.
 
 Embaixo de cada gráfico vem a leitura em texto, e o chat fica no
 painel lateral (`algoritimos\conversa.py`: entende a pergunta,
