@@ -12,11 +12,14 @@ from inteligencia import (
     escolher_uma_fonte,
     formatar_numero,
     leitura_evolucao,
+    leitura_ponta_projecao,
     nome_doenca,
+    ponta_fora_da_tendencia,
     projetar,
     resumo_doencas,
     ritmo_estadual_na_escala,
     serie_doenca,
+    tendencia_no_periodo,
     testar_projecao,
 )
 
@@ -75,6 +78,16 @@ pontas = [90] + [50] * 11 + [90]
 fora_pontas = anos_fora_do_padrao(serie_doenca(serie(pontas), "MAMA"))
 checar("C. primeiro e último ano não são marcados por extrapolação",
        fora_pontas.empty)
+ponta = ponta_fora_da_tendencia(serie_doenca(serie(pontas), "MAMA"))
+checar("C. ponta: último ano muito acima da tendência dos anteriores é marcado",
+       ponta["fora"] and ponta["direcao"] == "acima" and ponta["ano"] == 2025)
+pequenos = [0, 0, 1, 0, 1, 1, 0, 2, 1, 1, 2, 1, 6]
+checar("C. ponta com números pequenos: não arrisca (None), como pediu o teste das pontas",
+       ponta_fora_da_tendencia(serie_doenca(serie(pequenos), "MAMA")) is None)
+checar("C. ponta estável: não é marcada",
+       not ponta_fora_da_tendencia(serie_doenca(serie(estavel), "MAMA"))["fora"])
+checar("C. sem contradição aparente, sem frase de ponta",
+       leitura_ponta_projecao(serie_doenca(serie(estavel), "MAMA")) is None)
 
 pico = estavel.copy(); pico[8] = 90  # 2021
 fora = anos_fora_do_padrao(serie_doenca(serie(pico), "MAMA"))
@@ -161,8 +174,16 @@ if os.path.exists(CSV_REAL):
     checar("H. base real: Mama é o maior volume em Rio Claro (670)",
            resumo.iloc[0]["doenca"] == "Mama" and resumo.iloc[0]["internacoes"] == 670)
     fora, total = ano_atipico_no_estado(s, 2025)
-    checar("H. base real: 2025, por ser a ponta da série, não é marcado automaticamente",
-           total == 7 and fora == 0)
+    # anos_fora_do_padrao continua sem testar as pontas; o último ano
+    # do Estado é avaliado por ponta_fora_da_tendencia (um passo,
+    # números grandes): o salto simultâneo de 2025 volta a aparecer.
+    checar("H. base real: 2025 fora do padrão no Estado na maioria dos cânceres (checagem da ponta)",
+           total == 7 and fora >= 4)
+    mama = serie_doenca(s, "MAMA")
+    checar("H. base real: mama explica por que 2028 aparece abaixo de 2025 sem ser queda",
+           "sem que isso signifique queda" in (leitura_ponta_projecao(mama) or ""))
+    checar("H. base real: a projeção sai da reta, que em 2025 fica abaixo do observado",
+           tendencia_no_periodo(mama)["internacoes"].iloc[-1] < mama["internacoes"].iloc[-1])
 else:
     print("(pulado) H. base real não encontrada em " + CSV_REAL)
 

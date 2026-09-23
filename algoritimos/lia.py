@@ -13,6 +13,7 @@ from inteligencia import (
     ficha_cancer,
     formatar_numero,
     leitura_faixas,
+    leitura_ponta_projecao,
     MEDIA_PEQUENA,
     nome_doenca,
     pressao_projetada,
@@ -419,6 +420,9 @@ def _projecao(ctx, c):
     if teste:
         fala += (f" Testei o método prevendo anos que já conheço: ele errou "
                  f"{'menos' if i['tendencia_acerta_mais'] else 'mais'} do que simplesmente repetir a média.")
+    ponta = leitura_ponta_projecao(mun)
+    if ponta:  # último ano longe da reta: explica por que a projeção parece "cair"
+        fala += " " + ponta
     fala += (" É uma **projeção de tendência**, não previsão de casos novos. Serve de sinal para discutir "
              "planejamento e acompanhar a demanda.")
     return Resposta(

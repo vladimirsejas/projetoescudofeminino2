@@ -301,15 +301,52 @@ def anos_fora_do_padrao(dados):
     return pd.DataFrame(linhas, columns=["ano", "observado", "esperado", "direcao", "numeros_pequenos"])
 
 
+def ponta_fora_da_tendencia(dados):
+    """O ÚLTIMO ano comparado com a tendência dos anos ANTERIORES
+    (a reta só dos outros anos, prolongada um passo).
+
+    anos_fora_do_padrao() não testa as pontas, para não extrapolar
+    com números pequenos (6 observadas contra 0,8 esperadas). Aqui é
+    um passo só e exige esperado de pelo menos MEDIA_PEQUENA; abaixo
+    disso devolve None (não dá para dizer). Serve para ver saltos no
+    ano mais recente -- como 2025, quando os 7 cânceres subiram de
+    33% a 83% ao mesmo tempo no Estado inteiro."""
+    dados = dados.sort_values("ano")
+    if len(dados) < 6:
+        return None
+    anteriores, ultimo = dados.iloc[:-1], dados.iloc[-1]
+    modelo = ajustar_tendencia(anteriores["ano"], anteriores["internacoes"])
+    esperado = max(float(modelo["intercepto"] + modelo["inclinacao"] * ultimo["ano"]), 0.0)
+    if esperado < MEDIA_PEQUENA:
+        return None
+    observado = float(ultimo["internacoes"])
+    diferenca = observado - esperado
+    desvio = max(modelo["s"], math.sqrt(esperado))
+    return {
+        "ano": int(ultimo["ano"]),
+        "observado": observado,
+        "esperado": esperado,
+        "direcao": "acima" if diferenca > 0 else "abaixo",
+        "fora": abs(diferenca) > LIMIAR_DESVIOS * desvio and abs(diferenca) >= DIFERENCA_MINIMA,
+    }
+
+
 def ano_atipico_no_estado(serie, ano):
     """Quantos cânceres tiveram `ano` fora do padrão no Estado. Se
     forem todos ao mesmo tempo, é mais provável uma mudança no
-    registro/processamento do que em todas as doenças juntas."""
+    registro/processamento do que em todas as doenças juntas. O
+    último ano da série é avaliado por ponta_fora_da_tendencia (os
+    números do Estado são grandes; não há o risco da extrapolação
+    com números pequenos); os demais, por anos_fora_do_padrao."""
     canceres = serie[serie["grupo"] == GRUPO_ESTADO]["tipo_cancer"].unique()
-    fora = sum(
-        ano in set(anos_fora_do_padrao(serie_doenca(serie, c, GRUPO_ESTADO))["ano"])
-        for c in canceres
-    )
+    fora = 0
+    for c in canceres:
+        dados = serie_doenca(serie, c, GRUPO_ESTADO)
+        if ano == int(dados["ano"].max()):
+            ponta = ponta_fora_da_tendencia(dados)
+            fora += bool(ponta and ponta["fora"])
+        else:
+            fora += ano in set(anos_fora_do_padrao(dados)["ano"])
     return fora, len(canceres)
 
 
@@ -329,6 +366,43 @@ def projetar(dados, horizonte=3, coluna="internacoes"):
     ponto, minimo, maximo = prever(ajustar_tendencia(dados["ano"], dados[coluna]), anos)
     return pd.DataFrame({"ano": anos, coluna: ponto,
                          "minimo": minimo, "maximo": maximo})
+
+
+def tendencia_no_periodo(dados, coluna="internacoes"):
+    """A reta da tendência sobre os anos observados -- a mesma que a
+    projeção prolonga. No gráfico, a projeção sai DELA, não do último
+    ponto: senão um último ano acima da reta faz a projeção parecer
+    uma queda mesmo quando a tendência é de alta."""
+    dados = dados.sort_values("ano")
+    modelo = ajustar_tendencia(dados["ano"], dados[coluna])
+    anos = dados["ano"].astype(int).tolist()
+    return pd.DataFrame({"ano": anos, coluna: [max(modelo["intercepto"] + modelo["inclinacao"] * a, 0.0)
+                                                for a in anos]})
+
+
+def leitura_ponta_projecao(dados, horizonte=3, coluna="internacoes"):
+    """Frase para quando o último ano e a projeção parecem se
+    contradizer: tendência de alta, mas a projeção fica ABAIXO do
+    último ano (ou o contrário). Acontece quando o último ano ficou
+    longe da reta -- a projeção segue a reta de todos os anos, não o
+    último. None quando não há contradição aparente."""
+    dados = dados.sort_values("ano")
+    if len(dados) < 3:
+        return None
+    reta = tendencia_no_periodo(dados, coluna).iloc[-1][coluna]
+    proj = projetar(dados, horizonte, coluna).iloc[-1]
+    ultimo = float(dados[coluna].iloc[-1])
+    ano_fim = int(dados["ano"].iloc[-1])
+    ano_ini = int(dados["ano"].iloc[0])
+    subindo = proj[coluna] > reta
+    if subindo == (proj[coluna] > ultimo) or abs(ultimo - reta) < DIFERENCA_MINIMA:
+        return None
+    return (f"Em {ano_fim} foram {formatar_numero(ultimo)}, {'acima' if ultimo > reta else 'abaixo'} da tendência de "
+            f"{ano_ini}–{ano_fim} (cerca de {formatar_numero(reta)} para esse ano). A projeção segue a tendência de "
+            f"todos os anos, não o último: por isso {int(proj['ano'])} aparece "
+            f"{'abaixo' if ultimo > reta else 'acima'} de {ano_fim} sem que isso signifique "
+            f"{'queda' if ultimo > reta else 'alta'}. Se {ano_fim} for o novo patamar, {int(proj['ano'])} tende a ficar "
+            f"{'acima' if ultimo > reta else 'abaixo'} da projeção.")
 
 
 def testar_projecao(dados, anos_teste=3, coluna="internacoes"):

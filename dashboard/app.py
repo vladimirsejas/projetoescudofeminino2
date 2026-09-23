@@ -26,12 +26,14 @@ from inteligencia import (
     formatar_numero,
     leitura_evolucao,
     leitura_faixas,
+    leitura_ponta_projecao,
     nome_doenca,
     projetar,
     quando_aparece,
     resumo_doencas,
     ritmo_estadual_na_escala,
     serie_doenca,
+    tendencia_no_periodo,
     testar_projecao,
 )
 
@@ -447,6 +449,16 @@ if aba == "Evolução":
     fig = go.Figure()
     if ver_projecao:
         proj = projetar(mun)
+        # A projeção sai da RETA da tendência (desenhada fraquinha
+        # sobre o histórico), não do último ponto: se o último ano
+        # ficou acima da reta, sair dele desenhava uma "queda" falsa.
+        reta = tendencia_no_periodo(mun)
+        fig.add_trace(go.Scatter(
+            x=reta["ano"], y=reta["internacoes"], mode="lines",
+            line={"color": AZUL, "width": 1.5, "dash": "dot"}, opacity=0.55,
+            name="Tendência (reta dos anos observados)",
+            hovertemplate="%{x}: tendência ~%{y:.0f}<extra></extra>",
+        ))
         fig.add_trace(go.Scatter(
             x=list(proj["ano"]) + list(proj["ano"])[::-1],
             y=list(proj["maximo"]) + list(proj["minimo"])[::-1],
@@ -455,7 +467,7 @@ if aba == "Evolução":
         ))
         fig.add_trace(go.Scatter(
             x=[ano_fim] + list(proj["ano"]),
-            y=[float(mun["internacoes"].iloc[-1])] + list(proj["internacoes"]),
+            y=[float(reta["internacoes"].iloc[-1])] + list(proj["internacoes"]),
             mode="lines+markers", line={"color": AZUL, "width": 2, "dash": "dot"},
             marker={"size": 8, "symbol": "circle-open"}, name="Projeção de tendência",
             hovertemplate="%{x}: cerca de %{y:.0f} (projeção)<extra></extra>",
@@ -507,6 +519,9 @@ if aba == "Evolução":
                 f"({formatar_numero(teste['erro_media'], 1)}). Não é previsão clínica nem indica causa. "
                 f"A pressão projetada em dias e valores está na aba Planejamento."
             )
+        ponta = leitura_ponta_projecao(mun)
+        if ponta:
+            st.markdown(f'<div class="escudo-dica">{ponta}</div>', unsafe_allow_html=True)
 
     # Confiabilidade: a casa dos avisos é aqui, junto da tendência.
     avisos = confiabilidade(serie, doenca, duplicados_municipio(ORIGEM))
