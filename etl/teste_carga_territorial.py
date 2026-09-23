@@ -28,14 +28,6 @@ def main():
     ]
     assert codigos.tolist() == [3550308, 3543907, 352690, 3526902]
 
-    df_rc = pd.DataFrame({"MUNIC_RES": ["3550308", "3526902"]})
-    municipios_rc, codigos_rc = resolver_municipios(
-        df_rc, "RIO_CLARO", catalogo
-    )
-
-    assert municipios_rc.tolist() == ["RIO_CLARO", "RIO_CLARO"]
-    assert codigos_rc.tolist() == [3543907, 3543907]
-
     df_6 = pd.DataFrame({"MUNIC_RES": ["355030", "354390"]})
     municipios_6, _ = resolver_municipios(df_6, "SP", catalogo)
     assert municipios_6.tolist() == ["SAO_PAULO", "RIO_CLARO"]

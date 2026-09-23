@@ -28,11 +28,21 @@ def testar_encontrar_pastas_validas():
                 "deveriam falhar, não retornar lista vazia em silêncio"
             )
 
-        # criando a subpasta esperada, a carga volta a reconhecer o
-        # território -- prova que o guard não é permanente, só reage
-        # à ausência da estrutura correta.
+        # pasta municipal antiga sozinha também não vale: a carga só
+        # lê as estaduais (as municipais contavam Rio Claro em dobro).
         os.mkdir(os.path.join(base_dados, "cancer_mama_rio_claro"))
-        assert encontrar_pastas_validas(base_dados) == ["cancer_mama_rio_claro"]
+        try:
+            encontrar_pastas_validas(base_dados)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("pasta municipal não deveria ser reconhecida")
+
+        # criando a subpasta estadual, a carga volta a reconhecer --
+        # prova que o guard não é permanente, só reage à ausência da
+        # estrutura correta.
+        os.mkdir(os.path.join(base_dados, "cancer_mama_sp"))
+        assert encontrar_pastas_validas(base_dados) == ["cancer_mama_sp"]
 
     print("Todas as checagens de pastas válidas passaram.")
 
@@ -41,12 +51,12 @@ def main():
     testar_encontrar_pastas_validas()
 
     with tempfile.TemporaryDirectory() as pasta:
-        assert selecionar_csv_unico(pasta, "cancer_mama_rio_claro") is None
+        assert selecionar_csv_unico(pasta, "cancer_mama_sp") is None
 
         caminho_unico = os.path.join(pasta, "A123456780191307.csv")
         open(caminho_unico, "w").close()
         assert (
-            selecionar_csv_unico(pasta, "cancer_mama_rio_claro")
+            selecionar_csv_unico(pasta, "cancer_mama_sp")
             == caminho_unico
         )
 
@@ -56,7 +66,7 @@ def main():
         open(caminho_novo, "w").close()
 
         try:
-            selecionar_csv_unico(pasta, "cancer_mama_rio_claro")
+            selecionar_csv_unico(pasta, "cancer_mama_sp")
         except RuntimeError as erro:
             assert "mais de um CSV" in str(erro)
         else:

@@ -9,12 +9,12 @@ import carga_todas_bases as carga
 #
 # No banco real, as moradoras de Rio Claro estavam em `internacoes`
 # duas vezes (pasta de Rio Claro + pasta estadual): 1.668 + 1.668.
-# Este teste roda carregar() de verdade, com CSVs e banco
-# temporários, e prova que:
-#   - a pasta municipal é pulada quando o estadual do mesmo câncer
-#     existe (mama);
-#   - a pasta municipal continua valendo quando não há estadual
-#     daquele câncer (ovário);
+# Agora a carga só lê os arquivos estaduais. Este teste roda
+# carregar() de verdade, com CSVs e banco temporários, e prova que:
+#   - pastas municipais antigas em dados\ são ignoradas (e avisadas);
+#   - Rio Claro conta uma vez só, vinda do estadual;
+#   - câncer sem pasta estadual fica de fora (e é avisado), em vez
+#     de voltar a ler a pasta da cidade;
 #   - no fim não sobra município com duas fontes.
 # =====================================
 
@@ -29,14 +29,6 @@ def escrever_csv(pasta_base, pasta, linhas):
 
 
 def main():
-    # ---- função pura ----
-    carregar, puladas = carga.pastas_para_carregar([
-        "cancer_mama_rio_claro", "cancer_mama_sp", "cancer_ovario_rio_claro",
-    ])
-    assert puladas == ["cancer_mama_rio_claro"], puladas
-    assert carregar == ["cancer_mama_sp", "cancer_ovario_rio_claro"], carregar
-    print("[OK] pasta municipal pulada só quando existe o estadual do mesmo câncer")
-
     # ---- carga de ponta a ponta ----
     temporario = tempfile.mkdtemp()
     base_dados = os.path.join(temporario, "dados")
@@ -58,6 +50,11 @@ def main():
     conexao.commit()
     conexao.close()
 
+    assert carga.pastas_ignoradas(base_dados) == ["cancer_mama_rio_claro", "cancer_ovario_rio_claro"]
+    print("[OK] pastas municipais antigas são reconhecidas como ignoradas")
+    assert "OVARIO" in carga.canceres_faltando(carga.encontrar_pastas_validas(base_dados))
+    print("[OK] câncer sem pasta estadual é avisado")
+
     carga.BASE_DADOS, carga.BANCO = base_dados, banco
     carga.carregar()
 
@@ -71,8 +68,8 @@ def main():
 
     assert contagem.get("MAMA") == 3, contagem
     print("[OK] mama de Rio Claro conta 3, não 6")
-    assert contagem.get("OVARIO") == 4, contagem
-    print("[OK] ovário (sem arquivo estadual) continua vindo da pasta de Rio Claro")
+    assert "OVARIO" not in contagem, contagem
+    print("[OK] a pasta de Rio Claro não é lida nem quando falta o estadual")
     assert duplicados == [], duplicados
     print("[OK] nenhum município com duas fontes no fim da carga")
 

@@ -6,20 +6,22 @@ import pandas as pd
 BASE_DADOS = r"C:\projetoescudofeminino2\dados"
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
+# Só os arquivos ESTADUAIS entram no banco. Cada um traz as
+# internações de todas as moradoras de SP, já com o município de
+# residência (MUNIC_RES) -- inclusive as de Rio Claro. As pastas
+# municipais antigas (ex.: cancer_mama_rio_claro) repetiam essas
+# mesmas internações: carregar as duas contava Rio Claro em dobro
+# (confirmado no banco real em 09/2026: 1.668 + as mesmas 1.668).
+# Por isso elas não têm mais caminho na carga; se ainda estiverem em
+# dados\, são ignoradas com aviso. Fonte única também deixa todas
+# as cidades comparáveis entre si.
 MAPA = {
-    "cancer_mama_rio_claro": ("MAMA", "RIO_CLARO"),
     "cancer_mama_sp": ("MAMA", "SP"),
-    "cancer_colorretal_rio_claro": ("COLORRETAL", "RIO_CLARO"),
     "cancer_colorretal_sp": ("COLORRETAL", "SP"),
-    "cancer_colo_utero_rio_claro": ("COLO_UTERO", "RIO_CLARO"),
     "cancer_colo_utero_sp": ("COLO_UTERO", "SP"),
-    "cancer_ovario_rio_claro": ("OVARIO", "RIO_CLARO"),
     "cancer_ovario_sp": ("OVARIO", "SP"),
-    "cancer_pulmao_rio_claro": ("PULMAO", "RIO_CLARO"),
     "cancer_pulmao_sp": ("PULMAO", "SP"),
-    "cancer_tireoide_rio_claro": ("TIREOIDE", "RIO_CLARO"),
     "cancer_tireoide_sp": ("TIREOIDE", "SP"),
-    "cancer_pele_nao_melanoma_rio_claro": ("PELE_NAO_MELANOMA", "RIO_CLARO"),
     "cancer_pele_nao_melanoma_sp": ("PELE_NAO_MELANOMA", "SP"),
 }
 
@@ -99,7 +101,7 @@ def encontrar_pastas_validas(base_dados):
     Lista as subpastas de `base_dados` que a carga reconhece (as
     chaves de MAPA). Falha alto se nenhuma bater -- por exemplo, se
     os CSVs foram deixados soltos direto em dados\\ em vez de dentro
-    de dados\\cancer_mama_rio_claro\\ etc. Sem essa checagem, esse
+    de dados\\cancer_mama_sp\\ etc. Sem essa checagem, esse
     engano não gera erro nenhum: o laço da carga simplesmente ignora
     todo mundo que não bate com MAPA e termina com TOTAL: 0, fácil de
     passar despercebido.
@@ -114,8 +116,8 @@ def encontrar_pastas_validas(base_dados):
     if not pastas:
         raise RuntimeError(
             f"Nenhuma subpasta reconhecida foi encontrada em '{base_dados}'. "
-            "A carga espera uma subpasta por câncer x território (ex.: "
-            "dados\\cancer_mama_rio_claro\\, com um único CSV dentro dela) "
+            "A carga espera uma subpasta estadual por câncer (ex.: "
+            "dados\\cancer_mama_sp\\, com um único CSV dentro dela) "
             "-- não arquivos soltos direto em dados\\. Pastas esperadas: "
             + ", ".join(sorted(MAPA))
         )
@@ -123,45 +125,34 @@ def encontrar_pastas_validas(base_dados):
     return pastas
 
 
-def pastas_para_carregar(pastas):
+def pastas_ignoradas(base_dados):
     """
-    Tira da carga as pastas municipais (ex.: cancer_mama_rio_claro)
-    cujo câncer também tem a pasta estadual (cancer_mama_sp).
-
-    O arquivo estadual traz as internações de TODAS as moradoras de
-    SP, já com o município de residência -- inclusive as de Rio
-    Claro. Carregar os dois gravava as mesmas internações duas vezes
-    com municipio = 'RIO_CLARO' (confirmado no banco real em 09/2026:
-    1.668 linhas com origem RIO_CLARO e as mesmas 1.668 com origem
-    SP), e todo total de Rio Claro calculado por `municipio` saía em
-    dobro. Usar só o estadual também deixa todas as cidades vindas
-    da mesma fonte, o que torna a comparação entre elas justa.
-
-    Se faltar o arquivo estadual de algum câncer, a pasta municipal
-    desse câncer continua sendo carregada (senão a cidade ficaria
-    sem dado nenhum).
+    Subpastas de dados\\ com cara de base (cancer_...) que a carga
+    NÃO lê -- hoje, as municipais antigas (cancer_mama_rio_claro
+    etc.). Só para avisar: elas podem ficar no computador como
+    arquivo, mas não entram no banco.
     """
 
-    canceres_com_estadual = {
-        MAPA[pasta][0] for pasta in pastas if MAPA[pasta][1] == "SP"
-    }
+    return [
+        entrada
+        for entrada in sorted(os.listdir(base_dados))
+        if entrada.startswith("cancer_") and entrada not in MAPA
+        and os.path.isdir(os.path.join(base_dados, entrada))
+    ]
 
-    carregar, puladas = [], []
-    for pasta in pastas:
-        tipo_cancer, origem = MAPA[pasta]
-        if origem != "SP" and tipo_cancer in canceres_com_estadual:
-            puladas.append(pasta)
-        else:
-            carregar.append(pasta)
 
-    return carregar, puladas
+def canceres_faltando(pastas):
+    """Cânceres de MAPA sem pasta estadual em dados\\."""
+
+    presentes = {MAPA[pasta][0] for pasta in pastas}
+    return sorted({tipo for tipo, _ in MAPA.values()} - presentes)
 
 
 def municipios_duplicados(conexao):
     """
     (Município, câncer) com internações vindas de mais de uma fonte
-    (origem). Depois de pastas_para_carregar() a lista deve vir
-    vazia; se não vier, esses totais estão contados em dobro. É por
+    (origem). Com só os arquivos estaduais a lista deve vir vazia;
+    se não vier, esses totais estão contados em dobro. É por
     câncer: mama do estadual + ovário da pasta da cidade é normal.
     """
 
@@ -218,14 +209,6 @@ def carregar_catalogo(conexao):
 
 
 def resolver_municipios(df, origem, catalogo):
-    # A pasta de Rio Claro já representa o recorte municipal original.
-    # Não reclassificamos esses registros pelo código do CSV.
-    if origem == "RIO_CLARO":
-        return (
-            pd.Series(["RIO_CLARO"] * len(df), index=df.index),
-            pd.Series([3543907] * len(df), index=df.index),
-        )
-
     coluna = encontrar_coluna_codigo(df)
 
     if origem == "SP" and coluna is None:
@@ -282,15 +265,18 @@ def carregar():
     total_registros = 0
     primeira_carga = True
 
-    pastas, puladas = pastas_para_carregar(
-        encontrar_pastas_validas(BASE_DADOS)
-    )
+    pastas = encontrar_pastas_validas(BASE_DADOS)
 
-    for pasta in puladas:
+    for pasta in pastas_ignoradas(BASE_DADOS):
         print(
-            f"PULADA: {pasta} -- as mesmas internações já vêm no arquivo "
-            "estadual do mesmo câncer (evita contar a cidade em dobro)."
+            f"IGNORADA: {pasta} -- a carga usa só os arquivos estaduais "
+            "(as internações dessa cidade já vêm neles, com o município "
+            "de residência). Pode guardar a pasta fora de dados\\."
         )
+
+    for tipo in canceres_faltando(pastas):
+        print(f"ATENÇÃO: falta a pasta estadual de {tipo} "
+              "(esse câncer fica fora do banco).")
 
     for pasta in pastas:
 
@@ -362,8 +348,8 @@ def carregar():
         raise RuntimeError(
             "A carga encontrou pastas reconhecidas, mas nenhuma continha "
             "um CSV -- confira se os arquivos foram mesmo colocados "
-            "dentro das subpastas de dados\\ (uma por câncer x "
-            "território), e não deixados soltos na raiz."
+            "dentro das subpastas de dados\\ (uma por câncer), e não "
+            "deixados soltos na raiz."
         )
 
     print("\n" + "=" * 60)

@@ -11,7 +11,7 @@ SELECT
     COUNT(*) AS internacoes
 FROM internacoes
 WHERE tipo_cancer = 'MAMA'
-AND origem = 'RIO_CLARO'
+AND municipio = 'RIO_CLARO'
 GROUP BY ano
 ORDER BY ano
 """

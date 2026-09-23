@@ -25,7 +25,7 @@ for cancer in canceres:
         COUNT(*) AS internacoes
     FROM internacoes
     WHERE tipo_cancer = '{cancer}'
-    AND origem = 'RIO_CLARO'
+    AND municipio = 'RIO_CLARO'
     GROUP BY ano
     ORDER BY ano
     """

@@ -10,7 +10,7 @@ SELECT
     tipo_cancer,
     COUNT(*) AS total
 FROM internacoes
-WHERE origem = 'RIO_CLARO'
+WHERE municipio = 'RIO_CLARO'
 GROUP BY tipo_cancer
 ORDER BY total DESC
 """

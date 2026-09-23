@@ -167,13 +167,15 @@ Estado atual:
 - **Contagem em dobro de Rio Claro: confirmada e corrigida.** No
   banco real havia 1.668 internações de Rio Claro com origem
   RIO_CLARO e as mesmas 1.668 com origem SP (a pasta estadual já traz
-  todas as cidades). Todo total por `municipio = 'RIO_CLARO'` nos
-  scripts antigos saía dobrado (taxas e médias não). Correção na
-  carga: `pastas_para_carregar()` pula a pasta municipal quando existe
-  a estadual do mesmo câncer, e `municipios_duplicados()` confere no
-  fim (teste: `etl/teste_carga_duplicidade.py`). Com isso, as
-  moradoras de Rio Claro passam a ter `origem = 'SP'` como as de
-  qualquer cidade; nenhum script dependia de `origem = 'RIO_CLARO'`.
+  todas as cidades). **A carga agora lê SÓ os arquivos estaduais**
+  (`MAPA` em `etl/carga_todas_bases.py` não tem mais as pastas
+  `cancer_*_rio_claro`; se estiverem em `dados\`, são ignoradas com
+  aviso, e falta de pasta estadual é avisada -- nunca volta a ler a
+  da cidade). Toda linha tem `origem = 'SP'`; a cidade de residência
+  está em `municipio`. Scripts de `analises/` passaram de
+  `origem = 'RIO_CLARO'` para `municipio = 'RIO_CLARO'`. Teste:
+  `etl/teste_carga_duplicidade.py`. Os arquivos de Rio Claro não
+  precisam ser apagados (podem ficar guardados fora de `dados\`).
   Precisa rodar a carga + cadeia de novo no Windows.
 - **`algoritimos/conversa.py`** (fora do painel desde que a caixa
   da Lia saiu; substituiu `chat_servico.py`). Entender (assunto por PONTUAÇÃO de palavras-
