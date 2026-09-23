@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass, field
 
 from inteligencia import (
@@ -30,8 +29,9 @@ from inteligencia import (
 # próximos botões, o destino no painel e os números usados ("por
 # quê?"). As falas guiadas são DETERMINÍSTICAS: montadas com os
 # números de inteligencia.py, sem IA -- rápidas, sem custo e sempre
-# iguais para os mesmos dados. A IA de linguagem só entra na caixa
-# de texto livre, via conversa.py.
+# iguais para os mesmos dados. Não há caixa de texto livre no painel
+# (saiu em 09/2026, decisão do autor: respondia o mesmo que os botões,
+# com menos precisão); conversa.py continua fora do painel.
 #
 # A expressão vem dos dados: "cautelosa" quando a confiabilidade
 # pede cuidado, "atenta" quando há sinal, "explicando" no resto.
@@ -471,145 +471,3 @@ def responder(ctx, acao):
         return saudacao(ctx)
     r.botoes = r.botoes + [("Começar de novo", INICIO)]
     return r
-
-
-# ---------- texto livre (passa por conversa.py) ----------
-
-ASSUNTO_PARA_ABA = {"PANORAMA": "Panorama", "EVOLUCAO": "Evolução", "ESTADO": "Evolução",
-                    "FORA_PADRAO": "Investigar", "PROJECAO": "Evolução", "MORTALIDADE": "Panorama",
-                    "CUSTO": "Panorama", "PERMANENCIA": "Panorama", "ATENCAO": "Planejamento",
-                    "METODO": "Método"}
-
-
-LIMITE_IA_SEGUNDOS = 20
-
-
-def explicar_com_limite(segundos=LIMITE_IA_SEGUNDOS):
-    """A função de redação da IA (Gemini, via ia_linguagem), mas com
-    tempo máximo. Sem isso, um Gemini lento ou travado deixava a tela
-    parada sem aviso -- no computador do autor, a caixa de texto
-    "não respondia". Estourou o tempo (ou deu erro): conversa.py cai
-    na resposta direta com os números."""
-    from concurrent.futures import ThreadPoolExecutor
-
-    def explicar(pergunta, contexto, perfil):
-        from ia_linguagem import responder_com_ia
-        executor = ThreadPoolExecutor(max_workers=1)
-        try:
-            return executor.submit(responder_com_ia, pergunta, contexto, perfil).result(timeout=segundos)
-        finally:
-            executor.shutdown(wait=False)  # não espera a chamada lenta terminar
-
-    return explicar
-
-
-# ---------- vocabulário de perguntas da caixa de texto ----------
-#
-# Quem abre o Escudo não sabe o que perguntar a uma IA; em vez de
-# "pergunte qualquer coisa", a Lia oferece perguntas que o motor de
-# conversa.py responde bem. Cada uma é (rótulo curto do botão,
-# pergunta completa, assunto que o motor deve entender). O rótulo
-# cabe no botão; a pergunta completa é a que vai para o motor e
-# aparece no balão -- assim a pessoa aprende a perguntar do seu jeito.
-# teste_lia.py confere que TODAS caem no assunto certo e no câncer
-# certo, para todos os cânceres: nenhuma sugestão pode levar a uma
-# resposta sobre outra coisa.
-
-PERGUNTAS_DO_CANCER = [
-    ("Como evoluiu?", "Como evoluiu o {cancer}?", "EVOLUCAO"),
-    ("E no Estado de SP?", "Como o {cancer} se compara ao Estado de SP?", "ESTADO"),
-    ("Quantas morrem?", "Quantas mulheres morrem na internação por {cancer}?", "MORTALIDADE"),
-    ("Próximos anos", "O que esperar do {cancer} nos próximos anos?", "PROJECAO"),
-    ("Anos fora do padrão", "O {cancer} teve ano fora do padrão?", "FORA_PADRAO"),
-    ("Tempo internada", "Quanto tempo ficam internadas por {cancer}?", "PERMANENCIA"),
-    ("Valor registrado", "Qual o valor hospitalar registrado do {cancer}?", "CUSTO"),
-]
-
-PERGUNTAS_GERAIS = [
-    ("O que mais aparece?", "Quais cânceres mais levam as mulheres ao hospital?", "PANORAMA"),
-    ("Onde mais morrem?", "Em quais cânceres mais mulheres morrem na internação?", "MORTALIDADE"),
-    ("Ritmo x Estado", "Como a cidade se compara ao Estado de SP?", "ESTADO"),
-    ("Anos fora do padrão", "Algum câncer teve ano fora do padrão?", "FORA_PADRAO"),
-    ("Planejamento", "O que merece atenção no planejamento?", "ATENCAO"),
-    ("De onde vêm?", "De onde vêm esses dados?", "METODO"),
-]
-
-
-def sugestoes_de_pergunta(ctx, cancer_em_foco):
-    """Perguntas prontas para a caixa de texto: primeiro sobre o
-    câncer em foco no painel, depois sobre todos. Devolve
-    {"cancer": código, "do_cancer": [(rótulo, pergunta)], "gerais": [...]}."""
-    canceres = _canceres(ctx)
-    foco = cancer_em_foco if cancer_em_foco in canceres else canceres[0]
-    return {
-        "cancer": foco,
-        "do_cancer": [(r, p.format(cancer=cancer_de(foco))) for r, p, _ in PERGUNTAS_DO_CANCER],
-        "gerais": [(r, p) for r, p, _ in PERGUNTAS_GERAIS],
-    }
-
-
-# ---------- o que os dados NÃO respondem ----------
-#
-# Sem isto, "por que aumentou?" ou "qual tratamento?" recebiam uma
-# resposta sobre outra coisa, sem aviso -- a pessoa achava que a Lia
-# não tinha entendido. Agora ela diz o limite primeiro e depois
-# mostra o que os dados mostram. Detectar não é explicar.
-
-FORA_DO_ALCANCE = [
-    (["POR QUE", "PORQUE", "CAUSA", "MOTIVO", "RAZAO"],
-     "estes dados mostram **o que** mudou, não **por que** mudou: com internações não dá para apontar causa."),
-    (["TRATAMENTO", "TRATAR", "REMEDIO", "MEDICAMENTO", "SINTOMA", "DIAGNOSTIC", "CURA"],
-     "não oriento tratamento, sintomas nem diagnóstico: o Escudo lê internações do SUS, não é orientação médica."),
-    (["CASOS NOVOS", "CASO NOVO", "INCIDENCIA", "TERAO", "VAO TER"],
-     "internação não é caso novo: estes dados não dizem quantas mulheres têm ou terão câncer."),
-]
-
-
-def limites_da_pergunta(pergunta):
-    """Avisos para o que a pergunta pede e os dados não respondem."""
-    from conversa import normalizar
-    texto = normalizar(pergunta)
-    return [aviso for termos, aviso in FORA_DO_ALCANCE
-            if any(re.search(r"(?<![A-Z0-9])" + re.escape(t), texto) for t in termos)]
-
-
-# O gráfico certo para cada assunto: quem pergunta do futuro quer ver
-# a projeção ligada; quem pergunta de óbitos, as barras de óbitos.
-DETALHE_DO_DESTINO = {
-    "PROJECAO": {"camadas": {"ver_projecao": True}},
-    "ESTADO": {"camadas": {"ver_estado": True}},
-    "EVOLUCAO": {"camadas": {"ver_estado": True, "ver_fora": True}},
-    "MORTALIDADE": {"medida": "Óbitos na internação"},
-    "CUSTO": {"medida": "Valor hospitalar registrado"},
-    "PERMANENCIA": {"medida": "Dias de internação"},
-    "PANORAMA": {"medida": "Internações"},
-}
-
-
-def responder_texto(ctx, pergunta, cancer_em_foco=None, perfil="SIMPLES", explicar=None):
-    """Pergunta digitada: o motor de conversa.py responde, e a Lia
-    devolve no formato dela (expressão, botões, destino)."""
-    from conversa import responder as responder_conversa
-    if explicar is None:
-        explicar = explicar_com_limite()
-    r = responder_conversa(pergunta, ctx.serie, ctx.cidade, cancer_em_foco=cancer_em_foco,
-                           perfil=perfil, explicar=explicar)
-    cancer = r.get("cancer")
-    avisos = [t for nivel, t in confiabilidade(ctx.serie, cancer, ctx.duplicados)
-              if nivel == "atencao"] if cancer else []
-    expressao = {"METODO": "pensativa", "ATENCAO": "atenta"}.get(r["assunto"], "explicando")
-    if cancer and _pequeno(ctx, cancer):
-        expressao = "cautelosa"
-    limites = limites_da_pergunta(pergunta)
-    fala = r["texto"]
-    if limites:
-        fala = ("**Um limite antes:** " + " E ".join(limites) + " O que os dados mostram:\n\n" + fala)
-        expressao = "pensativa"
-    botoes = (_mais(cancer, "evolucao", "projecao", "porque") if cancer
-              else [("Onde prestar atenção?", caminho("atencao")), ("O que mais aparece?", caminho("mais_aparece"))])
-    destino = {"aba": ASSUNTO_PARA_ABA.get(r["assunto"], "Panorama")}
-    destino.update(DETALHE_DO_DESTINO.get(r["assunto"], {}))
-    if cancer:
-        destino["cancer"] = cancer
-    return Resposta(fala=fala, expressao=expressao, botoes=botoes + [("Começar de novo", INICIO)],
-                    destino=destino, numeros=r["fatos"] + avisos), r

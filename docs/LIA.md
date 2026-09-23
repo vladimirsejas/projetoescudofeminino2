@@ -89,34 +89,12 @@ sinais), não é enfeite.
 
 Sempre com **[Voltar]** e **[Começar de novo]**.
 
-**Caixa de texto livre** no alto da lateral, logo abaixo do rosto
-(a resposta aparece embaixo dela, sem precisar rolar a tela): a
-pergunta passa por `conversa.py` (o mesmo motor), e a resposta volta
-no formato da Lia, com expressão e botões.
-
-A Lia não diz "pergunte qualquer coisa": ela **oferece perguntas**
-que o motor responde bem (`lia.PERGUNTAS_DO_CANCER` e
-`lia.PERGUNTAS_GERAIS`). Quatro sobre o câncer em foco ficam à
-mostra; o resto (mais três do câncer e seis sobre todos) em "Mais
-perguntas". O botão tem um rótulo curto; a pergunta completa vai para
-o balão, para a pessoa aprender a perguntar do seu jeito.
-`teste_lia.py` confere que todas caem no assunto e no câncer certos,
-para todos os cânceres.
-
-| Sobre o câncer em foco | Sobre todos |
-|---|---|
-| Como evoluiu? | O que mais aparece? |
-| E no Estado de SP? | Onde mais morrem? |
-| Quantas morrem? | Ritmo x Estado |
-| Próximos anos | Anos fora do padrão |
-| Anos fora do padrão | Planejamento |
-| Tempo internada | De onde vêm? |
-| Valor registrado | |
-
-**O que os dados não respondem** (`lia.FORA_DO_ALCANCE`): "por
-quê?", tratamento/sintomas/diagnóstico e casos novos. A Lia diz o
-limite primeiro ("Um limite antes: ...") e depois mostra o que os
-dados mostram, em vez de responder sobre outra coisa sem avisar.
+**Sem caixa de texto livre.** Existiu (09/2026) e saiu por decisão
+do autor: o motor de texto (`conversa.py`) só entende os mesmos
+assuntos que os botões já cobrem, então a caixa respondia o mesmo com
+menos precisão e prometia "pergunte qualquer coisa". A Lia conduz só
+por botões. O código antigo está no histórico do git (commit
+`8d78523`); `conversa.py` continua no repositório, fora do painel.
 
 ## O que fica fora da versão 1.0 (de propósito)
 

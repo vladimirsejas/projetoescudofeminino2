@@ -120,8 +120,8 @@ Estado atual:
   aparece", faixa etária em dois períodos, download CSV),
   **Planejamento** (quadrante crescimento x letalidade relativa +
   evidências por câncer com pressão projetada em internações, dias e
-  valor registrado, e linha de ação do INCA), **Método**. Chat na
-  lateral.
+  valor registrado, e linha de ação do INCA), **Método**. Lia na
+  lateral (só botões).
 - Dinheiro sempre como **"valor hospitalar registrado no SIH/SUS"**
   (VAL_TOT das AIHs): não é orçamento municipal nem custo total do
   tratamento. Projeção sempre como **"projeção de tendência"**, nunca
@@ -131,13 +131,12 @@ Estado atual:
   médica, sem marca de instituição real). Árvore de 3 níveis
   (caminhos -> câncer -> ação), falas determinísticas montadas com
   `inteligencia.py`, expressão do rosto escolhida pela confiabilidade
-  do dado (acolhedora / explicando / atenta / cautelosa / pensativa);
-  texto livre passa por `conversa.py` e volta no formato dela. O
-  painel acompanha a Lia (aba, câncer, medida, camadas). Testado por
-  `teste_lia.py`. Caixa de texto no alto da lateral, com vocabulário
-  de perguntas testado (`lia.PERGUNTAS_DO_CANCER`/`PERGUNTAS_GERAIS`)
-  e aviso de limite para "por quê?", tratamento e casos novos
-  (`lia.FORA_DO_ALCANCE`). O atalho `Abrir Escudo Feminino.bat`
+  do dado (acolhedora / explicando / atenta / cautelosa / pensativa).
+  O painel acompanha a Lia (aba, câncer, medida, camadas). Testado por
+  `teste_lia.py`. **A caixa de texto livre saiu (decisão do autor,
+  09/2026):** respondia o mesmo que os botões, com menos precisão; a
+  Lia conduz só por botões. Mais opções devem entrar como caminhos
+  novos na árvore, não como texto livre. O atalho `Abrir Escudo Feminino.bat`
   reinicia o painel quando o `git pull` traz código novo (o Streamlit
   não recarrega `algoritimos/` sozinho). **Armadilha do Streamlit resolvida no painel:**
   widgets que somem e voltam (abas desenhadas só quando abertas)
@@ -176,8 +175,8 @@ Estado atual:
   moradoras de Rio Claro passam a ter `origem = 'SP'` como as de
   qualquer cidade; nenhum script dependia de `origem = 'RIO_CLARO'`.
   Precisa rodar a carga + cadeia de novo no Windows.
-- **Chat do painel: `algoritimos/conversa.py`** (substituiu
-  `chat_servico.py`). Entender (assunto por PONTUAÇÃO de palavras-
+- **`algoritimos/conversa.py`** (fora do painel desde que a caixa
+  da Lia saiu; substituiu `chat_servico.py`). Entender (assunto por PONTUAÇÃO de palavras-
   chave, não "primeiro if que der match"; câncer por sinônimos com
   palavra inteira) -> calcular (fatos de `inteligencia.py`, nunca das
   13 tabelas antigas) -> explicar (Gemini via `ia_linguagem`; se

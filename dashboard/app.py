@@ -9,8 +9,7 @@ import streamlit as st
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "algoritimos"))
 
 from configuracao_geografica import listar_municipios_disponiveis, obter_municipio, UF_REFERENCIA
-from conversa import registrar_pergunta
-from lia import INICIO, Contexto, Resposta, sugestoes_de_pergunta, responder as lia_responder, responder_texto as lia_texto
+from lia import INICIO, Contexto, responder as lia_responder
 from lia_rosto import img as rosto_lia
 from inteligencia import (
     anos_fora_do_padrao,
@@ -43,14 +42,14 @@ from inteligencia import (
 # repetiam os mesmos números em vários lugares. Regras deste:
 #   - cada informação tem uma casa só;
 #   - todo gráfico = pergunta (título) + gráfico + leitura em texto;
-#   - a tela não calcula nada: tudo vem de algoritimos/inteligencia.py,
-#     a mesma fonte que o chat deve usar.
+#   - a tela não calcula nada: tudo vem de algoritimos/inteligencia.py.
 # Portas (abas): Panorama (o que está acontecendo), Evolução (como
 # mudou e para onde vai), Investigar (o que merece ser pesquisado),
-# Planejamento (que evidências entram na discussão), Método. O chat
-# (lateral) atravessa todas -- agora como a Lia (algoritimos/lia.py,
-# docs/LIA.md), que conduz a conversa e leva o painel até o gráfico. Dinheiro aparece sempre como "valor
-# hospitalar registrado no SIH/SUS", nunca como orçamento.
+# Planejamento (que evidências entram na discussão), Método. A Lia
+# (lateral; algoritimos/lia.py, docs/LIA.md) atravessa todas: conduz
+# por botões e leva o painel até o gráfico. Sem caixa de texto livre
+# (saiu em 09/2026). Dinheiro aparece sempre como "valor hospitalar
+# registrado no SIH/SUS", nunca como orçamento.
 # O painel antigo continua no histórico do git (commit 273fbe5).
 # ============================================================
 
@@ -100,7 +99,6 @@ section[data-testid="stSidebar"] { min-width: 400px; }
 .lia-nome span { font-weight: 500; font-size: .95rem; color: #706b82; }
 .lia-cargo { color: #706b82; font-size: .85rem; line-height: 1.3; }
 .lia-fala-grande { color: #3d3852; font-size: 1.08rem; margin: 6px 0 12px; }
-.lia-pergunta { background: #efe9f7; border-radius: 12px; padding: 8px 12px; margin: 8px 0; color: #4d4863; font-size: .92rem; }
 div[data-testid="stRadio"]:has(input[value="Panorama"]) > div { gap: 4px; border-bottom: 1px solid #e6e3ef; }
 </style>
 """, unsafe_allow_html=True)
@@ -291,11 +289,10 @@ if lia_estado["cidade"] != ORIGEM:  # trocou de cidade: a Lia recomeça
     lia_estado.update({"cidade": ORIGEM, "atual": lia_responder(ctx_lia, INICIO), "pilha": []})
 
 
-def lia_mostrar(resposta, pergunta_digitada=None):
+def lia_mostrar(resposta):
     """Guarda a resposta e leva o painel até o gráfico dela."""
     if lia_estado["atual"] is not None:
         lia_estado["pilha"].append(lia_estado["atual"])
-    resposta.pergunta = pergunta_digitada
     lia_estado["atual"] = resposta
     st.session_state["lia_fechada"] = True
     destino = resposta.destino or {}
@@ -310,38 +307,8 @@ def lia_mostrar(resposta, pergunta_digitada=None):
         definir(camada, valor)
 
 
-if "lia_pendente" in st.session_state:  # pergunta digitada na execução anterior
-    lia_mostrar(*st.session_state.pop("lia_pendente"))
-    # a resposta pode ter trocado o câncer em foco: relê
-    doenca = st.session_state["doenca"]
-    nome = nome_doenca(doenca)
-
-
 def lia_clicar(acao):
     lia_mostrar(lia_responder(ctx_lia, acao))
-
-
-def lia_perguntar(texto, perfil):
-    """Pergunta em texto livre. Nunca deixa a tela sem resposta: se
-    algo falhar, a Lia diz que não conseguiu e mostra o detalhe
-    técnico (para o autor poder mandar a quem for corrigir)."""
-    try:
-        resposta, bruto = lia_texto(ctx_lia, texto, cancer_em_foco=doenca, perfil=perfil)
-        registrar_pergunta(BANCO, texto, bruto["assunto"])
-        return resposta
-    except Exception as erro:
-        return Resposta(
-            fala=("Não consegui responder essa pergunta agora. Tente um dos caminhos abaixo, ou escreva "
-                  "de outro jeito. Se continuar, mande o detalhe técnico para quem cuida do Escudo."),
-            expressao="cautelosa",
-            botoes=[("O que mais aparece?", {"tipo": "caminho", "id": "mais_aparece"}),
-                    ("Começar de novo", INICIO)],
-            numeros=[f"Detalhe técnico: {type(erro).__name__}: {erro}"],
-        )
-
-
-def lia_perguntar_exemplo(texto, perfil):
-    lia_mostrar(lia_perguntar(texto, perfil), pergunta_digitada=texto)
 
 
 def recarregar():
@@ -747,51 +714,10 @@ with st.sidebar:
         st.markdown('<div class="lia-nome">Lia</div><div class="lia-cargo">Pesquisadora do Escudo Feminino'
                     f'<br>{nome_cidade}</div>', unsafe_allow_html=True)
 
-    # A caixa fica NO ALTO, logo abaixo do rosto, e a resposta aparece
-    # embaixo dela. Antes a caixa ficava no fim da lateral e a resposta
-    # no topo, fora da tela de quem acabou de perguntar: parecia que a
-    # Lia "não respondia".
-    perfil = "SIMPLES" if st.session_state.get("linguagem", "Simples") == "Simples" else "TECNICO"
-    sugestoes = sugestoes_de_pergunta(ctx_lia, doenca)
-    with st.form("form_lia", clear_on_submit=True):
-        digitada = st.text_area(f"O que você quer descobrir sobre a saúde da mulher em {nome_cidade}?",
-                                height=80, placeholder=f"Escreva do seu jeito. Ex.: {sugestoes['do_cancer'][0][1]}")
-        enviar = st.form_submit_button("Perguntar à Lia", use_container_width=True, type="primary")
-    if enviar and digitada.strip():
-        with st.spinner("A Lia está lendo os dados..."):
-            resposta = lia_perguntar(digitada.strip(), perfil)
-        # A navegação já foi desenhada nesta execução e o Streamlit não
-        # deixa mudar um widget depois disso: a resposta é aplicada no
-        # começo da próxima execução.
-        st.session_state["lia_pendente"] = (resposta, digitada.strip())
-        recarregar()
-
-    # Para quem não sabe o que perguntar: perguntas que o motor responde
-    # bem (lia.PERGUNTAS_*, testadas em teste_lia.py). O botão mostra o
-    # rótulo curto; a pergunta completa vai para o balão, e a pessoa
-    # aprende a perguntar do seu jeito. Um clique já pergunta.
-    def botoes_de_sugestao(onde, lista, prefixo):
-        colunas = onde.columns(2)
-        for i, (rotulo, texto) in enumerate(lista):
-            colunas[i % 2].button(rotulo, key=f"{prefixo}_{i}_{texto}", help=texto, on_click=lia_perguntar_exemplo,
-                                  args=(texto, perfil), use_container_width=True)
-
-    st.caption(f"Ou comece por uma destas, sobre o {cancer_de(sugestoes['cancer'])}:")
-    botoes_de_sugestao(st, sugestoes["do_cancer"][:4], "sug_cancer")
-    with st.expander("Mais perguntas"):
-        botoes_de_sugestao(st, sugestoes["do_cancer"][4:], "sug_cancer_mais")
-        st.caption("Sobre todos os cânceres:")
-        botoes_de_sugestao(st, sugestoes["gerais"], "sug_geral")
-        st.caption("A Lia responde com as internações do SUS (SIH/SUS): o que aconteceu, como mudou e para "
-                   "onde a tendência aponta. Causas, tratamento e casos novos esses dados não mostram.")
-
-    st.divider()
     boas_vindas_aberta = not st.session_state.get("lia_fechada")
     if boas_vindas_aberta:
         # a saudação já está no centro da tela: aqui não se repete
-        st.markdown("Escolha um caminho ali no centro, ou pergunte aqui em cima.")
-    if getattr(atual, "pergunta", None):
-        st.markdown(f'<div class="lia-pergunta">{atual.pergunta}</div>', unsafe_allow_html=True)
+        st.markdown("Escolha um caminho ali no centro da tela.")
     if not boas_vindas_aberta:
         st.markdown(atual.fala)
     if atual.destino and atual.destino.get("aba") and lia_estado["pilha"]:
@@ -805,8 +731,5 @@ with st.sidebar:
         st.button(rotulo, key=f"lia_{i}_{rotulo}", on_click=lia_clicar, args=(acao,), use_container_width=True)
     if lia_estado["pilha"]:
         st.button("← Voltar", key="lia_voltar", on_click=lia_voltar)
-
-    st.divider()
-    st.radio("Linguagem das respostas escritas", ["Simples", "Técnica"], horizontal=True, key="linguagem")
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")
