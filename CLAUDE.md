@@ -140,6 +140,25 @@ Estado atual:
   devolviam o valor antigo; por isso cada widget tem chave atrelada
   ao valor (`chave_widget`) e o estado real fica em chaves próprias
   (`definir`). Não voltar a usar `key="doenca"` direto.
+- **Apoio à mulher — "Encontre um caminho" (09/2026, pedido do autor):**
+  outras lâminas, de APOIO, separadas do estudo da doença
+  (`dashboard/pages/apoio.py`, aberta pelo link no fim da lateral do
+  painel; `showSidebarNavigation = false` em `.streamlit/config.toml`).
+  Não mexer no painel principal por causa dela. Mesmo layout (CSS em
+  `dashboard/estilo.py`, movido de app.py sem mudar uma letra) e a
+  Lia idêntica, com a árvore de `algoritimos/apoio.py` (catálogo com
+  fonte oficial, data de conferência e "a confirmar" em cada item).
+  Lógica: Estado de SP primeiro (carretas, Mulheres de Peito, rede
+  oncológica da FOSP, Lista de Regulação de Oncologia), depois as
+  cidades como FONTE de itens (Campinas, Ribeirão Preto, Rio Preto,
+  Piracicaba entram nos caminhos; sem lâmina por cidade). Exceções
+  combinadas: lâmina **Rio Claro** (cidade do trabalho, mais detalhe)
+  e **Barretos** (Hospital de Amor). Cada item tem uma casa só; os
+  caminhos só apontam para os itens de Rio Claro e Barretos. Pesquisa
+  de 24/09/2026 feita pela busca na web (o ambiente de nuvem não abre
+  os sites do governo): itens com detalhe antigo ou de reportagem
+  estão marcados "a confirmar" -- conferir no Windows e tirar a marca.
+  Testes: `algoritimos/teste_apoio.py` e `dashboard/teste_apoio_tela.py`.
 - **Divisão de trabalho (09/2026):** o ChatGPT cuida de
   `conversa.py`/`teste_conversa.py`; Claude cuida de `inteligencia.py`
   e do painel (o autor passou a Lia para o Claude). Pendências do

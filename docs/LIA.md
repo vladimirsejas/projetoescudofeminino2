@@ -161,6 +161,20 @@ animação, memória entre visitas, personalidade gerada pela IA.
   (o `st.tabs` do Streamlit não pode ser trocado pelo código), e aba,
   câncer, medida e camadas ficam em chaves próprias do session_state.
 
+## A Lia no Apoio à mulher (09/2026)
+
+Além do painel de estudo da doença, a Lia conduz a lâmina **Apoio à
+mulher — "Encontre um caminho"** (`dashboard/pages/apoio.py`), aberta
+pelo link no fim da lateral do painel. É a **mesma Lia** (rosto,
+balão, botões, estilo em `dashboard/estilo.py`), com outra árvore
+(`algoritimos/apoio.py`): saudação ("Você está em Rio Claro. O que
+você precisa?") → 8 caminhos (Prevenir, Descobrir, Tratar,
+Acompanhar, Ir até você, Encontrar referência, Cuidar, Proteger) →
+item (para quem, o que levar, como, contato, página oficial, data em
+que foi conferido). Item "a confirmar" deixa a Lia **cautelosa**;
+Proteger fala com a expressão **acolhedora**. Ela não é médica e
+não promete vaga: mostra onde procurar.
+
 ## Testes
 
 - `algoritimos/teste_lia.py` percorre a árvore inteira (66 respostas

@@ -27,6 +27,10 @@ Esse é o motivo principal para tirá-la do caminho.
 | `dashboard/app.py` | o painel |
 | `dashboard/lia_rosto.py` | o rosto da Lia (5 expressões) |
 | `dashboard/teste_painel.py` | teste de aceitação: clica em tudo |
+| `dashboard/estilo.py` | o CSS do painel, compartilhado com a lâmina de apoio |
+| `dashboard/pages/apoio.py` | lâmina **Apoio à mulher** ("Encontre um caminho"), separada do estudo da doença |
+| `dashboard/teste_apoio_tela.py` | teste de aceitação da lâmina de apoio: clica em tudo |
+| `algoritimos/apoio.py` | catálogo de apoio (fontes oficiais) + árvore da Lia no apoio; testado por `teste_apoio.py` |
 | `algoritimos/inteligencia.py` | **única fonte dos números** |
 | `algoritimos/lia.py` | a Lia (árvore de caminhos) |
 | `algoritimos/passeio.py` | o Passeio pelo Escudo |

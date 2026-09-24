@@ -1,0 +1,340 @@
+import html
+import os
+import sys
+
+import pandas as pd
+import streamlit as st
+
+AQUI = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(AQUI, "..", "..", "algoritimos"))
+sys.path.insert(0, os.path.join(AQUI, ".."))
+
+import apoio  # noqa: E402
+from estilo import CSS  # noqa: E402
+from lia import INICIO  # noqa: E402
+from lia_rosto import img as rosto_lia  # noqa: E402
+
+# ============================================================
+# APOIO À MULHER — "Encontre um caminho" (combinado com o autor, 09/2026)
+#
+# Outras lâminas, SEPARADAS do painel de estudo da doença: aqui a
+# pergunta é "onde a mulher encontra ajuda?". O painel principal
+# (dashboard/app.py) não muda; só ganhou, no fim da lateral, o link
+# para cá. Mesmo layout (estilo.py) e a MESMA Lia (rosto, balão,
+# botões), com a árvore de algoritimos/apoio.py.
+# Lâminas: Encontre um caminho (Estado + itens de outras cidades,
+# por caminho), Rio Claro (a cidade do trabalho), Barretos (Hospital
+# de Amor) e Sobre estas informações. Cada item tem uma casa só.
+# O estado desta página usa chaves "ap_" (o session_state é
+# compartilhado com o painel) e a mesma defesa contra a armadilha do
+# Streamlit: chave do widget atrelada ao valor (ver app.py).
+# ============================================================
+
+st.set_page_config(page_title="Escudo Feminino · Apoio à mulher", page_icon="E", layout="wide",
+                   initial_sidebar_state="expanded")
+st.markdown(CSS, unsafe_allow_html=True)
+st.markdown("""
+<style>
+div[data-testid="stRadio"]:has(input[value="Encontre um caminho"]) > div { gap: 4px; border-bottom: 1px solid #e6e3ef; }
+.apoio-selo { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+              border-radius: 999px; padding: 2px 10px; margin-left: 8px; vertical-align: middle;
+              background: #ece7f7; color: #4d3f7a; }
+.apoio-selo.confirmar { background: #fff1e6; color: #a2400f; }
+.apoio-cartao { border-left: 6px solid #cdbfeb; }
+.apoio-cartao.confirmar { border-left-color: #f0b58d; }
+.apoio-cartao.destaque { box-shadow: 0 0 0 2px #7565a8; }
+.apoio-resumo { color: #4d4863; margin: 2px 0 6px; }
+.apoio-cartao ul { padding-left: 18px; margin: 4px 0; }
+.apoio-fonte { color: #8a8599; font-size: .85rem; margin-top: 8px; }
+.apoio-fonte a { color: #2a78d6; font-weight: 600; text-decoration: none; }
+.apoio-jornada { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 10px; }
+.apoio-jornada span { border-radius: 999px; padding: 4px 12px; background: #fff; border: 1px solid #e3dcf2;
+                      color: #4a3d78; font-weight: 600; font-size: .9rem; }
+.apoio-jornada span.ativo { background: #4a3d78; border-color: #4a3d78; color: #fff; }
+.apoio-jornada i { color: #9b8fc4; font-style: normal; }
+.apoio-grupo { font-family: 'Manrope', sans-serif; font-weight: 700; color: #4a3d78; font-size: 1rem; margin: 18px 0 0; }
+</style>
+""", unsafe_allow_html=True)
+
+ABAS = list(apoio.LAMINAS.values())
+ROTULO = apoio.NOME_CAMINHO
+PADROES = {"ap_aba": ABAS[0], "ap_caminho": "prevenir", "ap_item": None}
+for chave, valor in PADROES.items():
+    st.session_state.setdefault(chave, valor)
+st.session_state.setdefault("ap_lia", {"atual": apoio.responder(INICIO), "pilha": [], "falas": 0})
+lia_estado = st.session_state["ap_lia"]
+
+
+def definir(chave, valor):
+    st.session_state[chave] = valor
+
+
+def seletor(onde, rotulo, chave, opcoes, **kwargs):
+    """st.radio preso à chave persistente (mesma defesa de app.py)."""
+    k = f"w_{chave}_{st.session_state[chave]}"
+
+    def sincronizar():
+        st.session_state[chave] = st.session_state[k]
+        st.session_state["ap_item"] = None
+    return onde.radio(rotulo, opcoes, index=opcoes.index(st.session_state[chave]), key=k,
+                      on_change=sincronizar, **kwargs)
+
+
+def aplicar_destino(destino):
+    destino = destino or {}
+    if destino.get("aba") in ABAS:
+        definir("ap_aba", destino["aba"])
+    if destino.get("caminho") in ROTULO:
+        definir("ap_caminho", destino["caminho"])
+    definir("ap_item", destino.get("item"))
+
+
+def lia_clicar(acao):
+    resposta = apoio.responder(acao)
+    if lia_estado["atual"] is not None:
+        lia_estado["pilha"].append(lia_estado["atual"])
+    lia_estado["atual"] = resposta
+    lia_estado["falas"] += 1
+    st.session_state["ap_boas_vindas_fechada"] = True
+    aplicar_destino(resposta.destino)
+
+
+def lia_voltar():
+    if lia_estado["pilha"]:
+        lia_estado["atual"] = lia_estado["pilha"].pop()
+        lia_estado["falas"] += 1
+        aplicar_destino(lia_estado["atual"].destino)
+
+
+def balao(nome):
+    """Balão da Lia (CSS em estilo.py): a key muda a cada fala."""
+    chave = f"lia_balao_{nome}_apoio_{lia_estado['falas']}"
+    try:
+        return st.container(key=chave)
+    except TypeError:
+        return st.container(border=True)
+
+
+def rosto(expressao, tamanho):
+    return f'<div class="lia-rosto">{rosto_lia(expressao, tamanho)}</div>'
+
+
+def link_pagina(onde, destino, rotulo, href):
+    """st.page_link quando o Streamlit conhece a página; senão (Streamlit
+    antigo, ou esta página aberta sozinha num teste) um link comum."""
+    try:
+        onde.page_link(destino, label=rotulo)
+    except Exception:  # StreamlitPageNotFoundError / AttributeError
+        onde.markdown(f'<a href="{href}" target="_self">{rotulo}</a>', unsafe_allow_html=True)
+
+
+def pergunta(texto):
+    st.markdown(f'<div class="escudo-pergunta">{texto}</div>', unsafe_allow_html=True)
+
+
+def dica(texto):
+    st.markdown(f'<div class="escudo-dica">{texto}</div>', unsafe_allow_html=True)
+
+
+def leitura(titulo, frases):
+    st.markdown(f'<div class="escudo-leitura"><b>{titulo}</b><ul>'
+                + "".join(f"<li>{f}</li>" for f in frases) + "</ul></div>", unsafe_allow_html=True)
+
+
+def cartao(i):
+    """Um item do catálogo: o que é, para quem, como, fonte oficial."""
+    e = html.escape
+    linhas = "".join(f"<li><b>{r}:</b> {e(i[c])}</li>" for r, c in (
+        ("Para quem", "para_quem"), ("O que levar", "levar"), ("Como funciona", "como"), ("Onde e contato", "contato"))
+        if i[c])
+    classes = "escudo-cartao apoio-cartao" + (" confirmar" if i["confirmar"] else "") \
+        + (" destaque" if st.session_state["ap_item"] == i["id"] else "")
+    st.markdown(
+        f'<div class="{classes}"><h4>{e(i["titulo"])}<span class="apoio-selo">{e(i["onde"])}</span>'
+        + ('<span class="apoio-selo confirmar">a confirmar</span>' if i["confirmar"] else "") + "</h4>"
+        + f'<div class="apoio-resumo">{e(i["resumo"][0].upper() + i["resumo"][1:])}.</div>'
+        + (f"<ul>{linhas}</ul>" if linhas else "")
+        + (f'<div class="acao">Atenção: {e(i["cuidado"])}</div>' if i["cuidado"] else "")
+        + (f'<div class="acao">A confirmar: {e(i["confirmar"])}</div>' if i["confirmar"] else "")
+        + f'<div class="apoio-fonte"><a href="{e(i["link"])}" target="_blank" rel="noopener">Página oficial ↗</a>'
+        f' · Fonte: {e(i["fonte"])} · conferido em {apoio.CONFERIDO}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# TOPO
+# ============================================================
+
+col_titulo, col_link = st.columns([2.2, 1])
+with col_titulo:
+    st.markdown('<div class="escudo-marca">Escudo Feminino · Apoio à mulher</div>', unsafe_allow_html=True)
+    st.markdown('<div class="escudo-titulo">Encontre um caminho</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="escudo-sub">Onde a mulher de {apoio.CIDADE} encontra prevenção, diagnóstico, '
+                'tratamento e proteção, com as páginas oficiais do Estado de SP, da região e da cidade. '
+                'Um guia de onde procurar, não orientação médica.</div>', unsafe_allow_html=True)
+with col_link:
+    link_pagina(st, "app.py", "← Estudo da doença (painel)", "/")
+    st.caption(f"Informações conferidas em {apoio.CONFERIDO}. Confirme antes de ir.")
+
+# Boas-vindas da Lia no centro (primeiro acesso), como no painel.
+if not st.session_state.get("ap_boas_vindas_fechada"):
+    inicio = apoio.responder(INICIO)
+    c_rosto, c_fala = st.columns([1, 4.6])
+    with c_rosto:
+        st.markdown(rosto("acolhedora", 150), unsafe_allow_html=True)
+    with c_fala, balao("centro"):
+        st.markdown(f'<div class="lia-nome">Lia <span>· pesquisadora do Escudo Feminino</span></div>'
+                    f'<div class="lia-fala-grande">{inicio.fala.replace("**", "")}</div>', unsafe_allow_html=True)
+        colunas = st.columns(2)
+        for n, (c, rotulo, dentro, _) in enumerate(apoio.CAMINHOS):
+            colunas[n % 2].button(f"{rotulo} · {dentro}", key=f"bv_ap_{c}", on_click=lia_clicar,
+                                  args=(apoio.caminho(c),), use_container_width=True)
+        st.button("Prefiro explorar sozinha", key="bv_fechar_apoio",
+                  on_click=lambda: st.session_state.update(ap_boas_vindas_fechada=True))
+
+aba = seletor(st, "Lâmina", "ap_aba", ABAS, horizontal=True, label_visibility="collapsed")
+
+
+# ============================================================
+# ENCONTRE UM CAMINHO — Estado de SP e itens das cidades, por caminho
+# ============================================================
+
+if aba == apoio.LAMINAS["caminho"]:
+    pergunta("O que você precisa?")
+    dica("A jornada vai de prevenir a acompanhar; os outros caminhos servem em qualquer momento. "
+         "Cidades aparecem só quando têm algo útil para aquele caminho.")
+    atual_c = st.session_state["ap_caminho"]
+    jornada = " <i>→</i> ".join(f'<span class="{"ativo" if c == atual_c else ""}">{ROTULO[c]}</span>'
+                                for c in apoio.JORNADA)
+    st.markdown(f'<div class="apoio-jornada">{jornada}</div>', unsafe_allow_html=True)
+    codigos = [c for c, _, _, _ in apoio.CAMINHOS]
+    c = seletor(st, "Caminho", "ap_caminho", codigos, format_func=ROTULO.get, horizontal=True)
+    _, rotulo, dentro, abertura = next(x for x in apoio.CAMINHOS if x[0] == c)
+
+    pergunta(f"{rotulo}: {dentro}")
+    dica(abertura)
+    for i in apoio.itens(caminho=c, lamina="caminho"):
+        cartao(i)
+
+    apontados = [i for i in apoio.ITENS if i["caminho"] == c and i["lamina"] != "caminho"]
+    if apontados:
+        st.markdown('<div class="escudo-info"><b>Também para este caminho, nas lâminas próprias</b><ul>'
+                    + "".join(f"<li>{html.escape(i['titulo'])} → lâmina {apoio.LAMINAS[i['lamina']]}</li>"
+                              for i in apontados) + "</ul></div>", unsafe_allow_html=True)
+        for lam in dict.fromkeys(i["lamina"] for i in apontados):
+            st.button(f"Ver na lâmina {apoio.LAMINAS[lam]}", key=f"ir_{c}_{lam}",
+                      on_click=aplicar_destino, args=({"aba": apoio.LAMINAS[lam], "caminho": c},))
+    leitura("Como usar", [
+        "Cada cartão traz a página oficial e a data em que foi conferido. Borda laranja = ainda falta confirmar "
+        "algum detalhe na própria página.",
+        "Pelo SUS, o caminho quase sempre começa na unidade de saúde do bairro, e o encaminhamento é feito pela "
+        "regulação; os hospitais de referência não são porta de entrada.",
+    ])
+
+
+# ============================================================
+# RIO CLARO — a cidade do trabalho
+# ============================================================
+
+if aba == apoio.LAMINAS["rio_claro"]:
+    pergunta(f"O que {apoio.CIDADE} oferece às mulheres?")
+    dica(f"{apoio.CIDADE} faz parte da {apoio.REGIAO}. As referências de câncer da região (Rio Claro e "
+         "Piracicaba) estão no caminho Encontrar referência.")
+    lista = apoio.itens(lamina="rio_claro")
+    for c in [c for c, _, _, _ in apoio.CAMINHOS]:
+        do_caminho = [i for i in lista if i["caminho"] == c]
+        if do_caminho:
+            st.markdown(f'<div class="apoio-grupo">{ROTULO[c]}</div>', unsafe_allow_html=True)
+            for i in do_caminho:
+                cartao(i)
+    st.button("Referências de câncer na região", key="ir_referencia_rc", on_click=aplicar_destino,
+              args=({"aba": apoio.LAMINAS["caminho"], "caminho": "referencia"},))
+    leitura("Como usar", [
+        "Para quase tudo, a porta é a Unidade de Saúde da Família ou a UBS do bairro.",
+        "Vários dados de Rio Claro vêm de páginas antigas da Prefeitura e da Fundação Municipal de Saúde: estão "
+        "marcados para confirmar.",
+    ])
+
+
+# ============================================================
+# BARRETOS — Hospital de Amor
+# ============================================================
+
+if aba == apoio.LAMINAS["barretos"]:
+    pergunta("Quando o caminho chega à oncologia: o Hospital de Amor")
+    dica("Barretos tem um bloco especial pelo Hospital de Amor, que junta prevenção, unidades móveis e "
+         "tratamento do câncer.")
+    for i in apoio.itens(lamina="barretos"):
+        cartao(i)
+    st.markdown('<div class="escudo-alerta">Para quem mora em Rio Claro, o caminho do SUS passa primeiro pela '
+                'referência da própria região (RRAS 14: Rio Claro e Piracicaba). Converse com a equipe que '
+                'acompanha você.</div>', unsafe_allow_html=True)
+    leitura("A ligação com Rio Claro", [
+        "A carreta do Hospital de Amor já esteve em Rio Claro, com mamografia e Papanicolau agendados nas USF "
+        "(lâmina Rio Claro).",
+        "Prevenção e tratamento têm portas diferentes: a prevenção chega pelas ações com a prefeitura; o "
+        "tratamento, com o câncer confirmado, segue os fluxos do SUS.",
+    ])
+
+
+# ============================================================
+# SOBRE ESTAS INFORMAÇÕES
+# ============================================================
+
+if aba == apoio.LAMINAS["sobre"]:
+    pergunta("De onde vêm estas informações?")
+    st.markdown(f"""
+- **O que é:** um guia de onde procurar ajuda, montado a partir de páginas oficiais: portal da Saúde do Estado
+  de SP, Poupatempo, rede oncológica da FOSP, Ministério da Saúde, Fundação Municipal de Saúde de Rio Claro,
+  prefeituras de Campinas, Ribeirão Preto, São José do Rio Preto e Piracicaba e Hospital de Amor.
+- **Quando:** conferido em {apoio.CONFERIDO}. Regras, endereços, telefones e itinerários mudam.
+- **O que ainda falta confirmar:** a pesquisa foi feita pela busca na web, com trechos das páginas oficiais.
+  Quando o detalhe veio de página antiga, de reportagem ou não pôde ser aberto por inteiro, o item está marcado
+  "a confirmar".
+- **O que isto não é:** não é orientação médica, não garante vaga e não substitui a unidade de saúde.
+  A Lia não é médica.
+- **Cidades:** não há uma lâmina por cidade. Campinas, Ribeirão Preto, Rio Preto e Piracicaba entram nos caminhos
+  quando têm algo útil; Rio Claro (a cidade do trabalho) e Barretos (Hospital de Amor) têm lâmina própria.
+- **Para gestores:** o Plano Estadual de Oncologia 2025–2028 organiza a rede por região (RRAS); Rio Claro está na
+  {apoio.REGIAO}.
+""")
+    tabela = pd.DataFrame([{
+        "Item": i["titulo"], "Onde": i["onde"], "Lâmina": apoio.LAMINAS[i["lamina"]],
+        "Caminho": ROTULO[i["caminho"]], "Fonte": i["fonte"], "Situação": "a confirmar" if i["confirmar"] else "conferido",
+        "Página": i["link"]} for i in apoio.ITENS])
+    st.dataframe(tabela, use_container_width=True, hide_index=True)
+
+
+# ============================================================
+# LIA NA LATERAL (a mesma Lia do painel)
+# ============================================================
+
+with st.sidebar:
+    atual = lia_estado["atual"]
+    c_rosto, c_nome = st.columns([1, 2.6])
+    with c_rosto:
+        st.markdown(rosto(atual.expressao, 76), unsafe_allow_html=True)
+    with c_nome:
+        st.markdown('<div class="lia-nome">Lia</div><div class="lia-cargo">Pesquisadora do Escudo Feminino'
+                    f'<br>Apoio à mulher · {apoio.CIDADE}</div>', unsafe_allow_html=True)
+    with balao("lateral"):
+        if not st.session_state.get("ap_boas_vindas_fechada"):
+            st.markdown("Estou ali no centro da tela. Escolha um caminho por lá.")
+        else:
+            st.markdown(atual.fala)
+            if atual.numeros:
+                with st.expander("Onde a Lia conferiu"):
+                    st.markdown("\n".join(f"- {n}" for n in atual.numeros))
+            proximos = [(r, a) for r, a in atual.botoes if a is not INICIO and a.get("tipo") != "inicio"]
+            for n, (rotulo, acao) in enumerate(proximos):
+                st.button(rotulo, key=f"lia_ap_{n}_{rotulo}", on_click=lia_clicar, args=(acao,),
+                          use_container_width=True)
+            c_voltar, c_inicio = st.columns(2)
+            if lia_estado["pilha"]:
+                c_voltar.button("← Voltar", key="lia_discreto_voltar_ap", on_click=lia_voltar)
+            c_inicio.button("Começar de novo", key="lia_discreto_inicio_ap", on_click=lia_clicar, args=(INICIO,))
+    st.divider()
+    link_pagina(st, "app.py", "← Estudo da doença (painel)", "/")
+
+st.caption("Escudo Feminino · Apoio à mulher · guia de onde procurar; confirme sempre na unidade de saúde.")

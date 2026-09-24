@@ -22,6 +22,9 @@ jobs:
       - name: Lia
         working-directory: algoritimos
         run: python teste_lia.py
+      - name: Apoio à mulher (catálogo e Lia)
+        working-directory: algoritimos
+        run: python teste_apoio.py
       - name: Conversa (fora do painel)
         working-directory: algoritimos
         run: python teste_conversa.py
@@ -37,3 +40,5 @@ jobs:
           python teste_baixar_sih_sp.py
       - name: Painel (clica em tudo)
         run: python dashboard/teste_painel.py
+      - name: Lâmina de apoio (clica em tudo)
+        run: python dashboard/teste_apoio_tela.py
