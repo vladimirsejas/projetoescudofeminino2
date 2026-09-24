@@ -22,3 +22,4 @@ Thumbs.db
 # download do SIH (etl/baixar_sih_sp.py): meses baixados e cópias dos CSVs antigos
 dados/_download_sih_sp/
 dados/_backup_*/
+dashboard/versao_no_ar.txt

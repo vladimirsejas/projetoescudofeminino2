@@ -18,9 +18,13 @@ set depois=
 for /f %%h in ('git rev-parse HEAD 2^>nul') do set depois=%%h
 
 REM Painel aberto de antes continua com o codigo VELHO na memoria
-REM (o Streamlit nao recarrega algoritimos\lia.py, conversa.py...):
-REM se o git pull trouxe versao nova, fecha o painel antigo.
-if not "%antes%"=="%depois%" call :desligar_painel_antigo
+REM (o Streamlit nao recarrega algoritimos\lia.py, conversa.py...).
+REM Ao ligar, o painel anota a versao em dashboard\versao_no_ar.txt;
+REM se a versao da pasta for outra (git pull por aqui OU pela janela
+REM preta), fecha o painel antigo para ligar o novo.
+set no_ar=
+if exist "dashboard\versao_no_ar.txt" set /p no_ar=<"dashboard\versao_no_ar.txt"
+if not "%no_ar%"=="%depois%" call :desligar_painel_antigo
 
 REM Sem curl (Windows antigo): liga o painel, espera 10 s e abre.
 where curl >nul 2>nul || goto sem_curl
@@ -29,6 +33,7 @@ REM Se o painel ja estiver aberto, so abre o navegador de novo.
 curl -s -o nul http://localhost:8600/_stcore/health && goto abrir
 
 echo Ligando o painel...
+>"dashboard\versao_no_ar.txt" echo(%depois%
 start "Escudo Feminino - painel" /min cmd /k py -m streamlit run dashboard\app.py --server.port 8600 --server.headless true
 
 set /a tentativas=0
@@ -45,6 +50,7 @@ exit
 
 :sem_curl
 echo Ligando o painel...
+>"dashboard\versao_no_ar.txt" echo(%depois%
 start "Escudo Feminino - painel" /min cmd /k py -m streamlit run dashboard\app.py --server.port 8600 --server.headless true
 timeout /t 10 /nobreak >nul
 goto abrir
