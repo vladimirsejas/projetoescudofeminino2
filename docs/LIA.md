@@ -105,6 +105,26 @@ menos precisão e prometia "pergunte qualquer coisa". A Lia conduz só
 por botões. O código antigo está no histórico do git (commit
 `8d78523`); `conversa.py` continua no repositório, fora do painel.
 
+**Passeio pelo Escudo** (`algoritimos/passeio.py`). Uma interação a
+mais, logo abaixo da Lia na lateral, com cor e forma próprias
+(retângulo verde-água com barra à esquerda — o balão da Lia é lilás e
+arredondado): a Lia conta a história do Escudo em 6 paradas, na
+ordem — o que mais aparece, está aumentando, anos fora do padrão,
+comparação com SP, onde podemos ter problema, o que os dados não
+dizem. Só cliques (anterior / próxima / sair); cada parada leva o
+painel ao gráfico dela. As falas são as da própria Lia
+(`lia.responder`), então o Passeio nunca diz algo diferente dela. A
+árvore deixa a pessoa escolher; o Passeio conduz — serve para quem
+chega pela primeira vez e para apresentar à Secretaria.
+
+**Anos incompletos.** Quando a fonte não oferece todos os meses de um
+ano, a Lia avisa ("o DATASUS não oferece todos os meses de N anos… uso
+a média dos meses disponíveis × 12") e explica a regra no Método.
+
+**Teste de aceitação:** `dashboard/teste_painel.py` abre o painel e
+clica em tudo — a árvore, os 56 pares câncer × ação, Voltar, Começar
+de novo, o Passeio e as 5 abas.
+
 ## O que fica fora da versão 1.0 (de propósito)
 
 Escolha de perfil (gestora / pesquisadora / estudante / cidadã),

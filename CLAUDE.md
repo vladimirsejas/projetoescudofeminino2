@@ -138,7 +138,15 @@ Estado atual:
   `teste_lia.py`. **A caixa de texto livre saiu (decisão do autor,
   09/2026):** respondia o mesmo que os botões, com menos precisão; a
   Lia conduz só por botões. Mais opções devem entrar como caminhos
-  novos na árvore, não como texto livre. O atalho `Abrir Escudo Feminino.bat`
+  novos na árvore, não como texto livre. **Passeio pelo Escudo**
+  (`algoritimos/passeio.py`, 09/2026): interação a mais, combinada com
+  o autor -- 6 paradas na ordem, só cliques, cartão verde-água logo
+  abaixo do rosto da Lia (convite no fim da lateral), falas da própria
+  Lia, painel vai ao gráfico de cada parada (`aplicar_destino`). Não
+  mudar o que já existe (lado direito, balão da Lia) sem combinar.
+  **Teste de aceitação:** `dashboard/teste_painel.py` (AppTest: árvore
+  inteira, 56 pares câncer x ação, voltar, passeio, abas) -- rodar
+  antes de push que mexa no painel ou na Lia. O atalho `Abrir Escudo Feminino.bat`
   reinicia o painel quando o `git pull` traz código novo (o Streamlit
   não recarrega `algoritimos/` sozinho). **Armadilha do Streamlit resolvida no painel:**
   widgets que somem e voltam (abas desenhadas só quando abertas)
@@ -215,11 +223,13 @@ Estado atual:
   recebem sinais de atenção com evidência, nunca valores em R$.
   Testado por `teste_conversa.py`. O chat de terminal
   (`chat_escudo.py`) ainda usa o motor antigo.
-- Próximos passos combinados, nesta ordem: investigar 2025
-  (`ANO_CMPT` x `DT_INTER` nos CSVs brutos); população do IBGE para
-  comparar cidades (gráfico de funil, cidades semelhantes); decidir
-  o destino de `chat_escudo.py`/`motor_raciocinio.py` e das 13
-  tabelas antigas.
+- Próximos passos combinados, nesta ordem: (1) no Windows, rodar a
+  carga de novo (`py etl\carga_todas_bases.py`: grava o mês, sem ele
+  o ajuste dos anos incompletos não vale) e conferir o painel; (2)
+  população do IBGE para comparar cidades (gráfico de funil, cidades
+  semelhantes); (3) decidir o destino de `chat_escudo.py`/
+  `motor_raciocinio.py` e das 13 tabelas antigas. 2025 já foi
+  investigado: era falta de meses na fonte, não salto real.
 
 ## Notas de contexto do domínio
 

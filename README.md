@@ -150,37 +150,47 @@ só:
 - **Investigar** — o que merece ser pesquisado? Anos fora do padrão de
   todos os cânceres, quando cada câncer aparece, faixa etária ao longo
   do tempo, download dos dados.
-- **Planejamento** — que evidências entram na discussão? Sinais com
-  número, pressão projetada (internações, dias, valor hospitalar
-  registrado) e linhas de ação do INCA. Sem valores de orçamento.
+- **Planejamento** — se nada mudar, onde a cidade pode ter problema até
+  daqui a 3 anos? O radar do futuro: cada câncer em alerta, observar ou
+  estável, com os sinais, os dias de leito a mais e a linha de ação do
+  INCA. Sem valores de orçamento: quem decide é o gestor.
 - **Método** — como ler e o que os dados não permitem responder.
 
-Quem conduz a conversa é a **Lia**, a guia do Escudo (ver
-`docs\LIA.md`): no primeiro acesso ela aparece no centro com 4
-portas de entrada; depois fica na lateral com os 8 caminhos, e o
-painel acompanha cada resposta dela. Embaixo de cada gráfico vem a
-leitura em texto, e a caixa de texto livre da Lia usa o chat (`algoritimos\conversa.py`: entende a pergunta,
-calcula os fatos com a mesma inteligência dos gráficos e pede ao
-Gemini só a redação; sem Gemini, responde direto com os fatos). A tela não calcula nada: tudo vem de
-`algoritimos\inteligencia.py`, que lê `internacoes` direto (não
-depende da cadeia de scripts acima) e é testado sem o banco:
+Quem conduz é a **Lia**, a guia do Escudo (ver `docs\LIA.md`): no
+primeiro acesso ela aparece no centro com 4 portas de entrada; depois
+fica na lateral, num balão, com os caminhos, e o painel acompanha cada
+resposta dela. **Não há caixa de texto livre** (saiu por decisão do
+autor): a Lia conduz só por botões. Logo abaixo dela, o **Passeio pelo
+Escudo** (cartão verde-água) conta o essencial em 6 paradas, na ordem,
+levando o painel a cada gráfico. Embaixo de cada gráfico vem a leitura
+em texto. A tela não calcula nada: tudo vem de
+`algoritimos\inteligencia.py`, que lê `internacoes` direto (não depende
+da cadeia de scripts acima). O chat `algoritimos\conversa.py` continua
+no repositório, fora do painel.
+
+Testes (sem o banco):
 
 ```powershell
 python algoritimos\teste_inteligencia.py
-python algoritimos\teste_conversa.py
 python algoritimos\teste_lia.py
+python algoritimos\teste_conversa.py
+python dashboard\teste_painel.py      # abre o painel e clica em tudo (~2,5 min)
 py -m streamlit run dashboard\app.py
 ```
 
-Dois cuidados que a inteligência central já aplica:
-- **Uma fonte por cidade.** As moradoras de Rio Claro podem estar em
-  `internacoes` duas vezes (arquivo de Rio Claro + arquivo estadual,
-  ambos com `municipio = 'RIO_CLARO'`); somar tudo contaria em dobro.
-  Usa-se só o arquivo estadual (o mesmo para todas as cidades).
-- **2025 em investigação.** No Estado inteiro, 6 dos 7 cânceres
-  saltaram ao mesmo tempo em 2025 -- mais provável efeito de
-  registro/processamento (o ano gravado é `ANO_CMPT`, competência da
-  AIH) do que de adoecimento. O painel avisa isso ao lado do gráfico.
+Cuidados que a inteligência central já aplica:
+- **Uma fonte por cidade.** A carga lê só os arquivos estaduais (que já
+  trazem a cidade de residência); as pastas municipais antigas são
+  ignoradas. Assim Rio Claro não é contada em dobro.
+- **Meses que o DATASUS não oferece.** Faltam 35 dos 156 meses de 2013
+  a 2025 na própria fonte (2018 só tem 6), os mesmos para todos os
+  cânceres — não foi falha de download (ver `docs\FONTE_DOS_DADOS.md`).
+  Para comparar anos, o Escudo usa a média dos meses disponíveis × 12;
+  os totais do período são os registrados. O ano incompleto aparece
+  com marcador vazado no gráfico de Evolução, e a Lia avisa. Para isso
+  a carga guarda o mês: depois de atualizar, rode a carga de novo.
+- **Projeção de tendência**, não previsão: sai da reta dos anos
+  observados (não do último ano), com faixa e teste de acerto.
 
 ---
 
