@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import sqlite3
 import pandas as pd
 
@@ -24,6 +25,15 @@ MAPA = {
     "cancer_tireoide_sp": ("TIREOIDE", "SP"),
     "cancer_pele_nao_melanoma_sp": ("PELE_NAO_MELANOMA", "SP"),
 }
+
+# Colunas sem as quais um arquivo não entra (a carga diz quais faltam).
+COLUNAS_OBRIGATORIAS = ["ANO_CMPT", "IDADE", "DIAS_PERM", "MORTE", "VAL_TOT"]
+
+# Registros com código de município fora do catálogo IBGE: até esta
+# fração do arquivo, ficam de fora com aviso (ex.: código ignorado ou
+# de outra UF); acima disso o arquivo inteiro é recusado, porque aí o
+# problema é o catálogo ou o arquivo, não uns poucos registros.
+TOLERANCIA_DESCONHECIDOS = 0.01
 
 CANDIDATOS_CODIGO_MUNICIPIO = [
     "MUNIC_RES",
@@ -208,7 +218,7 @@ def carregar_catalogo(conexao):
     return por_codigo
 
 
-def resolver_municipios(df, origem, catalogo):
+def resolver_municipios(df, origem, catalogo, tolerancia=TOLERANCIA_DESCONHECIDOS):
     coluna = encontrar_coluna_codigo(df)
 
     if origem == "SP" and coluna is None:
@@ -237,18 +247,96 @@ def resolver_municipios(df, origem, catalogo):
             .head(10)
             .tolist()
         )
-        raise RuntimeError(
-            f"{quantidade} registros de {origem} possuem código municipal "
-            "sem correspondência no catálogo IBGE. Exemplos: {exemplos}"
-        )
+        if quantidade > tolerancia * len(df):
+            raise RuntimeError(
+                f"{quantidade} de {len(df)} registros de {origem} possuem código "
+                "municipal sem correspondência no catálogo IBGE. Exemplos: "
+                f"{exemplos}. Se forem muitos, rode antes "
+                "etl\\criar_tabela_municipios.py (catálogo com as 645 cidades)."
+            )
+        print(f"AVISO: {quantidade} registros com código de município fora do "
+              f"catálogo ficam de fora (exemplos: {exemplos}).")
 
     return municipios, codigos
 
 
-VERSAO_CARGA = "carga_todas_bases.py -- com detecção automática de separador (; ou ,)"
+VERSAO_CARGA = ("carga_todas_bases.py -- lê e confere todos os arquivos antes de gravar; "
+                "um arquivo com problema não derruba os outros")
+
+
+def ler_pasta(pasta, catalogo):
+    """Lê e confere o CSV de uma pasta estadual. Devolve os dados
+    prontos para o banco (None se a pasta não tiver CSV) ou levanta
+    RuntimeError dizendo o que está errado -- sem tocar no banco."""
+
+    arquivo_csv = selecionar_csv_unico(os.path.join(BASE_DADOS, pasta), pasta)
+
+    if arquivo_csv is None:
+        return None
+
+    tipo_cancer, origem = MAPA[pasta]
+    print("ARQUIVO:", os.path.basename(arquivo_csv))
+
+    separador = detectar_separador(arquivo_csv)
+
+    df = pd.read_csv(
+        arquivo_csv,
+        sep=separador,
+        encoding="latin1",
+        low_memory=False
+    )
+    df.columns = [str(c).strip().strip('"') for c in df.columns]
+
+    faltando = [c for c in COLUNAS_OBRIGATORIAS if c not in df.columns]
+    if faltando:
+        raise RuntimeError(
+            f"faltam as colunas {faltando}. Colunas do arquivo: {list(df.columns)[:40]}"
+        )
+
+    municipios, codigos = resolver_municipios(df, origem, catalogo)
+
+    dados = pd.DataFrame({
+        "tipo_cancer": [tipo_cancer] * len(df),
+        "origem": [origem] * len(df),
+        "municipio": municipios,
+        "codigo_ibge": codigos,
+        "ano": df["ANO_CMPT"],
+        # mês de competência: o Escudo precisa dele para saber quais
+        # meses a fonte não oferece (inteligencia.ajustar_meses)
+        "mes": pd.to_numeric(df["MES_CMPT"], errors="coerce") if "MES_CMPT" in df else None,
+        "idade": df["IDADE"],
+        "dias_permanencia": df["DIAS_PERM"],
+        "obito": df["MORTE"],
+        "valor_total": df["VAL_TOT"]
+    })
+
+    return dados[dados["municipio"].notna()]
+
+
+def guardar_copia(banco):
+    """Cópia do banco antes de trocar a tabela (uma só, a da última carga)."""
+    if not os.path.exists(banco):
+        return None
+    copia = banco[:-3] + "_antes_da_carga.db" if banco.endswith(".db") else banco + ".antes_da_carga"
+    shutil.copy2(banco, copia)
+    return copia
 
 
 def carregar():
+    """
+    Lê e confere TODOS os arquivos antes de mexer no banco. Antes
+    (até 09/2026) o primeiro arquivo apagava a tabela e cada um
+    seguinte era acrescentado: se o 2º desse erro, a carga parava e o
+    banco ficava só com o 1º câncer (foi o que aconteceu com o autor:
+    só colo do útero). Agora:
+      - um arquivo com problema não derruba os outros: ele fica de
+        fora e o motivo aparece no fim, com o que fazer;
+      - a tabela nova é montada ao lado (internacoes_nova) e só troca
+        de lugar com a antiga no fim;
+      - antes da troca, o banco é copiado para
+        escudo_feminino_antes_da_carga.db;
+      - se nenhum arquivo servir, o banco não é alterado.
+    """
     print(VERSAO_CARGA)
 
     conexao = sqlite3.connect(BANCO)
@@ -262,9 +350,6 @@ def carregar():
             "etl\\criar_tabela_municipios.py."
         ) from erro
 
-    total_registros = 0
-    primeira_carga = True
-
     pastas = encontrar_pastas_validas(BASE_DADOS)
 
     for pasta in pastas_ignoradas(BASE_DADOS):
@@ -274,19 +359,14 @@ def carregar():
             "de residência). Pode guardar a pasta fora de dados\\."
         )
 
-    for tipo in canceres_faltando(pastas):
+    faltando = canceres_faltando(pastas)
+    for tipo in faltando:
         print(f"ATENÇÃO: falta a pasta estadual de {tipo} "
               "(esse câncer fica fora do banco).")
 
+    prontos, problemas = [], []
+
     for pasta in pastas:
-
-        caminho_pasta = os.path.join(BASE_DADOS, pasta)
-
-        arquivo_csv = selecionar_csv_unico(caminho_pasta, pasta)
-
-        if arquivo_csv is None:
-            continue
-
         tipo_cancer, origem = MAPA[pasta]
 
         print("\n" + "=" * 60)
@@ -294,70 +374,71 @@ def carregar():
         print("TIPO:", tipo_cancer)
         print("ORIGEM:", origem)
 
-        separador = detectar_separador(arquivo_csv)
+        try:
+            dados = ler_pasta(pasta, catalogo)
+        except (Exception, MemoryError) as erro:  # noqa: B014 -- qualquer falha: segue para a próxima
+            problemas.append((pasta, f"{type(erro).__name__}: {erro}"))
+            print("PROBLEMA -- este arquivo fica de fora:", problemas[-1][1])
+            continue
 
-        df = pd.read_csv(
-            arquivo_csv,
-            sep=separador,
-            encoding="latin1",
-            low_memory=False
-        )
-
-        municipios, codigos = resolver_municipios(
-            df, origem, catalogo
-        )
-
-        dados = pd.DataFrame({
-            "tipo_cancer": [tipo_cancer] * len(df),
-            "origem": [origem] * len(df),
-            "municipio": municipios,
-            "codigo_ibge": codigos,
-            "ano": df["ANO_CMPT"],
-            # mês de competência: o Escudo precisa dele para saber quais
-            # meses a fonte não oferece (inteligencia.ajustar_meses)
-            "mes": pd.to_numeric(df["MES_CMPT"], errors="coerce") if "MES_CMPT" in df else None,
-            "idade": df["IDADE"],
-            "dias_permanencia": df["DIAS_PERM"],
-            "obito": df["MORTE"],
-            "valor_total": df["VAL_TOT"]
-        })
+        if dados is None:
+            problemas.append((pasta, "a pasta não tem nenhum CSV dentro"))
+            print("PROBLEMA -- a pasta não tem CSV.")
+            continue
 
         print("Municípios identificados:", dados["municipio"].nunique())
         print(dados["municipio"].value_counts().head(10))
-
-        dados.to_sql(
-            "internacoes",
-            conexao,
-            if_exists="replace" if primeira_carga else "append",
-            index=False
-        )
-
-        primeira_carga = False
-        total_registros += len(dados)
-
         print("OK ->", len(dados), "registros")
+        prontos.append((pasta, dados))
 
-    duplicados = (
-        municipios_duplicados(conexao) if total_registros else []
-    )
-
-    conexao.close()
-
-    if duplicados:
-        print("\nATENÇÃO: municípios com internações de mais de uma fonte "
-              "(totais em dobro):", duplicados)
-
-    if total_registros == 0:
+    if not prontos:
+        conexao.close()
         raise RuntimeError(
+            "Nenhum arquivo pôde ser carregado; o banco NÃO foi alterado. "
+            "Problemas: " + "; ".join(f"{p}: {m}" for p, m in problemas)
+            if problemas else
             "A carga encontrou pastas reconhecidas, mas nenhuma continha "
             "um CSV -- confira se os arquivos foram mesmo colocados "
             "dentro das subpastas de dados\\ (uma por câncer), e não "
             "deixados soltos na raiz."
         )
 
+    copia = guardar_copia(BANCO)
+
+    # Tabela nova ao lado; a antiga só sai depois que a nova está inteira.
+    conexao.execute("DROP TABLE IF EXISTS internacoes_nova")
+    conexao.commit()
+    for n, (pasta, dados) in enumerate(prontos):
+        dados.to_sql("internacoes_nova", conexao, if_exists="replace" if n == 0 else "append", index=False)
+    conexao.execute("DROP TABLE IF EXISTS internacoes")
+    conexao.execute("ALTER TABLE internacoes_nova RENAME TO internacoes")
+    conexao.commit()
+
+    duplicados = municipios_duplicados(conexao)
+    conexao.close()
+
+    if duplicados:
+        print("\nATENÇÃO: municípios com internações de mais de uma fonte "
+              "(totais em dobro):", duplicados)
+
+    total_registros = sum(len(d) for _, d in prontos)
     print("\n" + "=" * 60)
     print("CARGA TERRITORIAL FINALIZADA")
     print("TOTAL:", total_registros)
+    print("CÂNCERES NO BANCO:", ", ".join(MAPA[p][0] for p, _ in prontos),
+          f"({len(prontos)} de {len(MAPA)})")
+    if copia:
+        print("Cópia do banco anterior:", copia)
+    if problemas or faltando:
+        print("\n" + "!" * 60)
+        print("FICARAM DE FORA:")
+        for pasta, motivo in problemas:
+            print(f"  - {pasta}: {motivo}")
+        for tipo in faltando:
+            print(f"  - {tipo}: não existe a pasta estadual em dados\\")
+        print("Corrija o que está acima e rode a carga de novo; mande esta "
+              "mensagem ao Claude se não souber o que fazer.")
+        print("!" * 60)
     print("=" * 60)
 
 

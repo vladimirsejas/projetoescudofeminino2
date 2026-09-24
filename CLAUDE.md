@@ -258,7 +258,15 @@ Estado atual:
   com `py etl\validar_banco.py` que os 7 cânceres entraram (em
   24/09/2026 o banco do autor ficou só com colo do útero -- a carga
   provavelmente parou no 2º arquivo; falta ver a mensagem de erro);
-  (2) população do IBGE para comparar cidades. Testes do sistema atual
+  (2) população do IBGE para comparar cidades.
+  **Carga robusta (24/09/2026):** a carga antiga apagava a tabela no 1º arquivo
+  e parava no 2º que desse erro -- por isso o banco do autor ficou só com colo
+  do útero. Agora ela lê e confere os 7 arquivos antes de gravar, um arquivo com
+  problema fica de fora com o motivo no fim (os outros entram), a tabela nova é
+  montada ao lado e só troca no fim, e o banco anterior vai para
+  `banco\escudo_feminino_antes_da_carga.db`. `validar_banco.py` mostra
+  internações por câncer (Estado e Rio Claro) e diz se falta algum. Teste:
+  `etl/teste_carga_robusta.py`. Testes do sistema atual
   rodam no GitHub (`.github/workflows/testes.yml`).
 
 ## Notas de contexto do domínio
