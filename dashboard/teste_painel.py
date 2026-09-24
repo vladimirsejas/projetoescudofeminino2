@@ -204,6 +204,26 @@ def main():
         at.run()
         checar(f"D. aba {aba} abre sem erro", not erros(at))
 
+    # ---- E. banco atualizado com o painel aberto: o cache não pode segurar os dados velhos ----
+    at = abrir()
+    antes = list(next(r for r in at.radio if r.label == "Câncer em foco").options)
+    serie_original = inteligencia.carregar_serie
+    so_mama = serie_original(None, "RIO_CLARO")
+    so_mama = so_mama[so_mama["tipo_cancer"] == "MAMA"]
+    inteligencia.carregar_serie = lambda conn, o, uf="SP": so_mama.copy()
+    try:
+        at.run()  # banco não mudou: continua o cache (os 7)
+        igual = list(next(r for r in at.radio if r.label == "Câncer em foco").options) == antes
+        banco_app = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
+        if os.path.exists(banco_app):
+            os.utime(banco_app, (time.time() + 60, time.time() + 60))  # "nova carga"
+        at.run()
+        depois = list(next(r for r in at.radio if r.label == "Câncer em foco").options)
+        checar("E. banco sem mudança: o cache continua valendo", igual and len(antes) == 7)
+        checar("E. banco mudou: o painel lê de novo, sem reiniciar", not erros(at) and depois == ["Mama"])
+    finally:
+        inteligencia.carregar_serie = serie_original
+
     print(f"\n({time.time() - inicio:.0f} s)")
     if falhas:
         print(f"{len(falhas)} checagem(ns) falharam.")

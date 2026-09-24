@@ -81,6 +81,16 @@ CONFIG_GRAFICO = {"displayModeBar": False}
 
 st.markdown(CSS, unsafe_allow_html=True)
 
+# Banco refeito (nova carga) com o painel aberto: o cache (st.cache_data)
+# ainda seria o do banco antigo -- foi o que aconteceu em 24/09/2026 (o
+# banco já tinha 6 cânceres e o painel mostrava 1). Quando a data de
+# modificação do arquivo muda, o cache é limpo e os dados são lidos de
+# novo; se o banco não mudou, o cache continua valendo.
+_versao_banco = os.path.getmtime(BANCO) if os.path.exists(BANCO) else None
+if st.session_state.get("versao_banco") != _versao_banco:
+    st.cache_data.clear()
+    st.session_state["versao_banco"] = _versao_banco
+
 
 # ============================================================
 # DADOS (uma consulta só, via inteligencia.py)
