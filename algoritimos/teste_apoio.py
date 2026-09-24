@@ -32,7 +32,14 @@ def checar(nome, condicao):
 ids = [i["id"] for i in apoio.ITENS]
 checar("ids únicos", len(ids) == len(set(ids)))
 checar("todo item tem fonte e link https", all(i["fonte"] and i["link"].startswith("https://") for i in apoio.ITENS))
-checar("todo item está num caminho válido", all(i["caminho"] in apoio.NOME_CAMINHO for i in apoio.ITENS))
+checar("todo item está num caminho válido (sem caminho só fora da lâmina dos caminhos)",
+       all(i["caminho"] in apoio.NOME_CAMINHO or (i["caminho"] is None and i["lamina"] != "caminho")
+           for i in apoio.ITENS))
+checar("todo item de Barretos está num tema da lâmina",
+       all(i["grupo"] in apoio.GRUPOS_BARRETOS for i in apoio.itens(lamina="barretos")))
+checar("Barretos tem hospitais de referência e carretas",
+       apoio.itens(lamina="barretos") and all(any(i["grupo"] == g for i in apoio.ITENS)
+                                              for g in ("Hospitais de referência", "Carretas e unidades móveis")))
 checar("toda lâmina de item existe", all(i["lamina"] in ("caminho", "rio_claro", "barretos") for i in apoio.ITENS))
 checar("todo caminho tem pelo menos um item", all(apoio.itens(caminho=c) for c in apoio.NOME_CAMINHO))
 checar("Rio Claro tem lâmina com itens", len(apoio.itens(lamina="rio_claro")) >= 4)

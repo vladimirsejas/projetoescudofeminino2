@@ -142,7 +142,7 @@ Estado atual:
   (`definir`). Não voltar a usar `key="doenca"` direto.
 - **Apoio à mulher — "Encontre um caminho" (09/2026, pedido do autor):**
   outras lâminas, de APOIO, separadas do estudo da doença
-  (`dashboard/pages/apoio.py`, aberta pelo link no fim da lateral do
+  (`dashboard/pages/apoio.py`, aberta pelo botão vermelho "Apoio à mulher" no topo do
   painel; `showSidebarNavigation = false` em `.streamlit/config.toml`).
   Não mexer no painel principal por causa dela. Mesmo layout (CSS em
   `dashboard/estilo.py`, movido de app.py sem mudar uma letra) e a
@@ -159,6 +159,12 @@ Estado atual:
   os sites do governo): itens com detalhe antigo ou de reportagem
   estão marcados "a confirmar" -- conferir no Windows e tirar a marca.
   Testes: `algoritimos/teste_apoio.py` e `dashboard/teste_apoio_tela.py`.
+  **"O importante é saber onde clicar" (autor):** cada cartão tem o botão azul
+  "Abrir a página oficial"; caminhos e temas aparecem como botões (container
+  `ap_pilulas_*`); Barretos organizada nos temas do modelo do autor (Hospitais de
+  referência, Prevenção, Mama, Colo do útero, Tratamento e acesso pelo SUS,
+  Carretas, Ensino e pesquisa, No Estado de SP). O autor preferiu este layout à
+  grade de blocos do modelo do ChatGPT.
 - **Divisão de trabalho (09/2026):** o ChatGPT cuida de
   `conversa.py`/`teste_conversa.py`; Claude cuida de `inteligencia.py`
   e do painel (o autor passou a Lia para o Claude). Pendências do

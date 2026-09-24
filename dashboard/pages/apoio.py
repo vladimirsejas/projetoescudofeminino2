@@ -19,8 +19,8 @@ from lia_rosto import img as rosto_lia  # noqa: E402
 #
 # Outras lâminas, SEPARADAS do painel de estudo da doença: aqui a
 # pergunta é "onde a mulher encontra ajuda?". O painel principal
-# (dashboard/app.py) não muda; só ganhou, no fim da lateral, o link
-# para cá. Mesmo layout (estilo.py) e a MESMA Lia (rosto, balão,
+# (dashboard/app.py) não muda; só ganhou, no topo, o botão vermelho
+# "Apoio à mulher" que traz para cá. Mesmo layout (estilo.py) e a MESMA Lia (rosto, balão,
 # botões), com a árvore de algoritimos/apoio.py.
 # Lâminas: Encontre um caminho (Estado + itens de outras cidades,
 # por caminho), Rio Claro (a cidade do trabalho), Barretos (Hospital
@@ -46,7 +46,28 @@ div[data-testid="stRadio"]:has(input[value="Encontre um caminho"]) > div { gap: 
 .apoio-resumo { color: #4d4863; margin: 2px 0 6px; }
 .apoio-cartao ul { padding-left: 18px; margin: 4px 0; }
 .apoio-fonte { color: #8a8599; font-size: .85rem; margin-top: 8px; }
-.apoio-fonte a { color: #2a78d6; font-weight: 600; text-decoration: none; }
+.apoio-fonte { margin-top: 4px; }
+/* "saber onde clicar": o link oficial é um botão azul grande */
+a.apoio-botao { display: inline-block; margin-top: 10px; padding: 9px 18px; border-radius: 999px;
+                background: #2a78d6; color: #ffffff !important; font-weight: 700; text-decoration: none; }
+a.apoio-botao:hover { background: #1f5fae; }
+.apoio-onde-clicar { background: #eef4fd; border: 1px solid #c9dcf6; border-radius: 12px; padding: 8px 14px;
+                     color: #1f4f8f; font-size: .92rem; margin: 8px 0 4px; }
+/* caminhos e temas com cara de botão (em vez de bolinhas soltas): o
+   seletor fica num container "ap_pilulas_*"; vale para o Streamlit
+   novo (stRadioOption) e o antigo (baseweb) */
+[class*="st-key-ap_pilulas"] label[data-testid="stRadioOption"],
+[class*="st-key-ap_pilulas"] label[data-baseweb="radio"] {
+    border: 1px solid #cdbfeb; border-radius: 999px; padding: 7px 16px 7px 12px; background: #ffffff;
+    margin: 0 6px 6px 0; cursor: pointer; }
+[class*="st-key-ap_pilulas"] label[data-testid="stRadioOption"]:not([data-selected="true"]):hover,
+[class*="st-key-ap_pilulas"] label[data-baseweb="radio"]:not(:has(input:checked)):hover {
+    background: #f4f0fb; border-color: #9b8fc4; }
+[class*="st-key-ap_pilulas"] label[data-selected="true"],
+[class*="st-key-ap_pilulas"] label[data-baseweb="radio"]:has(input:checked) {
+    background: #4a3d78; border-color: #4a3d78; }
+[class*="st-key-ap_pilulas"] label[data-selected="true"] p,
+[class*="st-key-ap_pilulas"] label[data-baseweb="radio"]:has(input:checked) div { color: #ffffff; font-weight: 600; }
 .apoio-jornada { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 10px; }
 .apoio-jornada span { border-radius: 999px; padding: 4px 12px; background: #fff; border: 1px solid #e3dcf2;
                       color: #4a3d78; font-weight: 600; font-size: .9rem; }
@@ -58,7 +79,8 @@ div[data-testid="stRadio"]:has(input[value="Encontre um caminho"]) > div { gap: 
 
 ABAS = list(apoio.LAMINAS.values())
 ROTULO = apoio.NOME_CAMINHO
-PADROES = {"ap_aba": ABAS[0], "ap_caminho": "prevenir", "ap_item": None}
+TODOS = "Todos os temas"
+PADROES = {"ap_aba": ABAS[0], "ap_caminho": "prevenir", "ap_item": None, "ap_tema_barretos": TODOS}
 for chave, valor in PADROES.items():
     st.session_state.setdefault(chave, valor)
 st.session_state.setdefault("ap_lia", {"atual": apoio.responder(INICIO), "pilha": [], "falas": 0})
@@ -87,6 +109,9 @@ def aplicar_destino(destino):
     if destino.get("caminho") in ROTULO:
         definir("ap_caminho", destino["caminho"])
     definir("ap_item", destino.get("item"))
+    if destino.get("aba") == apoio.LAMINAS["barretos"]:
+        grupo = apoio.POR_ID[destino["item"]]["grupo"] if destino.get("item") else None
+        definir("ap_tema_barretos", grupo or TODOS)
 
 
 def lia_clicar(acao):
@@ -141,6 +166,18 @@ def leitura(titulo, frases):
                 + "".join(f"<li>{f}</li>" for f in frases) + "</ul></div>", unsafe_allow_html=True)
 
 
+def pilulas(nome):
+    """Container cujo radio aparece como botões (ver CSS "ap_pilulas")."""
+    try:
+        return st.container(key=f"ap_pilulas_{nome}")
+    except TypeError:  # Streamlit antigo: sem key em container
+        return st.container()
+
+
+def onde_clicar(texto):
+    st.markdown(f'<div class="apoio-onde-clicar">👉 {texto}</div>', unsafe_allow_html=True)
+
+
 def cartao(i):
     """Um item do catálogo: o que é, para quem, como, fonte oficial."""
     e = html.escape
@@ -156,8 +193,8 @@ def cartao(i):
         + (f"<ul>{linhas}</ul>" if linhas else "")
         + (f'<div class="acao">Atenção: {e(i["cuidado"])}</div>' if i["cuidado"] else "")
         + (f'<div class="acao">A confirmar: {e(i["confirmar"])}</div>' if i["confirmar"] else "")
-        + f'<div class="apoio-fonte"><a href="{e(i["link"])}" target="_blank" rel="noopener">Página oficial ↗</a>'
-        f' · Fonte: {e(i["fonte"])} · conferido em {apoio.CONFERIDO}</div></div>',
+        + f'<a class="apoio-botao" href="{e(i["link"])}" target="_blank" rel="noopener">Abrir a página oficial ↗</a>'
+        f'<div class="apoio-fonte">Fonte: {e(i["fonte"])} · conferido em {apoio.CONFERIDO}</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -209,7 +246,10 @@ if aba == apoio.LAMINAS["caminho"]:
                                 for c in apoio.JORNADA)
     st.markdown(f'<div class="apoio-jornada">{jornada}</div>', unsafe_allow_html=True)
     codigos = [c for c, _, _, _ in apoio.CAMINHOS]
-    c = seletor(st, "Caminho", "ap_caminho", codigos, format_func=ROTULO.get, horizontal=True)
+    onde_clicar("Clique num caminho. Depois, em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
+    with pilulas("caminho"):
+        c = seletor(st, "Caminho", "ap_caminho", codigos, format_func=ROTULO.get, horizontal=True,
+                    label_visibility="collapsed")
     _, rotulo, dentro, abertura = next(x for x in apoio.CAMINHOS if x[0] == c)
 
     pergunta(f"{rotulo}: {dentro}")
@@ -241,6 +281,7 @@ if aba == apoio.LAMINAS["rio_claro"]:
     pergunta(f"O que {apoio.CIDADE} oferece às mulheres?")
     dica(f"{apoio.CIDADE} faz parte da {apoio.REGIAO}. As referências de câncer da região (Rio Claro e "
          "Piracicaba) estão no caminho Encontrar referência.")
+    onde_clicar("Em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
     lista = apoio.itens(lamina="rio_claro")
     for c in [c for c, _, _, _ in apoio.CAMINHOS]:
         do_caminho = [i for i in lista if i["caminho"] == c]
@@ -262,11 +303,20 @@ if aba == apoio.LAMINAS["rio_claro"]:
 # ============================================================
 
 if aba == apoio.LAMINAS["barretos"]:
-    pergunta("Quando o caminho chega à oncologia: o Hospital de Amor")
-    dica("Barretos tem um bloco especial pelo Hospital de Amor, que junta prevenção, unidades móveis e "
-         "tratamento do câncer.")
-    for i in apoio.itens(lamina="barretos"):
-        cartao(i)
+    pergunta("Barretos: referência em oncologia e prevenção")
+    dica("Barretos concentra, no Hospital de Amor, prevenção, diagnóstico, tratamento, ensino e pesquisa em câncer, "
+         "com ações que chegam a outros municípios, como Rio Claro.")
+    onde_clicar("Clique num tema. Em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
+    with pilulas("barretos"):
+        tema = seletor(st, "Tema", "ap_tema_barretos", [TODOS] + apoio.GRUPOS_BARRETOS, horizontal=True,
+                       label_visibility="collapsed")
+    lista = apoio.itens(lamina="barretos")
+    for g in (apoio.GRUPOS_BARRETOS if tema == TODOS else [tema]):
+        do_grupo = [i for i in lista if i["grupo"] == g]
+        if do_grupo:
+            st.markdown(f'<div class="apoio-grupo">{g}</div>', unsafe_allow_html=True)
+            for i in do_grupo:
+                cartao(i)
     st.markdown('<div class="escudo-alerta">Para quem mora em Rio Claro, o caminho do SUS passa primeiro pela '
                 'referência da própria região (RRAS 14: Rio Claro e Piracicaba). Converse com a equipe que '
                 'acompanha você.</div>', unsafe_allow_html=True)
@@ -301,7 +351,7 @@ if aba == apoio.LAMINAS["sobre"]:
 """)
     tabela = pd.DataFrame([{
         "Item": i["titulo"], "Onde": i["onde"], "Lâmina": apoio.LAMINAS[i["lamina"]],
-        "Caminho": ROTULO[i["caminho"]], "Fonte": i["fonte"], "Situação": "a confirmar" if i["confirmar"] else "conferido",
+        "Caminho": ROTULO.get(i["caminho"], "—"), "Fonte": i["fonte"], "Situação": "a confirmar" if i["confirmar"] else "conferido",
         "Página": i["link"]} for i in apoio.ITENS])
     st.dataframe(tabela, use_container_width=True, hide_index=True)
 

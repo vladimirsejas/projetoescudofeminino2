@@ -179,6 +179,18 @@ col_titulo, col_cidade = st.columns([2.2, 1])
 with col_cidade:
     nome_cidade = st.selectbox("Município", nomes, index=indice_padrao,
                                help="Digite para procurar entre os municípios de SP.")
+    # Apoio à mulher (dashboard/pages/apoio.py): lâminas de apoio, separadas
+    # deste estudo da doença. A única ligação é este botão vermelho (pedido
+    # do autor); o estilo está em estilo.py ("botao_apoio").
+    try:
+        caixa_apoio = st.container(key="botao_apoio")
+    except TypeError:  # Streamlit antigo: sem key em container
+        caixa_apoio = st.container()
+    with caixa_apoio:
+        try:
+            st.page_link("pages/apoio.py", label="Apoio à mulher")
+        except Exception:  # Streamlit antigo, sem page_link
+            st.markdown('<a href="/apoio" target="_self">Apoio à mulher</a>', unsafe_allow_html=True)
 cidade = next(m for m in lista_municipios if m["nome"] == nome_cidade)
 ORIGEM = cidade["origem"]
 
@@ -846,13 +858,5 @@ with st.sidebar:
     else:
         with lugar_do_passeio:  # passeio ativo: logo abaixo do rosto
             desenhar_passeio(indice_passeio)
-
-    # Apoio à mulher (dashboard/pages/apoio.py): outras lâminas, de apoio,
-    # separadas deste estudo da doença. Só o link, no fim da lateral.
-    try:
-        st.page_link("pages/apoio.py", label="Apoio à mulher: encontre um caminho →")
-    except Exception:  # Streamlit antigo, sem page_link
-        st.markdown('<a href="/apoio" target="_self">Apoio à mulher: encontre um caminho →</a>',
-                    unsafe_allow_html=True)
 
 st.caption("Escudo Feminino · dados públicos do SIH/SUS · internações não equivalem a casos novos.")

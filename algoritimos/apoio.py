@@ -59,10 +59,13 @@ JORNADA = ["prevenir", "descobrir", "tratar", "acompanhar"]  # a ordem da jornad
 
 
 def _item(id, caminho, lamina, onde, titulo, resumo, fonte, link, para_quem=None, como=None, levar=None,
-          contato=None, confirmar=None, cuidado=None):
+          contato=None, confirmar=None, cuidado=None, grupo=None):
+    """caminho=None: item que não é passo da jornada da mulher (ensino,
+    pesquisa, a região no Estado) -- mora só na lâmina dele. grupo: o
+    tema em que o item aparece na lâmina Barretos."""
     return {"id": id, "caminho": caminho, "lamina": lamina, "onde": onde, "titulo": titulo, "resumo": resumo,
             "para_quem": para_quem, "como": como, "levar": levar, "contato": contato, "fonte": fonte,
-            "link": link, "confirmar": confirmar, "cuidado": cuidado}
+            "link": link, "confirmar": confirmar, "cuidado": cuidado, "grupo": grupo}
 
 
 ITENS = [
@@ -309,12 +312,13 @@ ITENS = [
                     "feito ali."),
     _item("rc_carreta_hospital_de_amor", "ir_ate_voce", "rio_claro", "Rio Claro",
           "Carreta do Hospital de Amor em Rio Claro",
-          "ação com a Prefeitura: mamografia (40 a 69 anos) e Papanicolau (25 a 65), com agendamento nas USF",
+          "em fevereiro de 2025 a carreta veio a Rio Claro: cerca de 300 mamografias e Papanicolau, com agendamento",
           "Prefeitura de Rio Claro",
           "https://rioclaro.sp.gov.br/fundacao-de-saude/rc-faz-300-exames-de-papanicolau-e-mamografia-em-carreta-"
           "do-hospital-do-amor/",
-          como="Na ação noticiada foram 180 vagas de mamografia para mulheres de 40 a 69 anos e 120 de Papanicolau "
-               "para 25 a 65 anos, com agendamento prévio nas Unidades de Saúde da Família.",
+          como="Nos dias 17, 18 e 20 de fevereiro de 2025 a carreta ficou no Centro Cultural, das 8h às 16h, e fez "
+               "cerca de 300 exames gratuitos. Foram 180 vagas de mamografia para mulheres de 40 a 69 anos e 120 de "
+               "Papanicolau para 25 a 65 anos, com agendamento prévio nas Unidades de Saúde da Família.",
           confirmar="Foi uma ação com data marcada, não um serviço fixo: pergunte na sua USF se haverá nova vinda."),
     _item("rc_santa_casa", "tratar", "rio_claro", "Rio Claro",
           "Santa Casa de Rio Claro – oncologia (UNACON) e Centro Oncológico Santa Ágata",
@@ -343,7 +347,8 @@ ITENS = [
           como="Hospital filantrópico mantido pela Fundação Pio XII, dedicado à prevenção e ao tratamento do câncer, "
                "com unidades em várias regiões do Brasil. O atendimento é gratuito pelo SUS.",
           confirmar="A habilitação como CACON aparece na rede estadual, mas não consegui abrir a lista da FOSP para "
-                    "confirmar."),
+                    "confirmar.",
+          grupo="Hospitais de referência"),
     _item("ha_prevencao", "prevenir", "barretos", "Barretos",
           "Prevenção do Hospital de Amor",
           "Instituto de Prevenção em Barretos e unidades fixas de prevenção, inclusive em Campinas",
@@ -353,16 +358,18 @@ ITENS = [
           como="O Instituto de Prevenção de Barretos faz mamografia, Papanicolau, exame da boca, teste FIT (intestino) "
                "e teledermatologia (pele). Há unidades fixas de prevenção no Estado em Barretos, Campinas e "
                "Fernandópolis.",
-          confirmar="Os detalhes do Instituto vieram de reportagem: confirme na página de Prevenção do hospital."),
+          confirmar="Os detalhes do Instituto vieram de reportagem: confirme na página de Prevenção do hospital.",
+          grupo="Prevenção"),
     _item("ha_moveis", "ir_ate_voce", "barretos", "Barretos",
           "Unidades móveis do Hospital de Amor",
-          "carretas que percorrem o país em ações com as prefeituras; já estiveram em Rio Claro",
+          "carretas que percorrem o país em ações com as prefeituras; em fevereiro de 2025 uma esteve em Rio Claro",
           "Hospital de Amor",
           "https://hospitaldeamor.com.br/prevencao/",
           para_quem="Mulheres de 40 a 69 anos.",
           como="As unidades móveis chegam por parceria com a prefeitura. Para agendar, procure a unidade de saúde "
                "mais próxima.",
-          levar="Cópia do RG, CPF, cartão SUS e comprovante de residência."),
+          levar="Cópia do RG, CPF, cartão SUS e comprovante de residência.",
+          grupo="Carretas e unidades móveis"),
     _item("ha_primeiro_atendimento", "tratar", "barretos", "Barretos",
           "Primeiro atendimento no Hospital de Amor",
           "com o câncer confirmado por exame, o primeiro agendamento é feito com os documentos pelo WhatsApp",
@@ -375,8 +382,67 @@ ITENS = [
           contato="Documentos pelo WhatsApp (17) 3321-5403; dúvidas pelo (17) 3321-5400. Segunda a quinta, 8h às "
                   "17h; sexta, 8h às 16h.",
           cuidado="Para quem mora em Rio Claro, o caminho do SUS passa primeiro pela referência da própria região "
-                  "(RRAS 14). Converse com a equipe que acompanha você."),
+                  "(RRAS 14). Converse com a equipe que acompanha você.",
+          grupo="Tratamento e acesso pelo SUS"),
+    _item("ha_unidades", "referencia", "barretos", "Barretos",
+          "As três unidades do Hospital de Amor em Barretos",
+          "hospital adulto, Hospital Infantojuvenil e Hospital São Judas Tadeu (cuidados paliativos)",
+          "Hospital de Amor",
+          "https://hospitaldeamor.com.br/tag/hospital-sao-judas-tadeu/",
+          como="O Hospital de Amor (unidade principal); o Hospital de Amor Infantojuvenil, só para câncer em crianças "
+               "e adolescentes; e o Hospital São Judas Tadeu, onde o hospital começou em 1962 e que hoje atende "
+               "pacientes em cuidados paliativos, com atendimento domiciliar na região de saúde de Barretos.",
+          confirmar="Os números dos cuidados paliativos vieram da Academia Nacional de Cuidados Paliativos: confira "
+                    "na página do hospital.",
+          grupo="Hospitais de referência"),
+    _item("ha_mastologia", "tratar", "barretos", "Barretos",
+          "Mastologia e reconstrução mamária",
+          "referência no tratamento do câncer de mama, com oncoplastia e reconstrução da mama",
+          "Hospital de Amor (Especialidades)",
+          "https://especialidades.hospitaldeamor.com.br/especialidades/mastologia/",
+          como="O departamento de Mastologia e Reconstrução Mamária é referência no tratamento do câncer de mama, com "
+               "oncoplastia e reconstrução mamária. São cerca de 15 mil atendimentos e 1.200 cirurgias por ano.",
+          grupo="Câncer de mama"),
+    _item("ha_colo_busca_ativa", "prevenir", "barretos", "Barretos",
+          "Busca ativa do câncer do colo do útero desde 1994",
+          "na região de Barretos, 72% dos diagnósticos de câncer do colo do útero são feitos no estágio inicial",
+          "Hospital de Amor (dado da FOSP)",
+          "https://hospitaldeamor.com.br/site/barretos-possui-o-maior-indice-de-deteccao-precoce-do-cancer-de-colo-"
+          "uterino-em-sp/",
+          como="Desde 1994 o hospital faz busca ativa para o preventivo na periferia de Barretos e depois nas cidades "
+               "da DRS V. Segundo a FOSP, 72% dos diagnósticos da região acontecem no estágio in situ, tratado com "
+               "procedimentos simples no ambulatório: a região é a de maior detecção precoce do Estado.",
+          grupo="Câncer do colo do útero"),
+    _item("ha_pesquisa_hpv", None, "barretos", "Barretos",
+          "Grupo de Pesquisa em HPV (IEP) e autocoleta",
+          "estudos sobre o HPV e novas formas de rastreamento, como a autocoleta pela própria mulher",
+          "Instituto de Ensino e Pesquisa do Hospital de Amor",
+          "https://iep.hospitaldeamor.com.br/grupo_de_pesquisa/pesquisa-em-hpv/",
+          como="Criado em 2010 e certificado pelo CNPq, estuda a infecção pelo HPV, a transformação em câncer e novas "
+               "tecnologias de rastreamento. Num estudo de autocoleta (a mulher colhe a amostra com uma escovinha), "
+               "os resultados concordaram em cerca de 80% com a coleta feita pela profissional.",
+          grupo="Câncer do colo do útero"),
+    _item("ha_iep", None, "barretos", "Barretos",
+          "Instituto de Ensino e Pesquisa (IEP)",
+          "pós-graduação, residência médica e grupos de pesquisa em oncologia",
+          "Instituto de Ensino e Pesquisa do Hospital de Amor",
+          "https://iep.hospitaldeamor.com.br/",
+          como="Fundado em 2008, oferece estágios, pós-graduação em oncologia (especialização, mestrado e doutorado, "
+               "com nota 6 na CAPES no acadêmico) e residências médicas. Interessa a estudantes e pesquisadores.",
+          grupo="Ensino e pesquisa"),
+    _item("ha_rras13", None, "barretos", "Barretos",
+          "Barretos na rede do Estado: RRAS 13",
+          "Barretos está na RRAS 13, com as DRS de Araraquara, Franca e Ribeirão Preto; é um dos polos de oncologia",
+          "FOSP – boletim da RRAS 13",
+          "https://fosp.saude.sp.gov.br/wp-content/uploads/Boletim-RRAS13.pdf",
+          como="A RRAS 13 reúne as DRS de Araraquara, Barretos, Franca e Ribeirão Preto. A Fundação Pio XII "
+               "(Hospital de Amor) está entre os serviços de oncologia da região, ao lado da Santa Casa de Franca e "
+               "do HC de Ribeirão Preto. Rio Claro fica em outra região, a RRAS 14.",
+          grupo="No Estado de SP"),
 ]
+GRUPOS_BARRETOS = ["Hospitais de referência", "Prevenção", "Câncer de mama", "Câncer do colo do útero",
+                   "Tratamento e acesso pelo SUS", "Carretas e unidades móveis", "Ensino e pesquisa",
+                   "No Estado de SP"]
 POR_ID = {i["id"]: i for i in ITENS}
 
 
@@ -465,7 +531,8 @@ def responder_item(id):
     return Resposta(
         fala="\n\n".join(partes),
         expressao="cautelosa" if i["confirmar"] else ("acolhedora" if i["caminho"] == "proteger" else "explicando"),
-        botoes=[(f"Voltar a {NOME_CAMINHO[i['caminho']]}", caminho(i["caminho"]))] + _proximo(i["caminho"]),
+        botoes=([(f"Voltar a {NOME_CAMINHO[i['caminho']]}", caminho(i["caminho"]))] if i["caminho"] else
+                [(f"Voltar a {LAMINAS[i['lamina']]}", lamina(i["lamina"]))]) + _proximo(i["caminho"]),
         destino={"aba": LAMINAS[i["lamina"]], "caminho": i["caminho"], "item": id},
         numeros=[f"Fonte: {i['fonte']}", f"Página: {i['link']}", f"Conferido em {CONFERIDO}"],
     )
@@ -478,8 +545,11 @@ def responder_lamina(id):
                 f"faz parte da **{REGIAO}**: as referências de câncer da região ficam em Rio Claro e em Piracicaba "
                 "(caminho Encontrar referência).")
     else:
-        fala = ("**Barretos** tem um bloco especial pelo **Hospital de Amor**, que junta prevenção, unidades móveis "
-                "e tratamento do câncer. Uma ligação com a nossa cidade: a carreta do hospital já esteve em Rio Claro.")
+        fala = ("**Barretos** reúne, no **Hospital de Amor**, hospitais de referência, prevenção, carretas, ensino e "
+                "pesquisa em câncer. Aqui estão as informações e os links oficiais, e a ligação com a nossa cidade: "
+                "em fevereiro de 2025 a carreta do hospital esteve em Rio Claro.")
+    if id == "barretos":
+        lista = [i for g in GRUPOS_BARRETOS for i in lista if i["grupo"] == g]
     fala += "\n\n" + "\n".join(f"- **{i['titulo']}**: {i['resumo']}." for i in lista)
     extra = [("Referências na região de Rio Claro", caminho("referencia"))] if id == "rio_claro" else \
             [("Rio Claro: o que tem aqui", lamina("rio_claro"))]

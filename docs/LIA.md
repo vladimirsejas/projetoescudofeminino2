@@ -165,7 +165,7 @@ animação, memória entre visitas, personalidade gerada pela IA.
 
 Além do painel de estudo da doença, a Lia conduz a lâmina **Apoio à
 mulher — "Encontre um caminho"** (`dashboard/pages/apoio.py`), aberta
-pelo link no fim da lateral do painel. É a **mesma Lia** (rosto,
+pelo botão vermelho "Apoio à mulher" no topo do painel. É a **mesma Lia** (rosto,
 balão, botões, estilo em `dashboard/estilo.py`), com outra árvore
 (`algoritimos/apoio.py`): saudação ("Você está em Rio Claro. O que
 você precisa?") → 8 caminhos (Prevenir, Descobrir, Tratar,

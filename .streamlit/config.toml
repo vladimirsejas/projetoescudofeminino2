@@ -9,7 +9,7 @@ secondaryBackgroundColor = "#efedf5"
 textColor = "#292541"
 
 # O painel (app.py) é a entrada; a lâmina de apoio à mulher
-# (dashboard/pages/apoio.py) abre pelo link no fim da lateral, sem o
+# (dashboard/pages/apoio.py) abre pelo botão vermelho "Apoio à mulher" no topo, sem o
 # menu automático de páginas em cima da Lia.
 [client]
 showSidebarNavigation = false

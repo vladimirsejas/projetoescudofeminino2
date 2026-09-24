@@ -123,6 +123,15 @@ for c in apoio.NOME_CAMINHO:
     checar(f"D. caminho {c} mostra seus {len(esperados)} cartões",
            not erros(at) and all(t.replace('"', "&quot;") in texto or t in texto for t in esperados))
 
+at.session_state["ap_aba"] = apoio.LAMINAS["barretos"]
+for g in apoio.GRUPOS_BARRETOS:
+    at.session_state["ap_tema_barretos"] = g
+    at.run()
+    texto = " ".join(m.value for m in at.markdown)
+    checar(f"D. Barretos, tema {g}: só os cartões dele",
+           not erros(at) and all((i["grupo"] == g) == (i["titulo"] in texto) for i in apoio.itens(lamina="barretos")))
+checar("D. cartões com o botão Abrir a página oficial", "apoio-botao" in texto)
+
 print(f"\n({time.time() - inicio:.0f} s)")
 print("Todas as checagens da lâmina de apoio passaram." if not falhas else f"{len(falhas)} falha(s).")
 sys.exit(1 if falhas else 0)

@@ -106,5 +106,11 @@ section[data-testid="stSidebar"] { min-width: 400px; }
     [class*="st-key-lia_balao"]::after { display: none; }
 }
 div[data-testid="stRadio"]:has(input[value="Panorama"]) > div { gap: 4px; border-bottom: 1px solid #e6e3ef; }
+/* Botão vermelho "Apoio à mulher" (app.py): leva às lâminas de apoio */
+[class*="st-key-botao_apoio"] a { display: flex; justify-content: center; align-items: center; width: 100%;
+    background: #c62839; border: 1px solid #c62839; border-radius: 12px; padding: 8px 14px; text-decoration: none; }
+[class*="st-key-botao_apoio"] a:hover { background: #a51f2e; border-color: #a51f2e; }
+[class*="st-key-botao_apoio"] a, [class*="st-key-botao_apoio"] a p, [class*="st-key-botao_apoio"] a span {
+    color: #ffffff !important; font-weight: 700; font-size: 1rem; }
 </style>
 """
