@@ -842,6 +842,29 @@ ITENS = [
           como="Criada em dezembro de 2018: a Guarda Civil visita as mulheres com medida protetiva e verifica se a "
                "decisão da Justiça está sendo cumprida. Trabalha com a DDM, o CREAS, o Conselho Tutelar, o CAPS e o "
                "Anexo de Violência Doméstica."),
+    _item("rc_gacc", "tratamento", "rio_claro", "Rio Claro",
+          "GACC Rio Claro – Grupo de Apoio à Criança com Câncer",
+          "desde 1996: transporte 24 horas para consultas e tratamentos, apoio social e psicológico, para crianças e "
+          "adolescentes com câncer e suas famílias",
+          "GACC Rio Claro",
+          "https://www.gacc-rc.org.br/",
+          para_quem="Crianças e adolescentes com câncer ou doenças hematológicas crônicas, e suas famílias, de Rio "
+                    "Claro e região.",
+          como="O principal serviço é o transporte do paciente e da família para consultas, exames e tratamentos, 24 "
+               "horas por dia. Oferece também apoio social e psicológico, dentista, cestas básicas e de hortifrúti, "
+               "ajuda com remédios e exames, suplementação alimentar e reforço escolar.",
+          contato="Av. P-17, 253 – Vila Paulista, Rio Claro. (19) 3534-5612. Segunda a sexta, das 8h às 17h.",
+          cuidado="Entidade filantrópica (Associação Lute pela Vida), não é serviço público."),
+    _item("rc_perucas", "tratamento", "rio_claro", "Rio Claro",
+          "Curso de confecção de perucas para pacientes com câncer",
+          "a Prefeitura promoveu curso para fazer perucas para quem perde o cabelo no tratamento",
+          "Prefeitura de Rio Claro (Fundação Municipal de Saúde)",
+          "https://rioclaro.sp.gov.br/fundacao-de-saude/rio-claro-promove-curso-de-confeccao-de-perucas-para-atender-"
+          "pacientes-com-cancer/",
+          como="Ação da Fundação Municipal de Saúde para atender pacientes com câncer que perdem o cabelo por causa do "
+               "tratamento.",
+          confirmar="Foi uma ação noticiada pela Prefeitura, sem data visível na busca: pergunte na Fundação "
+                    "Municipal de Saúde se as perucas continuam sendo oferecidas."),
     _item("rc_rede_feminina", "tratamento", "rio_claro", "Rio Claro",
           "Rede Rio-Clarense \"Carmem Prudente\" (Rede Feminina de Combate ao Câncer)",
           "núcleo da Rede Feminina em Rio Claro: apoio voluntário a pacientes com câncer",
@@ -882,8 +905,8 @@ ETAPAS = [
      ["tratamento", "rede", "direitos"], ["lei_60_dias", "como_chegar_cross", "cartilha_inca"]),
     ("em_tratamento", "Estou em tratamento",
      "Durante o tratamento, vale conhecer os seus direitos (transporte, FGTS, INSS) e o apoio de entidades como a "
-     "Rede Feminina de Combate ao Câncer.",
-     ["tratamento", "direitos"], ["tfd", "fgts_pis", "auxilio_inss", "rede_feminina"]),
+     "Rede Feminina de Combate ao Câncer e, em Rio Claro, o GACC (para crianças e adolescentes).",
+     ["tratamento", "direitos"], ["tfd", "fgts_pis", "auxilio_inss", "rede_feminina", "rc_gacc", "rc_perucas"]),
     ("violencia", "Estou em situação de violência",
      "Você não precisa passar por isso sozinha. Em perigo agora, ligue 190. Estes canais atendem, orientam e "
      "protegem.",
