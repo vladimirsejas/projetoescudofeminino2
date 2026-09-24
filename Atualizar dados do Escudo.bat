@@ -23,6 +23,7 @@ echo ============================================================ >> carga_resul
 py etl\validar_banco.py >> carga_resultado.txt 2>&1
 
 type carga_resultado.txt
+start "" notepad carga_resultado.txt
 echo.
 echo ============================================================
 echo O resultado tambem esta em carga_resultado.txt (nesta pasta).

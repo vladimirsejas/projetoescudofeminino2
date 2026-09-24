@@ -236,7 +236,17 @@ def resolver_municipios(df, origem, catalogo, tolerancia=TOLERANCIA_DESCONHECIDO
         if codigo is not None else None
     )
 
-    desconhecidos = municipios.isna()
+    # Moradoras de outros estados (código que não começa com 35): o
+    # Escudo é sobre moradoras de SP, então ficam de fora -- em qualquer
+    # quantidade. Era isso que derrubava a base de colorretal de SP na
+    # versão de 94.005 registros (a "corrigida" tem 91.341: só SP; ver
+    # docs/BASES_ORIGINAIS_2013_2025.md).
+    fora_de_sp = codigos.map(lambda c: c is not None and not str(c).startswith("35"))
+    if fora_de_sp.any():
+        print(f"AVISO: {int(fora_de_sp.sum())} registros de moradoras de outros estados "
+              "ficam de fora (o Escudo é sobre moradoras de SP).")
+
+    desconhecidos = municipios.isna() & ~fora_de_sp
 
     if desconhecidos.any():
         quantidade = int(desconhecidos.sum())
@@ -311,6 +321,19 @@ def ler_pasta(pasta, catalogo):
     })
 
     return dados[dados["municipio"].notna()]
+
+
+def gravar_resultado(conexao, linhas):
+    """Tabela carga_resultado: o que entrou e o que ficou de fora (com o
+    motivo) na última carga. O painel lê esta tabela e mostra um aviso
+    quando falta algum câncer -- o autor não precisa abrir log nenhum."""
+    from datetime import datetime
+    quando = datetime.now().strftime("%d/%m/%Y %H:%M")
+    pd.DataFrame(
+        [(quando, pasta, tipo, situacao, registros, motivo) for pasta, tipo, situacao, registros, motivo in linhas],
+        columns=["quando", "pasta", "tipo_cancer", "situacao", "registros", "motivo"],
+    ).to_sql("carga_resultado", conexao, if_exists="replace", index=False)
+    conexao.commit()
 
 
 def guardar_copia(banco):
@@ -391,7 +414,14 @@ def carregar():
         print("OK ->", len(dados), "registros")
         prontos.append((pasta, dados))
 
+    resultado = (
+        [(p, MAPA[p][0], "carregado", len(d), "") for p, d in prontos]
+        + [(p, MAPA[p][0], "de fora", 0, motivo) for p, motivo in problemas]
+        + [("", tipo, "sem pasta", 0, "não existe a pasta estadual em dados") for tipo in faltando]
+    )
+
     if not prontos:
+        gravar_resultado(conexao, resultado)
         conexao.close()
         raise RuntimeError(
             "Nenhum arquivo pôde ser carregado; o banco NÃO foi alterado. "
@@ -413,6 +443,7 @@ def carregar():
     conexao.execute("DROP TABLE IF EXISTS internacoes")
     conexao.execute("ALTER TABLE internacoes_nova RENAME TO internacoes")
     conexao.commit()
+    gravar_resultado(conexao, resultado)
 
     duplicados = municipios_duplicados(conexao)
     conexao.close()

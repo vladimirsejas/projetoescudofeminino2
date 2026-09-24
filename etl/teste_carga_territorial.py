@@ -43,12 +43,19 @@ def main():
 
     try:
         resolver_municipios(
-            pd.DataFrame({"MUNIC_RES": ["9999999"]}), "SP", catalogo
+            pd.DataFrame({"MUNIC_RES": ["3599999"]}), "SP", catalogo
         )
     except RuntimeError as erro:
         assert "sem correspondência no catálogo IBGE" in str(erro)
     else:
-        raise AssertionError("Código IBGE desconhecido deveria falhar")
+        raise AssertionError("Código de SP desconhecido deveria falhar")
+
+    # moradoras de outros estados ficam de fora, em qualquer quantidade
+    # (a base de colorretal de SP de 94.005 registros tinha várias)
+    fora, _ = resolver_municipios(
+        pd.DataFrame({"MUNIC_RES": ["3543907", "3106200", "3304557"]}), "SP", catalogo
+    )
+    assert fora.tolist()[0] == "RIO_CLARO" and fora.isna().tolist() == [False, True, True]
 
     print("Todas as checagens da carga territorial passaram.")
 

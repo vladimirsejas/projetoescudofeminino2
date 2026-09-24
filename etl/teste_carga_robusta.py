@@ -54,16 +54,26 @@ def main():
     escrever(base, "cancer_colorretal_sp", "ANO_CMPT;IDADE;MUNIC_RES\n2024;60;354390\n")  # faltam colunas
     # mama: 200 registros de Rio Claro e 1 com código fora do catálogo (0,5%)
     escrever(base, "cancer_mama_sp", BOM + "2024;2;55;4;0;200.0;354390\n" * 200 + "2024;2;55;4;0;200.0;359999\n")
+    # colorretal "não corrigido": muitas moradoras de outros estados (MG) -- não pode derrubar o arquivo
+    escrever(base, "cancer_pulmao_sp", BOM + "2024;3;70;5;1;300.0;354390\n" * 5 + "2024;3;70;5;1;300.0;310620\n" * 5)
 
     carga.BASE_DADOS, carga.BANCO = base, banco
     carga.carregar()
 
     contagem = tipos(banco)
-    assert contagem == {"COLO_UTERO": 3, "MAMA": 200}, contagem
-    print("[OK] colorretal com problema fica de fora; colo do útero e mama entram (o 2º arquivo não derruba o resto)")
+    assert contagem == {"COLO_UTERO": 3, "MAMA": 200, "PULMAO": 5}, contagem
+    print("[OK] colorretal com problema fica de fora; colo do útero, mama e pulmão entram (o 2º arquivo não derruba o resto)")
+    print("[OK] metade de moradoras de outro estado não derruba o arquivo de pulmão: elas ficam de fora")
     assert tipos(banco[:-3] + "_antes_da_carga.db") == {"ANTIGO": 1}
     print("[OK] o banco anterior foi copiado antes da troca")
     print("[OK] 1 código fora do catálogo em 201 registros fica de fora com aviso")
+    conexao = sqlite3.connect(banco)
+    situacoes = dict(conexao.execute("SELECT tipo_cancer, situacao FROM carga_resultado").fetchall())
+    motivo = conexao.execute("SELECT motivo FROM carga_resultado WHERE tipo_cancer = 'COLORRETAL'").fetchone()[0]
+    conexao.close()
+    assert situacoes["COLO_UTERO"] == "carregado" and situacoes["COLORRETAL"] == "de fora", situacoes
+    assert situacoes["OVARIO"] == "sem pasta" and "faltam as colunas" in motivo, (situacoes, motivo)
+    print("[OK] o resultado da carga fica gravado no banco (carga_resultado), com o motivo de cada um")
 
     # nenhum arquivo serve: o banco não muda
     temporario2 = tempfile.mkdtemp()
