@@ -49,7 +49,21 @@ checar("todo 'também em' aponta para um tema/região que existe",
 checar("todo tema/região tem pelo menos um item", all(sum(map(len, apoio.do_grupo(lam, g)))
                                                        for lam in apoio.GRUPOS for g in apoio.GRUPOS[lam]))
 checar("Hospitais no Estado: pelo menos 20 hospitais", len(apoio.itens(lamina="hospitais")) >= 20)
-checar("proteção à mulher: pelo menos 8 portas", len(apoio.itens(caminho="proteger")) >= 8)
+checar("proteção à mulher (em Preciso de ajuda): pelo menos 8 canais", len(apoio.itens(caminho="ajuda")) >= 8)
+checar("as 8 portas combinadas com o autor", list(apoio.NOME_CAMINHO) == [
+    "mama", "colo", "diagnostico", "regulacao", "tratamento", "rede", "direitos", "ajuda"])
+checar("Preciso de ajuda: 6 pontos do caminho, com violência", len(apoio.ETAPAS) == 6
+       and "violencia" in apoio.NOME_ETAPA)
+checar("todo ponto do caminho aponta para portas e itens que existem",
+       all(set(portas) <= set(apoio.NOME_CAMINHO) and all(i in apoio.POR_ID for i in ids)
+           for _, _, _, portas, ids in apoio.ETAPAS) and all(apoio.itens_da_etapa(e) for e in apoio.NOME_ETAPA))
+checar("todo 'tambem_caminhos' aponta para uma porta que existe",
+       all(c in apoio.NOME_CAMINHO and c != i["caminho"] for i in apoio.ITENS for c in i["tambem_caminhos"]))
+checar("diagnóstico explica mamografia e preventivo alterados",
+       {"mamografia_alterada", "preventivo_alterado"} <= {i["id"] for i in apoio.itens(caminho="diagnostico")})
+checar("regulação diz o que fazer se o nome não aparecer", "nao_achei_nome" in apoio.POR_ID
+       and apoio.POR_ID["nao_achei_nome"]["caminho"] == "regulacao")
+checar("fluxo da rede aponta para portas que existem", all(p in apoio.NOME_CAMINHO for _, _, p in apoio.FLUXO_REDE))
 checar("caminho Seus direitos com TFD e reconstrução da mama",
        {"tfd", "reconstrucao_mamaria"} <= {i["id"] for i in apoio.itens(caminho="direitos")})
 checar("todo caminho tem pelo menos um item", all(apoio.itens(caminho=c) for c in apoio.NOME_CAMINHO))
@@ -65,7 +79,7 @@ checar("texto sem seta ASCII (->)", not any("->" in str(v) for i in apoio.ITENS 
 # ---------- a Lia: árvore inteira ----------
 inicio = apoio.responder(INICIO)
 checar("saudação diz onde a pessoa está", apoio.CIDADE in inicio.fala and inicio.expressao == "acolhedora")
-checar("saudação oferece os 8 caminhos", all(any(a == apoio.caminho(c) for _, a in inicio.botoes)
+checar("saudação oferece as 8 portas", all(any(a == apoio.caminho(c) for _, a in inicio.botoes)
                                               for c in apoio.NOME_CAMINHO))
 
 vistos, fila, respostas = set(), deque([INICIO]), 0

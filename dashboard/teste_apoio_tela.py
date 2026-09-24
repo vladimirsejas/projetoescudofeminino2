@@ -97,13 +97,19 @@ checar("B. todo item do catálogo tem botão na Lia", titulos <= vistos)
 # ---------- C. voltar e começar de novo ----------
 at = abrir()
 botao(at, "bv_fechar_apoio").click().run()
-next(b for b in botoes_lia(at) if b.label == "Prevenir").click().run()
-fala_prevenir = at.session_state["ap_lia"]["atual"].fala
+next(b for b in botoes_lia(at) if b.label == "Câncer de mama").click().run()
+fala_mama = at.session_state["ap_lia"]["atual"].fala
 next(b for b in botoes_lia(at) if b.label.startswith("Próximo passo")).click().run()
-checar("C. próximo passo da jornada leva a Descobrir", at.session_state["ap_caminho"] == "descobrir")
+checar("C. próximo passo de Câncer de mama leva a Diagnóstico", at.session_state["ap_caminho"] == "diagnostico")
 botao(at, "lia_discreto_voltar_ap").click().run()
-checar("C. voltar devolve a fala anterior", at.session_state["ap_lia"]["atual"].fala == fala_prevenir
-       and at.session_state["ap_caminho"] == "prevenir")
+checar("C. voltar devolve a fala anterior", at.session_state["ap_lia"]["atual"].fala == fala_mama
+       and at.session_state["ap_caminho"] == "mama")
+at2 = abrir()
+botao(at2, "bv_ap_ajuda").click().run()
+next(b for b in botoes_lia(at2) if b.label == "Meu exame deu alteração").click().run()
+checar("C. Preciso de ajuda → 'Meu exame deu alteração' leva a Diagnóstico",
+       not erros(at2) and at2.session_state["ap_etapa"] == "alterado"
+       and any(b.label == "Porta Diagnóstico" for b in botoes_lia(at2)))
 botao(at, "lia_discreto_inicio_ap").click().run()
 checar("C. começar de novo volta à saudação", apoio.CIDADE in at.session_state["ap_lia"]["atual"].fala
        and not erros(at))
@@ -117,11 +123,25 @@ for nome in apoio.LAMINAS.values():
     checar(f"D. lâmina {nome} abre sem erro", not erros(at))
 at.session_state["ap_aba"] = apoio.LAMINAS["caminho"]
 for c in apoio.NOME_CAMINHO:
+    if c == "ajuda":
+        continue
     at.session_state["ap_caminho"] = c
     at.run()
     texto = " ".join(m.value for m in at.markdown)
     esperados = [i["titulo"] for i in apoio.itens(caminho=c, lamina="caminho")]
-    checar(f"D. caminho {c} mostra seus {len(esperados)} cartões",
+    checar(f"D. porta {c} mostra seus {len(esperados)} cartões",
+           not erros(at) and all(_html_esc(t) in texto for t in esperados))
+at.session_state["ap_caminho"] = "rede"
+at.run()
+checar("D. porta Rede oncológica desenha o caminho em 6 passos",
+       not erros(at) and sum('class="apoio-fluxo"' in m.value for m in at.markdown) == len(apoio.FLUXO_REDE))
+at.session_state["ap_caminho"] = "ajuda"
+for e in apoio.NOME_ETAPA:
+    at.session_state["ap_etapa"] = e
+    at.run()
+    texto = " ".join(m.value for m in at.markdown)
+    esperados = [i["titulo"] for i in apoio.itens_da_etapa(e)]
+    checar(f"D. Preciso de ajuda, '{apoio.NOME_ETAPA[e]}': {len(esperados)} cartões",
            not erros(at) and all(_html_esc(t) in texto for t in esperados))
 
 import html as _html
@@ -137,11 +157,10 @@ for lam in apoio.GRUPOS:
                and not any(_html.escape(i["titulo"]) in texto for i in apoio.itens(lamina=lam) if i["grupo"] != g
                            and (lam, g) not in i["tambem"]))
 checar("D. cartões com o botão Abrir a página oficial", "apoio-botao" in texto)
-at.session_state["ap_aba"] = apoio.LAMINAS["caminho"]
-at.session_state["ap_caminho"] = "ir_ate_voce"
+at.session_state["ap_aba"] = apoio.LAMINAS["carretas"]
 at.run()
 texto = " ".join(m.value for m in at.markdown)
-checar("D. Ir até você mostra onde a carreta está agora",
+checar("D. lâmina Carretas mostra onde a carreta está agora",
        not erros(at) and "Onde a carreta da mamografia está agora?" in texto
        and ("carreta-grade" in texto or "escudo-alerta" in texto))
 

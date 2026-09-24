@@ -177,6 +177,13 @@ Estado atual:
   Agência SP em 24/09/2026) alimenta o quadro "Onde a carreta está agora?" (Ir até
   você) e a fala da Lia, pela data do dia; vencido, avisa para ver o Poupatempo.
   Atualizar todo mês trocando a lista.
+  **8 portas (proposta do autor, 09/2026):** Câncer de mama, Colo do útero,
+  Diagnóstico, Regulação ("já fui encaminhada, e agora?"), Tratamento, Rede
+  oncológica (fluxo UBS → diagnóstico → regulação → especialista → tratamento →
+  acompanhamento), Direitos e acesso, Preciso de ajuda ("Em que ponto você está?",
+  `apoio.ETAPAS`; a proteção contra violência mora aqui, decisão do autor).
+  Hospitais e Carretas viraram recursos (lâminas próprias). Mama e colo reúnem
+  prevenção, exame, diagnóstico e tratamento de cada câncer.
 - **Divisão de trabalho (09/2026):** o ChatGPT cuida de
   `conversa.py`/`teste_conversa.py`; Claude cuida de `inteligencia.py`
   e do painel (o autor passou a Lia para o Claude). Pendências do

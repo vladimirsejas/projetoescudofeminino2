@@ -22,9 +22,11 @@ from lia_rosto import img as rosto_lia  # noqa: E402
 # (dashboard/app.py) não muda; só ganhou, no topo, o botão vermelho
 # "Apoio à mulher" que traz para cá. Mesmo layout (estilo.py) e a MESMA Lia (rosto, balão,
 # botões), com a árvore de algoritimos/apoio.py.
-# Lâminas: Encontre um caminho (Estado + itens de outras cidades,
-# por caminho), Rio Claro (a cidade do trabalho), Barretos (Hospital
-# de Amor) e Sobre estas informações. Cada item tem uma casa só.
+# Lâminas: Encontre um caminho (as 8 portas da Lia, com "Preciso de
+# ajuda" e o fluxo da rede oncológica), Hospitais no Estado e
+# Carretas (recursos), Rio Claro (a cidade do trabalho), Barretos
+# (Hospital de Amor) e Sobre estas informações. Cada item tem uma
+# casa só; nos outros lugares aparece em cartão curto.
 # O estado desta página usa chaves "ap_" (o session_state é
 # compartilhado com o painel) e a mesma defesa contra a armadilha do
 # Streamlit: chave do widget atrelada ao valor (ver app.py).
@@ -44,7 +46,7 @@ div[data-testid="stRadio"]:has(input[value="Encontre um caminho"]) > div { gap: 
 .apoio-cartao.confirmar { border-left-color: #f0b58d; }
 .apoio-cartao.destaque { box-shadow: 0 0 0 2px #7565a8; }
 .apoio-cartao.curto { border-left-style: dashed; }
-/* "Onde a carreta está agora?" (caminho Ir até você) */
+/* "Onde a carreta está agora?" (lâmina Carretas) */
 .carreta-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 8px 0; }
 .carreta { background: #fff; border: 1px solid #ebe8f2; border-radius: 14px; padding: 10px 14px; }
 .carreta b { font-family: 'Manrope', sans-serif; color: #292541; }
@@ -80,7 +82,12 @@ a.apoio-botao:hover { background: #1f5fae; }
     background: #4a3d78; border-color: #4a3d78; }
 [class*="st-key-ap_pilulas"] label[data-selected="true"] p,
 [class*="st-key-ap_pilulas"] label[data-baseweb="radio"]:has(input:checked) div { color: #ffffff; font-weight: 600; }
-.apoio-jornada { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 10px; }
+.apoio-fluxo { background: #fff; border: 1px solid #e3dcf2; border-radius: 14px; padding: 10px 12px; min-height: 150px; }
+.apoio-fluxo .n { color: #9b8fc4; font-weight: 700; font-size: .8rem; }
+.apoio-fluxo b { font-family: 'Manrope', sans-serif; color: #292541; display: block; }
+.apoio-fluxo span { color: #625d72; font-size: .85rem; }
+.apoio-etapa { background: #fff; border: 1px solid #e3dcf2; border-left: 6px solid #4a3d78; border-radius: 14px;
+               padding: 12px 16px; margin: 8px 0; color: #3d3852; font-size: 1.02rem; }
 .apoio-jornada span { border-radius: 999px; padding: 4px 12px; background: #fff; border: 1px solid #e3dcf2;
                       color: #4a3d78; font-weight: 600; font-size: .9rem; }
 .apoio-jornada span.ativo { background: #4a3d78; border-color: #4a3d78; color: #fff; }
@@ -91,9 +98,9 @@ a.apoio-botao:hover { background: #1f5fae; }
 
 ABAS = list(apoio.LAMINAS.values())
 ROTULO = apoio.NOME_CAMINHO
-TODOS = {"barretos": "Todos os temas", "hospitais": "Todas as regiões"}
-PADROES = {"ap_aba": ABAS[0], "ap_caminho": "prevenir", "ap_item": None,
-           "ap_grupo_barretos": TODOS["barretos"], "ap_grupo_hospitais": TODOS["hospitais"]}
+TODOS = {"barretos": "Todos os temas", "hospitais": "Todas as regiões", "carretas": "Todas as carretas"}
+PADROES = {"ap_aba": ABAS[0], "ap_caminho": "mama", "ap_item": None, "ap_etapa": apoio.ETAPAS[0][0],
+           **{f"ap_grupo_{lam}": TODOS[lam] for lam in apoio.GRUPOS}}
 for chave, valor in PADROES.items():
     st.session_state.setdefault(chave, valor)
 st.session_state.setdefault("ap_lia", {"atual": apoio.responder(INICIO), "pilha": [], "falas": 0})
@@ -121,6 +128,8 @@ def aplicar_destino(destino):
         definir("ap_aba", destino["aba"])
     if destino.get("caminho") in ROTULO:
         definir("ap_caminho", destino["caminho"])
+    if destino.get("etapa") in apoio.NOME_ETAPA:
+        definir("ap_etapa", destino["etapa"])
     definir("ap_item", destino.get("item"))
     for lam in apoio.GRUPOS:  # lâmina com temas/regiões: vai ao do item (ou a todos)
         if destino.get("aba") == apoio.LAMINAS[lam]:
@@ -220,7 +229,7 @@ def cartao_curto(i):
         f'<div class="escudo-cartao apoio-cartao curto"><h4>{e(i["titulo"])}<span class="apoio-selo">{e(i["onde"])}'
         f'</span></h4><div class="apoio-resumo">{e(i["resumo"][0].upper() + i["resumo"][1:])}.</div>'
         f'<a class="apoio-botao" href="{e(i["link"])}" target="_blank" rel="noopener">Abrir a página oficial ↗</a>'
-        f'<div class="apoio-fonte">Detalhes completos na lâmina {apoio.LAMINAS[i["lamina"]]}.</div></div>',
+        f'<div class="apoio-fonte">Detalhes completos na {apoio.onde_mora(i)}.</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -248,7 +257,7 @@ def onde_esta_a_carreta():
     st.markdown(f'<div class="escudo-info"><b>O que levar:</b> {e(levar)} Fontes: '
                 + " · ".join(f'<a href="{e(link)}" target="_blank" rel="noopener">{e(nome)}</a>'
                              for nome, link in apoio.FONTES_ITINERARIO.values())
-                + ". O itinerário completo e atualizado fica no Poupatempo (cartão abaixo).</div>",
+                + ". O itinerário completo e atualizado fica no Poupatempo (cartão Carretas da Mamografia).</div>",
                 unsafe_allow_html=True)
 
 
@@ -265,6 +274,75 @@ def lamina_por_grupos(lam, rotulo_seletor):
                 cartao(i)
             for i in visitas:
                 cartao_curto(i)
+
+
+def apontados(c):
+    """O que serve a esta porta mas mora em outra porta ou lâmina."""
+    for lam, fora in apoio.nas_laminas(c).items():
+        nome = "outras portas" if lam == "caminho" else f"lâmina {apoio.LAMINAS[lam]}"
+        st.markdown(f'<div class="apoio-grupo">Também para esta porta: {nome}</div>', unsafe_allow_html=True)
+        if lam != "caminho" and len(fora) > apoio.MAX_APONTADOS:
+            st.button(f"Ver os {len(fora)} itens na lâmina {apoio.LAMINAS[lam]} →", key=f"ir_{c}_{lam}",
+                      type="primary", on_click=aplicar_destino, args=({"aba": apoio.LAMINAS[lam]},))
+        else:
+            for i in fora:
+                cartao_curto(i)
+
+
+def fluxo_rede():
+    """A rede oncológica em passos, cada um levando à sua porta."""
+    colunas = st.columns(len(apoio.FLUXO_REDE))
+    for n, (col, (passo, o_que, porta_id)) in enumerate(zip(colunas, apoio.FLUXO_REDE), start=1):
+        seta = " →" if n < len(apoio.FLUXO_REDE) else ""
+        col.markdown(f'<div class="apoio-fluxo"><span class="n">{n}{seta}</span><b>{passo}</b>'
+                     f'<span>{o_que}</span></div>', unsafe_allow_html=True)
+        destino = ({"aba": apoio.LAMINAS["hospitais"]} if passo == "Especialista"
+                   else {"aba": apoio.LAMINAS["caminho"], "caminho": porta_id})
+        col.button("Hospitais" if passo == "Especialista" else ROTULO[porta_id], key=f"fluxo_{n}",
+                   on_click=aplicar_destino, args=(destino,), use_container_width=True)
+
+
+def porta(c, rotulo, dentro, abertura):
+    pergunta(f"{rotulo}: {dentro}")
+    dica(abertura)
+    if c == "rede":
+        fluxo_rede()
+    if c == "mama":
+        st.button("Carretas da mamografia: onde estão agora →", key="ir_carretas_mama", type="primary",
+                  on_click=aplicar_destino, args=({"aba": apoio.LAMINAS["carretas"]},))
+    for i in apoio.itens(caminho=c, lamina="caminho"):
+        cartao(i)
+    apontados(c)
+    if c in apoio.PROXIMO:
+        seguinte = apoio.PROXIMO[c]
+        st.button(f"Próximo passo: {ROTULO[seguinte]} →", key=f"prox_{c}", on_click=aplicar_destino,
+                  args=({"aba": apoio.LAMINAS["caminho"], "caminho": seguinte},))
+
+
+def porta_ajuda():
+    """Preciso de ajuda: em que ponto a mulher está -> o próximo passo."""
+    pergunta("Em que ponto você está?")
+    dica("Escolha o que está acontecendo com você. A Lia mostra o próximo passo na rede de saúde.")
+    with pilulas("etapa"):
+        e = seletor(st, "Em que ponto você está?", "ap_etapa", list(apoio.NOME_ETAPA),
+                    format_func=apoio.NOME_ETAPA.get, horizontal=True, label_visibility="collapsed")
+    _, _, fala, portas, _ = next(x for x in apoio.ETAPAS if x[0] == e)
+    st.markdown(f'<div class="apoio-etapa">{html.escape(fala)}</div>', unsafe_allow_html=True)
+    if portas or e == "nao_fiz":
+        colunas = st.columns(max(len(portas) + (e == "nao_fiz"), 1))
+        for col, porta_id in zip(colunas, portas):
+            col.button(f"Porta {ROTULO[porta_id]} →", key=f"etapa_{e}_{porta_id}", type="primary",
+                       on_click=aplicar_destino, args=({"aba": apoio.LAMINAS["caminho"], "caminho": porta_id},),
+                       use_container_width=True)
+        if e == "nao_fiz":
+            colunas[-1].button("Carretas: onde estão agora →", key="etapa_carretas", type="primary",
+                               on_click=aplicar_destino, args=({"aba": apoio.LAMINAS["carretas"]},),
+                               use_container_width=True)
+    for i in apoio.itens_da_etapa(e):
+        (cartao if i["caminho"] == "ajuda" else cartao_curto)(i)
+    if e == "violencia":
+        for i in apoio.itens(caminho="ajuda", lamina="rio_claro"):
+            cartao_curto(i)
 
 
 # ============================================================
@@ -295,6 +373,12 @@ if not st.session_state.get("ap_boas_vindas_fechada"):
         for n, (c, rotulo, dentro, _) in enumerate(apoio.CAMINHOS):
             colunas[n % 2].button(f"{rotulo} · {dentro}", key=f"bv_ap_{c}", on_click=lia_clicar,
                                   args=(apoio.caminho(c),), use_container_width=True)
+        st.caption("Recursos:")
+        r1, r2 = st.columns(2)
+        r1.button("Hospitais no Estado", key="bv_ap_hospitais", on_click=lia_clicar,
+                  args=(apoio.lamina("hospitais"),), use_container_width=True)
+        r2.button("Carretas: onde estão agora", key="bv_ap_carretas", on_click=lia_clicar,
+                  args=(apoio.lamina("carretas"),), use_container_width=True)
         st.button("Prefiro explorar sozinha", key="bv_fechar_apoio",
                   on_click=lambda: st.session_state.update(ap_boas_vindas_fechada=True))
 
@@ -307,35 +391,19 @@ aba = seletor(st, "Lâmina", "ap_aba", ABAS, horizontal=True, label_visibility="
 
 if aba == apoio.LAMINAS["caminho"]:
     pergunta("O que você precisa?")
-    dica("A jornada vai de prevenir a acompanhar; os outros caminhos servem em qualquer momento. "
-         "Cidades aparecem só quando têm algo útil para aquele caminho.")
-    atual_c = st.session_state["ap_caminho"]
-    jornada = " <i>→</i> ".join(f'<span class="{"ativo" if c == atual_c else ""}">{ROTULO[c]}</span>'
-                                for c in apoio.JORNADA)
-    st.markdown(f'<div class="apoio-jornada">{jornada}</div>', unsafe_allow_html=True)
+    dica("Oito portas para a mulher andar pela rede de saúde. Hospitais e Carretas têm lâmina própria (abas acima). "
+         "Não sabe por onde começar? Use <b>Preciso de ajuda</b>.")
     codigos = [c for c, _, _, _ in apoio.CAMINHOS]
-    onde_clicar("Clique num caminho. Depois, em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
+    onde_clicar("Clique numa porta. Depois, em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
     with pilulas("caminho"):
         c = seletor(st, "Caminho", "ap_caminho", codigos, format_func=ROTULO.get, horizontal=True,
                     label_visibility="collapsed")
     _, rotulo, dentro, abertura = next(x for x in apoio.CAMINHOS if x[0] == c)
 
-    if c == "ir_ate_voce":
-        onde_esta_a_carreta()
-    pergunta(f"{rotulo}: {dentro}")
-    dica(abertura)
-    for i in apoio.itens(caminho=c, lamina="caminho"):
-        cartao(i)
-
-    for lam, fora in apoio.nas_laminas(c).items():
-        st.markdown(f'<div class="apoio-grupo">Também para este caminho: lâmina {apoio.LAMINAS[lam]}</div>',
-                    unsafe_allow_html=True)
-        if len(fora) > apoio.MAX_APONTADOS:
-            st.button(f"Ver os {len(fora)} itens na lâmina {apoio.LAMINAS[lam]} →", key=f"ir_{c}_{lam}",
-                      type="primary", on_click=aplicar_destino, args=({"aba": apoio.LAMINAS[lam]},))
-        else:
-            for i in fora:
-                cartao_curto(i)
+    if c == "ajuda":
+        porta_ajuda()
+    else:
+        porta(c, rotulo, dentro, abertura)
     leitura("Como usar", [
         "Cada cartão traz a página oficial e a data em que foi conferido. Borda laranja = ainda falta confirmar "
         "algum detalhe na própria página.",
@@ -358,9 +426,19 @@ if aba == apoio.LAMINAS["hospitais"]:
         "Com suspeita ou diagnóstico de câncer, procure a unidade de saúde do bairro: o médico do SUS pede a vaga "
         "pela CROSS, que encaminha a um centro perto de onde você mora.",
         "Se o tratamento for longe (mais de 50 km) e não existir na sua região, o SUS pode pagar transporte e "
-        "diárias (TFD, no caminho Seus direitos).",
+        "diárias (TFD, na porta Direitos e acesso).",
         "A lista completa e oficial é a da FOSP (primeira região desta lâmina).",
     ])
+
+
+# ============================================================
+# CARRETAS — onde a carreta da mamografia está agora
+# ============================================================
+
+if aba == apoio.LAMINAS["carretas"]:
+    onde_esta_a_carreta()
+    onde_clicar("Em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
+    lamina_por_grupos("carretas", "Carretas")
 
 
 # ============================================================
@@ -376,7 +454,8 @@ if aba == apoio.LAMINAS["rio_claro"]:
     for c in [c for c, _, _, _ in apoio.CAMINHOS]:
         do_caminho = [i for i in lista if i["caminho"] == c]
         if do_caminho:
-            st.markdown(f'<div class="apoio-grupo">{ROTULO[c]}</div>', unsafe_allow_html=True)
+            titulo_grupo = "Proteção contra a violência" if c == "ajuda" else ROTULO[c]
+            st.markdown(f'<div class="apoio-grupo">{titulo_grupo}</div>', unsafe_allow_html=True)
             for i in do_caminho:
                 cartao(i)
     st.button("Hospitais de referência da região →", key="ir_referencia_rc", type="primary",
@@ -426,7 +505,7 @@ if aba == apoio.LAMINAS["sobre"]:
   "a confirmar".
 - **O que isto não é:** não é orientação médica, não garante vaga e não substitui a unidade de saúde.
   A Lia não é médica.
-- **Cidades:** não há uma lâmina por cidade. Campinas, Ribeirão Preto, Rio Preto e Piracicaba entram nos caminhos
+- **Cidades:** não há uma lâmina por cidade. Campinas, Ribeirão Preto, Rio Preto e Piracicaba entram nas portas
   quando têm algo útil; Rio Claro (a cidade do trabalho) e Barretos (Hospital de Amor) têm lâmina própria.
 - **Para gestores:** o Plano Estadual de Oncologia 2025–2028 organiza a rede por região (RRAS); Rio Claro está na
   {apoio.REGIAO}.

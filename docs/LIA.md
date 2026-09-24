@@ -168,12 +168,18 @@ mulher — "Encontre um caminho"** (`dashboard/pages/apoio.py`), aberta
 pelo botão vermelho "Apoio à mulher" no topo do painel. É a **mesma Lia** (rosto,
 balão, botões, estilo em `dashboard/estilo.py`), com outra árvore
 (`algoritimos/apoio.py`): saudação ("Você está em Rio Claro. O que
-você precisa?") → 8 caminhos (Prevenir, Descobrir, Tratar,
-Acompanhar, Ir até você, Encontrar referência, Cuidar, Proteger) →
-item (para quem, o que levar, como, contato, página oficial, data em
-que foi conferido). Item "a confirmar" deixa a Lia **cautelosa**;
-Proteger fala com a expressão **acolhedora**. Ela não é médica e
-não promete vaga: mostra onde procurar.
+você precisa?") → 8 portas (Câncer de mama, Colo do útero,
+Diagnóstico, Regulação, Tratamento, Rede oncológica, Direitos e
+acesso, Preciso de ajuda) → item (para quem, o que levar, como,
+contato, página oficial, data em que foi conferido). **Preciso de
+ajuda** pergunta "Em que ponto você está?" (ainda não fiz o exame,
+meu exame deu alteração, fui encaminhada, recebi diagnóstico, estou
+em tratamento, estou em situação de violência) e leva à porta certa:
+a Lia vira ponte entre a mulher e a rede, não um menu de links.
+Hospitais e Carretas são recursos (lâminas próprias). Item "a
+confirmar" deixa a Lia **cautelosa**; violência e diagnóstico
+recebido, **acolhedora**. Ela não é médica e não promete vaga:
+mostra onde procurar.
 
 ## Testes
 
