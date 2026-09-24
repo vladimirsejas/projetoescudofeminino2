@@ -1,3 +1,5 @@
+from datetime import date
+
 from lia import INICIO, Resposta
 
 # =====================================
@@ -794,6 +796,96 @@ GRUPOS = {"barretos": GRUPOS_BARRETOS, "hospitais": GRUPOS_HOSPITAIS}
 POR_ID = {i["id"]: i for i in ITENS}
 
 
+# ---------- itinerário das Carretas da Mamografia do Estado ----------
+# Trazido pelo autor em 24/09/2026 e conferido nas notícias da Agência
+# SP. Muda todo mês: quando vencer, o painel e a Lia avisam para ver o
+# novo no Poupatempo. Atualizar = trocar esta lista (datas em 2026).
+FONTES_ITINERARIO = {
+    "setembro": ("Agência SP – Carretas da Mamografia atenderão a capital e mais cinco municípios em setembro",
+                 "https://www.agenciasp.sp.gov.br/carretas-da-mamografia-atenderao-capital-e-mais-cinco-municipios-no-"
+                 "estado-em-setembro/"),
+    "fim_setembro": ("Agência SP – Carretas fecham o mês de setembro em cinco municípios (publicada em 23/09/2026)",
+                     "https://www.agenciasp.sp.gov.br/carretas-de-prevencao-ao-cancer-de-mama-fecham-o-mes-de-setembro-"
+                     "em-cinco-municipios-paulistas-veja-itinerario/"),
+}
+ITINERARIO = [
+    {"cidade": "Apiaí", "inicio": None, "fim": None, "local": None, "fonte": "setembro"},
+    {"cidade": "Bananal", "inicio": date(2026, 9, 3), "fim": date(2026, 9, 14), "local": None, "fonte": "setembro"},
+    {"cidade": "São Paulo (Paraisópolis)", "inicio": date(2026, 9, 10), "fim": date(2026, 9, 21), "local": None,
+     "fonte": "setembro"},
+    {"cidade": "Eldorado", "inicio": date(2026, 9, 16), "fim": date(2026, 9, 28), "local": None, "fonte": "setembro"},
+    {"cidade": "Piquete", "inicio": date(2026, 9, 17), "fim": date(2026, 9, 28), "local": None, "fonte": "setembro"},
+    {"cidade": "Araçoiaba da Serra", "inicio": date(2026, 9, 24), "fim": date(2026, 10, 5), "local": None,
+     "fonte": "setembro"},
+    {"cidade": "Bertioga", "inicio": date(2026, 9, 22), "fim": date(2026, 10, 3),
+     "local": "Avenida São Gonçalo, s/n – Chácara Vista Linda", "fonte": "fim_setembro"},
+    {"cidade": "Serrana", "inicio": date(2026, 9, 22), "fim": date(2026, 10, 3),
+     "local": "Rua Tancredo de Almeida Neves, 176 – Jardim Bela Vista", "fonte": "fim_setembro"},
+    {"cidade": "Barra do Turvo", "inicio": date(2026, 9, 22), "fim": date(2026, 10, 3),
+     "local": "Avenida Vinte e Um de Março, 304 – Centro", "fonte": "fim_setembro"},
+    {"cidade": "Itapura", "inicio": date(2026, 9, 22), "fim": date(2026, 10, 3),
+     "local": "Av. Mal. Artur Costa e Silva, 1120 (em frente à UBS II)", "fonte": "fim_setembro"},
+    {"cidade": "Avaré", "inicio": date(2026, 9, 22), "fim": date(2026, 10, 3),
+     "local": "Praça Prefeito Romeu Bretas (Praça da Concha Acústica) – Centro", "fonte": "fim_setembro"},
+]
+SITUACOES = {"agora": "Agora", "em_breve": "Em breve", "sem_data": "Sem data publicada", "encerrada": "Já passou"}
+
+
+def hoje():
+    """A data de hoje (função própria para os testes fixarem o dia)."""
+    return date.today()
+
+
+def carretas(dia=None):
+    """O itinerário com a situação de cada carreta no dia: agora, em
+    breve, sem data publicada ou já passou (nessa ordem)."""
+    dia = dia or hoje()
+    lista = []
+    for c in ITINERARIO:
+        if c["inicio"] is None:
+            situacao = "sem_data"
+        elif dia < c["inicio"]:
+            situacao = "em_breve"
+        elif dia > c["fim"]:
+            situacao = "encerrada"
+        else:
+            situacao = "agora"
+        lista.append({**c, "situacao": situacao})
+    ordem = list(SITUACOES)
+    return sorted(lista, key=lambda c: (ordem.index(c["situacao"]), c["inicio"] or date.max, c["cidade"]))
+
+
+def itinerario_vencido(dia=None):
+    """True quando todas as datas guardadas já passaram."""
+    dia = dia or hoje()
+    return all(c["fim"] is None or c["fim"] < dia for c in ITINERARIO)
+
+
+def periodo(c):
+    if c["inicio"] is None:
+        return "datas no Poupatempo"
+    return f"{c['inicio']:%d/%m} a {c['fim']:%d/%m}"
+
+
+def frase_carretas(dia=None):
+    """A fala da Lia sobre onde a carreta está no dia."""
+    dia = dia or hoje()
+    if itinerario_vencido(dia):
+        return (f"O itinerário que eu tenho terminou em {max(c['fim'] for c in ITINERARIO if c['fim']):%d/%m}. "
+                "Consulte o novo no Poupatempo (cartão Carretas da Mamografia).")
+    lista = carretas(dia)
+    agora = [c for c in lista if c["situacao"] == "agora"]
+    breve = [c for c in lista if c["situacao"] == "em_breve"]
+    partes = [f"**Hoje ({dia:%d/%m}) a carreta está em:** "
+              + (", ".join(f"{c['cidade']} (até {c['fim']:%d/%m})" for c in agora) if agora else "nenhuma cidade")
+              + "."]
+    if breve:
+        partes.append("**Em breve:** " + ", ".join(f"{c['cidade']} ({periodo(c)})" for c in breve) + ".")
+    partes.append(f"Nenhuma está na região de {CIDADE} ({REGIAO}) neste itinerário; ele muda todo mês."
+                  if not any(c["cidade"] == CIDADE for c in agora + breve) else "")
+    return " ".join(p for p in partes if p)
+
+
 def itens(caminho=None, lamina=None):
     return [i for i in ITENS if (caminho is None or i["caminho"] == caminho)
             and (lamina is None or i["lamina"] == lamina)]
@@ -882,6 +974,8 @@ def responder_caminho(c):
             botoes += [(i["titulo"], item(i["id"])) for i in fora]
     if partes:
         fala += "\n\nTambém para este caminho: " + "; ".join(partes) + "."
+    if c == "ir_ate_voce":
+        fala += "\n\n" + frase_carretas()
     return Resposta(
         fala=fala,
         expressao="acolhedora" if c == "proteger" else "explicando",

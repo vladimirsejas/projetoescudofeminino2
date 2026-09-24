@@ -173,6 +173,10 @@ Estado atual:
   DDMs, Casas da Mulher Paulista, Defensoria (NUDEM) e violência sexual 24 h;
   Rio Claro com AME, DDM, Patrulha Maria da Penha e Rede Feminina. Item que mora
   numa lâmina e aparece em outra usa `tambem` (cartão curto, sem repetir texto).
+  **Carretas (itinerário):** `apoio.ITINERARIO` (trazido pelo autor, conferido na
+  Agência SP em 24/09/2026) alimenta o quadro "Onde a carreta está agora?" (Ir até
+  você) e a fala da Lia, pela data do dia; vencido, avisa para ver o Poupatempo.
+  Atualizar todo mês trocando a lista.
 - **Divisão de trabalho (09/2026):** o ChatGPT cuida de
   `conversa.py`/`teste_conversa.py`; Claude cuida de `inteligencia.py`
   e do painel (o autor passou a Lia para o Claude). Pendências do

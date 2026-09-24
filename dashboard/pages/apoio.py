@@ -44,6 +44,17 @@ div[data-testid="stRadio"]:has(input[value="Encontre um caminho"]) > div { gap: 
 .apoio-cartao.confirmar { border-left-color: #f0b58d; }
 .apoio-cartao.destaque { box-shadow: 0 0 0 2px #7565a8; }
 .apoio-cartao.curto { border-left-style: dashed; }
+/* "Onde a carreta está agora?" (caminho Ir até você) */
+.carreta-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 8px 0; }
+.carreta { background: #fff; border: 1px solid #ebe8f2; border-radius: 14px; padding: 10px 14px; }
+.carreta b { font-family: 'Manrope', sans-serif; color: #292541; }
+.carreta .quando { color: #4d4863; font-size: .92rem; margin-top: 2px; }
+.carreta .local { color: #706b82; font-size: .85rem; margin-top: 4px; }
+.carreta-selo { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+                border-radius: 999px; padding: 2px 9px; margin-bottom: 4px; }
+.carreta-selo.agora { background: #dcf3e8; color: #11734f; }
+.carreta-selo.em_breve { background: #e3eefc; color: #1f5fae; }
+.carreta-selo.sem_data { background: #efeef3; color: #625d72; }
 .apoio-resumo { color: #4d4863; margin: 2px 0 6px; }
 .apoio-cartao ul { padding-left: 18px; margin: 4px 0; }
 .apoio-fonte { color: #8a8599; font-size: .85rem; margin-top: 8px; }
@@ -214,6 +225,33 @@ def cartao_curto(i):
     )
 
 
+def onde_esta_a_carreta():
+    """Quadro do itinerário das Carretas da Mamografia no dia de hoje."""
+    e = html.escape
+    dia = apoio.hoje()
+    pergunta("Onde a carreta da mamografia está agora?")
+    dica(f"Itinerário do Estado (Programa Mulheres de Peito) conferido em {apoio.CONFERIDO}; hoje é {dia:%d/%m/%Y}. "
+         "Gratuito e sem agendamento, com senhas limitadas por dia.")
+    if apoio.itinerario_vencido(dia):
+        st.markdown(f'<div class="escudo-alerta">{e(apoio.frase_carretas(dia))}</div>', unsafe_allow_html=True)
+    else:
+        lista = [c for c in apoio.carretas(dia) if c["situacao"] != "encerrada"]
+        st.markdown('<div class="carreta-grade">' + "".join(
+            f'<div class="carreta"><span class="carreta-selo {c["situacao"]}">{apoio.SITUACOES[c["situacao"]]}</span>'
+            f'<br><b>{e(c["cidade"])}</b><div class="quando">{e(apoio.periodo(c))}</div>'
+            + (f'<div class="local">{e(c["local"])}</div>' if c["local"] else "") + "</div>"
+            for c in lista) + "</div>", unsafe_allow_html=True)
+        passou = [c for c in apoio.carretas(dia) if c["situacao"] == "encerrada"]
+        if passou:
+            st.caption("Já passou: " + "; ".join(f"{c['cidade']} ({apoio.periodo(c)})" for c in passou) + ".")
+    levar = apoio.POR_ID["carretas_estado"]["levar"]
+    st.markdown(f'<div class="escudo-info"><b>O que levar:</b> {e(levar)} Fontes: '
+                + " · ".join(f'<a href="{e(link)}" target="_blank" rel="noopener">{e(nome)}</a>'
+                             for nome, link in apoio.FONTES_ITINERARIO.values())
+                + ". O itinerário completo e atualizado fica no Poupatempo (cartão abaixo).</div>",
+                unsafe_allow_html=True)
+
+
 def lamina_por_grupos(lam, rotulo_seletor):
     """Lâmina organizada em temas ou regiões, escolhidos como botões."""
     with pilulas(lam):
@@ -282,6 +320,8 @@ if aba == apoio.LAMINAS["caminho"]:
                     label_visibility="collapsed")
     _, rotulo, dentro, abertura = next(x for x in apoio.CAMINHOS if x[0] == c)
 
+    if c == "ir_ate_voce":
+        onde_esta_a_carreta()
     pergunta(f"{rotulo}: {dentro}")
     dica(abertura)
     for i in apoio.itens(caminho=c, lamina="caminho"):

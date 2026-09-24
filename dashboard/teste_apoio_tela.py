@@ -137,6 +137,13 @@ for lam in apoio.GRUPOS:
                and not any(_html.escape(i["titulo"]) in texto for i in apoio.itens(lamina=lam) if i["grupo"] != g
                            and (lam, g) not in i["tambem"]))
 checar("D. cartões com o botão Abrir a página oficial", "apoio-botao" in texto)
+at.session_state["ap_aba"] = apoio.LAMINAS["caminho"]
+at.session_state["ap_caminho"] = "ir_ate_voce"
+at.run()
+texto = " ".join(m.value for m in at.markdown)
+checar("D. Ir até você mostra onde a carreta está agora",
+       not erros(at) and "Onde a carreta da mamografia está agora?" in texto
+       and ("carreta-grade" in texto or "escudo-alerta" in texto))
 
 print(f"\n({time.time() - inicio:.0f} s)")
 print("Todas as checagens da lâmina de apoio passaram." if not falhas else f"{len(falhas)} falha(s).")

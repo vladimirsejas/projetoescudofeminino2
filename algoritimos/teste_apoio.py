@@ -103,6 +103,23 @@ checar("todo item é alcançável pelos botões", itens_alcancados == set(ids))
 checar("botão desconhecido volta à saudação", apoio.responder({"tipo": "apoio_item", "id": "nao_existe"}).fala
        == inicio.fala)
 
+# ---------- itinerário das carretas ----------
+from datetime import date  # noqa: E402
+dia = date(2026, 9, 24)
+agora = {c["cidade"] for c in apoio.carretas(dia) if c["situacao"] == "agora"}
+checar("carretas em 24/09/2026: as 8 em andamento", agora == {
+    "Eldorado", "Piquete", "Araçoiaba da Serra", "Bertioga", "Serrana", "Barra do Turvo", "Itapura", "Avaré"})
+checar("carretas: Bananal e Paraisópolis já passaram; Apiaí sem data",
+       {c["cidade"]: c["situacao"] for c in apoio.carretas(dia)}["Bananal"] == "encerrada"
+       and {c["cidade"]: c["situacao"] for c in apoio.carretas(dia)}["Apiaí"] == "sem_data")
+checar("carretas: em 01/09 Bananal aparece como em breve",
+       {c["cidade"]: c["situacao"] for c in apoio.carretas(date(2026, 9, 1))}["Bananal"] == "em_breve")
+checar("carretas: a Lia diz onde a carreta está hoje", "Araçoiaba da Serra" in apoio.frase_carretas(dia))
+checar("carretas: itinerário vencido manda ver o novo no Poupatempo",
+       apoio.itinerario_vencido(date(2026, 10, 10)) and "Poupatempo" in apoio.frase_carretas(date(2026, 10, 10)))
+checar("carretas: toda fonte do itinerário existe", all(c["fonte"] in apoio.FONTES_ITINERARIO
+                                                         for c in apoio.ITINERARIO))
+
 print()
 print("Todas as checagens do apoio passaram." if not falhas else f"{len(falhas)} falha(s).")
 sys.exit(1 if falhas else 0)
