@@ -1,7 +1,6 @@
 import os
 import sqlite3
 
-import pandas as pd
 
 BANCO = r"C:\projetoescudofeminino2\banco\escudo_feminino.db"
 
@@ -140,81 +139,3 @@ def listar_municipios_disponiveis():
 
     finally:
         conexao.close()
-
-
-def nome_coluna_municipio(df):
-    municipio = obter_municipio()
-    if municipio in df.columns:
-        return municipio
-    if MUNICIPIO_PADRAO in df.columns:
-        return MUNICIPIO_PADRAO
-    return None
-
-
-def salvar_tabela_municipio(df, nome_tabela, conexao, municipio=None):
-    """
-    Salva `df` em `nome_tabela`, marcado com uma coluna `municipio`,
-    substituindo só as linhas desse município -- nunca a tabela
-    inteira. Isso permite que os resultados de vários municípios já
-    processados coexistam na mesma tabela (ex.: rodar a cadeia
-    determinística para RIO_CLARO e depois para outro município não
-    apaga o que já foi calculado para o primeiro).
-
-    Antes disso, cada script fazia to_sql(..., if_exists="replace"),
-    que sempre apagava a tabela inteira -- por isso trocar o
-    município no dashboard não "reprocessava": as tabelas derivadas
-    só existiam para o último município que rodou a cadeia.
-    """
-
-    municipio = municipio or obter_municipio()
-
-    df = df.copy()
-    df["municipio"] = municipio
-
-    cursor = conexao.cursor()
-
-    tabela_existe = cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
-        (nome_tabela,)
-    ).fetchone()
-
-    if tabela_existe:
-        colunas_existentes = [
-            linha[1] for linha in
-            cursor.execute(f"PRAGMA table_info({nome_tabela})")
-        ]
-
-        if "municipio" not in colunas_existentes:
-            cursor.execute(
-                f"ALTER TABLE {nome_tabela} ADD COLUMN municipio TEXT"
-            )
-
-        # remove tanto as linhas antigas deste município quanto
-        # linhas órfãs sem município (sobra de antes desta migração)
-        cursor.execute(
-            f"DELETE FROM {nome_tabela} "
-            f"WHERE municipio = ? OR municipio IS NULL",
-            (municipio,)
-        )
-        conexao.commit()
-
-    df.to_sql(nome_tabela, conexao, if_exists="append", index=False)
-
-
-def ler_tabela_municipio(nome_tabela, conexao, municipio=None, colunas="*"):
-    """
-    Lê `nome_tabela` filtrando pelo município (nunca lê todas as
-    linhas de todos os municípios de uma vez -- isso duplicaria
-    resultados em qualquer merge posterior por tipo_cancer).
-    """
-
-    municipio = municipio or obter_municipio()
-
-    try:
-        return pd.read_sql(
-            f"SELECT {colunas} FROM {nome_tabela} WHERE municipio = ?",
-            conexao,
-            params=(municipio,)
-        )
-    except Exception:
-        return pd.DataFrame()

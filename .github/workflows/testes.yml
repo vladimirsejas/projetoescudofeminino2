@@ -1,0 +1,39 @@
+name: Testes do Escudo
+
+on:
+  pull_request:
+  push:
+
+# Os testes do sistema atual (sem banco: usam dados sintéticos e a
+# base pública analises/base_preditiva_2013_2025.csv).
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instala dependências
+        run: pip install -r requirements.txt pyarrow
+      - name: Inteligência (números do painel)
+        working-directory: algoritimos
+        run: python teste_inteligencia.py
+      - name: Lia
+        working-directory: algoritimos
+        run: python teste_lia.py
+      - name: Conversa (fora do painel)
+        working-directory: algoritimos
+        run: python teste_conversa.py
+      - name: Carga e ferramentas do ETL
+        working-directory: etl
+        run: |
+          python teste_carga_duplicidade.py
+          python teste_carga_territorial.py
+          python teste_selecao_csv.py
+          python teste_deteccao_separador.py
+          python teste_completude_meses.py
+          python teste_investigar_2025.py
+          python teste_baixar_sih_sp.py
+      - name: Painel (clica em tudo)
+        run: python dashboard/teste_painel.py

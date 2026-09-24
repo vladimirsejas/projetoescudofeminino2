@@ -43,47 +43,28 @@ configurável", identificado pelo código oficial do IBGE:
   `obter_codigo_ibge()`, `obter_nome_municipio()`, `obter_uf()` e
   `listar_municipios_disponiveis()` (consulta `municipios ∩
   internacoes`, nunca lista fixa no código).
-- Todas as 13 tabelas derivadas (mortalidade, custos, permanência,
-  faixa etária, score, tendência estadual, anomalias, priorização,
-  base de conhecimento, perfil epidemiológico, memória, fichas,
-  vulnerabilidade) são **multi-tenant**: gravadas via
-  `salvar_tabela_municipio()` (marca cada linha com uma coluna
-  `municipio` e substitui só as linhas desse município, nunca a
-  tabela inteira) e lidas via `ler_tabela_municipio()` (sempre
-  filtra por município -- ler sem filtrar duplicaria linhas em
-  qualquer merge por `tipo_cancer`). Isso permite que os resultados
-  de vários municípios já processados coexistam na mesma tabela.
-  `tendencia_estadual.py` guarda a variação em colunas fixas
-  (`variacao_municipio`/`variacao_sp`, não mais nomeadas
-  dinamicamente pelo município) exatamente por isso -- nome de
-  coluna dinâmico é incompatível com tabela multi-tenant. SP
-  continua fixo como referência estadual.
 - `dashboard/app.py` tem seletor de município no topo (populado por
   `listar_municipios_disponiveis()`) e lê tudo de
-  `algoritimos/inteligencia.py`, direto de `internacoes` -- não
-  depende da cadeia determinística (ver "Painel novo" abaixo).
-- Textos narrativos (`chat_escudo.py`, `base_conhecimento.py`,
-  `relatorio_executivo.py`, `motor_raciocinio.py`) usam
-  `obter_nome_municipio()` dinamicamente -- não há mais "Rio Claro"
-  fixo nas frases geradas.
-- Municípios disponíveis dependem só dos dados carregados no banco
-  -- adicionar uma cidade nova é (1) extrair os CSVs do DATASUS
-  seguindo o padrão de pastas de `etl/carga_todas_bases.py`, (2)
-  cadastrar o município em `municipios`, (3) rodar a cadeia
-  determinística de novo (`ESCUDO_MUNICIPIO=<origem_ou_ibge>`).
-  Nenhum código precisa mudar para isso, e processar um município
-  novo não apaga os já processados (`teste_territorial.py` prova
-  essa coexistência).
+  `algoritimos/inteligencia.py`, direto de `internacoes`.
+- Municípios disponíveis dependem só dos dados carregados no banco --
+  adicionar uma cidade é (1) ter os CSVs estaduais em `dados\` (a
+  carga já traz todas as cidades de SP pelo MUNIC_RES), (2) a cidade
+  estar no catálogo `municipios`. Nenhum código precisa mudar.
 
-**Pendências conhecidas desta etapa** (arquitetura pronta, mas não
-tudo foi feito -- ver commits para detalhes):
-- Comparação entre múltiplos municípios: a aba "Comparar" do painel
-  antigo (só 2 cidades, números absolutos) saiu junto com ele. A
-  comparação nova depende de trazer a população do IBGE (gráfico de
-  funil) -- ver "Painel novo" abaixo.
-- Teste de regressão real (rodar a cadeia contra o banco de verdade
-  no Windows do autor) ainda não foi feito -- `teste_territorial.py`
-  valida a lógica com banco sintético/temporário.
+**Limpeza de 09/2026:** a arquitetura antiga saiu do repositório (está
+no histórico do git; lista e motivos em `docs/INVENTARIO_DO_CODIGO.md`):
+a cadeia das 13 tabelas derivadas (mortalidade, custos, anomalias,
+priorizador, base_conhecimento, memoria_ia...), o chat de terminal
+(`chat_escudo.py`, `motor_raciocinio.py`, `padroes_analiticos.py`) e os
+testes dela, os scripts avulsos de `analises/` e as espiadas no banco
+(fica só `etl/validar_banco.py`). Ela calculava em paralelo, sem as
+regras novas (meses da fonte, fonte única), e podia divergir do painel.
+`salvar_tabela_municipio`/`ler_tabela_municipio` saíram de
+`configuracao_geografica.py`. Ideias antigas (vulnerabilidade, score,
+perfil) só voltam como função nova em `inteligencia.py`.
+
+**Pendência:** comparação entre municípios depende da população do IBGE
+(gráfico de funil, cidades semelhantes).
 
 ## Painel novo (09/2026) — decisões combinadas com o autor
 
@@ -227,26 +208,19 @@ Estado atual:
   13 tabelas antigas) -> explicar (Gemini via `ia_linguagem`; se
   falhar, resposta direta com os fatos). Perguntas de orçamento
   recebem sinais de atenção com evidência, nunca valores em R$.
-  Testado por `teste_conversa.py`. O chat de terminal
-  (`chat_escudo.py`) ainda usa o motor antigo.
+  Testado por `teste_conversa.py`.
 - Próximos passos combinados, nesta ordem: (1) no Windows, rodar a
-  carga de novo (`py etl\carga_todas_bases.py`: grava o mês, sem ele
-  o ajuste dos anos incompletos não vale) e conferir o painel; (2)
-  população do IBGE para comparar cidades (gráfico de funil, cidades
-  semelhantes); (3) decidir o destino de `chat_escudo.py`/
-  `motor_raciocinio.py` e das 13 tabelas antigas. 2025 já foi
-  investigado: era falta de meses na fonte, não salto real.
+  carga de novo (`py etl\carga_todas_bases.py`: grava o mês) e conferir
+  com `py etl\validar_banco.py` que os 7 cânceres entraram (em
+  24/09/2026 o banco do autor ficou só com colo do útero -- a carga
+  provavelmente parou no 2º arquivo; falta ver a mensagem de erro);
+  (2) população do IBGE para comparar cidades. Testes do sistema atual
+  rodam no GitHub (`.github/workflows/testes.yml`).
 
 ## Notas de contexto do domínio
 
 - Banco de dados: `banco/escudo_feminino.db` (SQLite). Caminho hardcoded
   em alguns scripts como `C:\projetoescudofeminino2\banco\...` — isso é
   esperado, o projeto roda no Windows do autor.
-- `algoritimos/chat_escudo.py` é a interface de chat: classifica a
-  intenção da pergunta (`classificar_intencao`) e monta contexto
-  estruturado para a IA (Gemini) responder com base nos dados, nunca por
-  conta própria.
-- Ordem dos blocos `if` em `classificar_intencao()` importa: o primeiro
-  bloco cujas palavras-chave derem match "vence". Ao adicionar novas
-  palavras-chave a uma intenção, verificar se algum bloco anterior no
-  arquivo não vai capturar a pergunta antes de chegar na intenção nova.
+- `pysus` só funciona no Python 3.12 do autor (`py -3.12`); o `py`
+  padrão dele é 3.14.

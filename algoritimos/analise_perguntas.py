@@ -21,8 +21,8 @@ print("\n=== ANÁLISE DAS PERGUNTAS JÁ FEITAS AO CHAT ===\n")
 
 if df.empty:
     print(
-        "Ainda não há perguntas registradas. Use o chat_escudo.py "
-        "algumas vezes e rode este script de novo."
+        "Ainda não há perguntas registradas. O painel não tem caixa de texto hoje; "
+        "perguntas só são registradas se ela voltar (conversa.registrar_pergunta)."
     )
 
 else:

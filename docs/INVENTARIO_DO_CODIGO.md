@@ -1,8 +1,13 @@
 # Inventário do código — o que está em uso, o que guardar, o que pode sair
 
 Leitura de todos os arquivos do repositório (24/09/2026), com o mapa de
-quem importa quem. **É uma proposta: nada foi apagado.** O que sair
-continua no histórico do git e pode voltar a qualquer momento.
+quem importa quem. **Feito em 24/09/2026** (o autor pediu "faça o que for
+melhor"): os itens da seção 3 saíram do repositório — incluindo
+`algoritimos/teste_serie_temporal.py` e `teste_par_real_municipios.py`,
+que dependiam da cadeia antiga —, os documentos-retrato foram para
+`docs/historico/` e o teste do GitHub passou a rodar os testes do sistema
+atual. Tudo continua no histórico do git e pode voltar a qualquer
+momento (`git log --diff-filter=D --name-only` lista o que saiu).
 
 ## Resumo
 
