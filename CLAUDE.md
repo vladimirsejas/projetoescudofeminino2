@@ -165,6 +165,14 @@ Estado atual:
   referência, Prevenção, Mama, Colo do útero, Tratamento e acesso pelo SUS,
   Carretas, Ensino e pesquisa, No Estado de SP). O autor preferiu este layout à
   grade de blocos do modelo do ChatGPT.
+  **Ampliação (autor achou "fraquinho"):** 75 itens. Lâmina nova **Hospitais no
+  Estado** (23 hospitais de câncer pelo SUS em 8 regiões, com a lista oficial da
+  FOSP, o INCA e "como chegar" pela CROSS; o HC Unicamp é referência também da
+  DRS Piracicaba); caminho novo **Seus direitos** (TFD, FGTS/PIS, INSS e IR,
+  reconstrução da mama, cartilha do INCA); Proteger com Casa da Mulher Brasileira,
+  DDMs, Casas da Mulher Paulista, Defensoria (NUDEM) e violência sexual 24 h;
+  Rio Claro com AME, DDM, Patrulha Maria da Penha e Rede Feminina. Item que mora
+  numa lâmina e aparece em outra usa `tambem` (cartão curto, sem repetir texto).
 - **Divisão de trabalho (09/2026):** o ChatGPT cuida de
   `conversa.py`/`teste_conversa.py`; Claude cuida de `inteligencia.py`
   e do painel (o autor passou a Lia para o Claude). Pendências do

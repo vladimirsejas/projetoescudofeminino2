@@ -32,7 +32,8 @@ CONFERIDO = "24/09/2026"
 CIDADE = "Rio Claro"
 REGIAO = "DRS X Piracicaba / RRAS 14"
 
-LAMINAS = {"caminho": "Encontre um caminho", "rio_claro": "Rio Claro", "barretos": "Barretos",
+LAMINAS = {"caminho": "Encontre um caminho", "hospitais": "Hospitais no Estado", "rio_claro": "Rio Claro",
+           "barretos": "Barretos",
            "sobre": "Sobre estas informações"}
 
 # (id, rótulo, o que tem dentro, frase da Lia ao abrir)
@@ -51,6 +52,8 @@ CAMINHOS = [
      "Estes são hospitais e centros de referência que a pesquisa encontrou na rede do Estado."),
     ("cuidar", "Cuidar", "saúde da mulher nas cidades",
      "Algumas cidades têm serviços próprios de saúde da mulher. Valem para quem mora nelas."),
+    ("direitos", "Seus direitos", "transporte, benefícios e cirurgias",
+     "Quem tem câncer tem direitos garantidos por lei: transporte para tratar em outra cidade, benefícios e cirurgias."),
     ("proteger", "Proteger", "violência contra a mulher",
      "Se você está em situação de violência, não precisa passar por isso sozinha. Estes canais atendem."),
 ]
@@ -59,13 +62,15 @@ JORNADA = ["prevenir", "descobrir", "tratar", "acompanhar"]  # a ordem da jornad
 
 
 def _item(id, caminho, lamina, onde, titulo, resumo, fonte, link, para_quem=None, como=None, levar=None,
-          contato=None, confirmar=None, cuidado=None, grupo=None):
+          contato=None, confirmar=None, cuidado=None, grupo=None, tambem=()):
     """caminho=None: item que não é passo da jornada da mulher (ensino,
     pesquisa, a região no Estado) -- mora só na lâmina dele. grupo: o
-    tema em que o item aparece na lâmina Barretos."""
+    tema (Barretos) ou a região (Hospitais no Estado) do item na lâmina.
+    tambem: [(lâmina, grupo)] onde o item também aparece, em cartão
+    curto, sem repetir o texto (a casa dele continua sendo uma só)."""
     return {"id": id, "caminho": caminho, "lamina": lamina, "onde": onde, "titulo": titulo, "resumo": resumo,
             "para_quem": para_quem, "como": como, "levar": levar, "contato": contato, "fonte": fonte,
-            "link": link, "confirmar": confirmar, "cuidado": cuidado, "grupo": grupo}
+            "link": link, "confirmar": confirmar, "cuidado": cuidado, "grupo": grupo, "tambem": list(tambem)}
 
 
 ITENS = [
@@ -129,7 +134,8 @@ ITENS = [
                "encaminhamento ao serviço de referência quando o câncer se confirma. O acesso é pela rede pública da "
                "região.",
           contato="Rua Wanderley Taffo, 330 – Quintino Facci II, Ribeirão Preto.",
-          cuidado="Vale para a região de Ribeirão Preto; quem mora em outra região segue a referência da sua."),
+          cuidado="Vale para a região de Ribeirão Preto; quem mora em outra região segue a referência da sua.",
+          tambem=[("hospitais", "Barretos, Franca, Ribeirão Preto e Araraquara (RRAS 13)")]),
 
     # ---------------- TRATAR ----------------
     _item("lei_60_dias", "tratar", "caminho", "SUS (todo o Brasil)",
@@ -177,28 +183,31 @@ ITENS = [
           confirmar="O itinerário muda todo mês: consulte antes de ir."),
 
     # ---------------- ENCONTRAR REFERÊNCIA ----------------
-    _item("santa_casa_piracicaba", "referencia", "caminho", "Piracicaba (região de Rio Claro)",
+    _item("santa_casa_piracicaba", "referencia", "hospitais", "Piracicaba (região de Rio Claro)",
           "Santa Casa de Piracicaba",
           "UNACON com radioterapia, na mesma região de saúde de Rio Claro",
           "FOSP – boletim da RRAS 14 (DRS Piracicaba)",
           "https://fosp.saude.sp.gov.br/wp-content/uploads/Boletim-RRAS14.pdf",
           como="Hospital habilitado como UNACON com serviço de radioterapia. Faz parte da RRAS 14, a mesma de Rio "
-               "Claro. O acesso é pela regulação do SUS."),
-    _item("fornecedores_cana", "referencia", "caminho", "Piracicaba (região de Rio Claro)",
+               "Claro. O acesso é pela regulação do SUS.",
+          grupo="Rio Claro e Piracicaba (RRAS 14)"),
+    _item("fornecedores_cana", "referencia", "hospitais", "Piracicaba (região de Rio Claro)",
           "Hospital dos Fornecedores de Cana de Piracicaba",
           "UNACON com radioterapia e hematologia, na mesma região de saúde de Rio Claro",
           "FOSP – boletim da RRAS 14 (DRS Piracicaba)",
           "https://fosp.saude.sp.gov.br/wp-content/uploads/Boletim-RRAS14.pdf",
           como="Hospital habilitado como UNACON com radioterapia e hematologia. Faz parte da RRAS 14, a mesma de Rio "
-               "Claro. O acesso é pela regulação do SUS."),
-    _item("santa_casa_limeira", "referencia", "caminho", "Limeira (região de Rio Claro)",
+               "Claro. O acesso é pela regulação do SUS.",
+          grupo="Rio Claro e Piracicaba (RRAS 14)"),
+    _item("santa_casa_limeira", "referencia", "hospitais", "Limeira (região de Rio Claro)",
           "Santa Casa de Limeira",
           "citada como UNACON com radioterapia na região de Rio Claro (a confirmar)",
           "FOSP – boletim da RRAS 14 (DRS Piracicaba)",
           "https://fosp.saude.sp.gov.br/wp-content/uploads/Boletim-RRAS14.pdf",
           como="O acesso é pela regulação do SUS.",
-          confirmar="Não consegui abrir o boletim da FOSP inteiro para confirmar a habilitação de Limeira."),
-    _item("caism_unicamp", "referencia", "caminho", "Campinas",
+          confirmar="Não consegui abrir o boletim da FOSP inteiro para confirmar a habilitação de Limeira.",
+          grupo="Rio Claro e Piracicaba (RRAS 14)"),
+    _item("caism_unicamp", "referencia", "hospitais", "Campinas",
           "CAISM Unicamp – Hospital da Mulher",
           "maior hospital de saúde da mulher do interior; câncer ginecológico e de mama; só SUS",
           "CAISM – Unicamp",
@@ -206,9 +215,10 @@ ITENS = [
           como="Atende só pelo SUS. Tem ambulatórios de oncologia ginecológica (vulva, vagina, colo e corpo do útero, "
                "ovário) e de mastologia, referência para Campinas e região. As consultas são agendadas pelas "
                "unidades básicas de saúde e pela rede pública.",
-          cuidado="Campinas é outra região de saúde: para quem mora em Rio Claro, o caminho normal é a referência "
-                  "da própria região."),
-    _item("hospital_base_rio_preto", "referencia", "caminho", "São José do Rio Preto",
+          cuidado="O acesso é por encaminhamento da rede pública; para quem mora em Rio Claro, o caminho começa "
+                  "na referência da própria região.",
+          grupo="Campinas"),
+    _item("hospital_base_rio_preto", "referencia", "hospitais", "São José do Rio Preto",
           "Hospital de Base – Centro de Oncologia",
           "um dos hospitais que mais diagnosticam câncer no Estado; atende SUS com encaminhamento",
           "Hospital de Base de São José do Rio Preto",
@@ -216,7 +226,8 @@ ITENS = [
           como="Atende gratuitamente pacientes do SUS encaminhados pela unidade básica de saúde da cidade de origem, "
                "pela Central de Agendamento de Consultas. Equipe com médicos, enfermagem, farmácia, serviço social, "
                "psicologia, nutrição e outras áreas.",
-          cuidado="É referência da região de Rio Preto; quem mora em outra região segue a referência da sua."),
+          cuidado="É referência da região de Rio Preto; quem mora em outra região segue a referência da sua.",
+          grupo="Rio Preto, Araçatuba e Jales (RRAS 12)"),
 
     # ---------------- CUIDAR ----------------
     _item("sp_por_todas", "cuidar", "caminho", "Estado de SP",
@@ -327,7 +338,8 @@ ITENS = [
           "https://www.santacasaderioclaro.com.br/",
           como="Habilitada como UNACON. O Centro Oncológico Santa Ágata tem 24 poltronas de quimioterapia, 6 leitos e "
                "11 consultórios. É referência em câncer de cabeça e pescoço para os 26 municípios da DRS X. O acesso "
-               "pelo SUS é pela regulação (encaminhamento da unidade ou do especialista)."),
+               "pelo SUS é pela regulação (encaminhamento da unidade ou do especialista).",
+          tambem=[("hospitais", "Rio Claro e Piracicaba (RRAS 14)")]),
     _item("rc_cram", "proteger", "rio_claro", "Rio Claro",
           "Centro de Referência de Atendimento à Mulher (CRAM) Dona Ângela Gonzaga",
           "acolhimento e orientação para mulheres, das 8h às 17h",
@@ -348,7 +360,8 @@ ITENS = [
                "com unidades em várias regiões do Brasil. O atendimento é gratuito pelo SUS.",
           confirmar="A habilitação como CACON aparece na rede estadual, mas não consegui abrir a lista da FOSP para "
                     "confirmar.",
-          grupo="Hospitais de referência"),
+          grupo="Hospitais de referência",
+          tambem=[("hospitais", "Barretos, Franca, Ribeirão Preto e Araraquara (RRAS 13)")]),
     _item("ha_prevencao", "prevenir", "barretos", "Barretos",
           "Prevenção do Hospital de Amor",
           "Instituto de Prevenção em Barretos e unidades fixas de prevenção, inclusive em Campinas",
@@ -439,16 +452,359 @@ ITENS = [
                "(Hospital de Amor) está entre os serviços de oncologia da região, ao lado da Santa Casa de Franca e "
                "do HC de Ribeirão Preto. Rio Claro fica em outra região, a RRAS 14.",
           grupo="No Estado de SP"),
+
+    # ---------------- ENCONTRAR REFERÊNCIA: como chegar e listas oficiais ----------------
+    _item("como_chegar_cross", "referencia", "caminho", "Estado de SP",
+          "Como se chega a um hospital de referência pelo SUS",
+          "os hospitais de câncer não são porta de entrada: a unidade de saúde pede a vaga pela regulação (CROSS)",
+          "ICESP e HC Unicamp (orientações aos pacientes)",
+          "https://icesp.org.br/como-ser-atendido/",
+          como="Com suspeita ou diagnóstico de câncer, procure a unidade de saúde (UBS) mais próxima de casa. O médico "
+               "do SUS insere o caso na Central de Regulação de Oferta de Serviços de Saúde (CROSS/SIRESP), que "
+               "encaminha a paciente a um centro de oncologia perto de onde ela mora, seguindo protocolos clínicos. "
+               "É a Rede Hebe Camargo de Combate ao Câncer, do Estado.",
+          tambem=[("hospitais", "Como chegar e listas oficiais")]),
+    _item("fosp_hospitais_sus", "referencia", "caminho", "Estado de SP",
+          "Lista oficial: hospitais do SUS com atendimento em câncer no Estado",
+          "a lista da FOSP com todos os hospitais habilitados (CACON e UNACON) do Estado de São Paulo",
+          "Fundação Oncocentro de São Paulo (FOSP) – Espaço do Paciente",
+          "https://fosp.saude.sp.gov.br/fosp/espaco-paciente/hospitais-do-sus-habilitadas-para-atendimento-em-"
+          "cancer-no-estado-de-sao-paulo/",
+          como="A lista completa e atualizada pelo Estado. Os hospitais desta lâmina são os que a pesquisa encontrou "
+               "com fonte; a lista da FOSP tem todos.",
+          tambem=[("hospitais", "Como chegar e listas oficiais")]),
+    _item("inca_onde_tratar", "referencia", "caminho", "SUS (todo o Brasil)",
+          "Onde tratar pelo SUS (INCA)",
+          "a página do Instituto Nacional de Câncer com os hospitais habilitados de cada estado",
+          "Instituto Nacional de Câncer (INCA)",
+          "https://www.gov.br/inca/pt-br/assuntos/cancer/tratamento/onde-tratar-pelo-sus",
+          como="UNACON trata os cânceres mais comuns; CACON trata todos os tipos. Os dois fazem do diagnóstico ao "
+               "cuidado paliativo.",
+          tambem=[("hospitais", "Como chegar e listas oficiais")]),
+
+    # ================ LÂMINA HOSPITAIS NO ESTADO (por região) ================
+    _item("hc_unicamp", "referencia", "hospitais", "Campinas",
+          "HC da Unicamp – Oncologia",
+          "referência em câncer para as regiões de Campinas, Piracicaba (a de Rio Claro) e São João da Boa Vista",
+          "HC Unicamp e Governo do Estado de SP",
+          "https://www.hc.unicamp.br/especialidades/",
+          como="Atende pacientes com câncer das DRS de Campinas, Piracicaba e São João da Boa Vista. Casos novos "
+               "chegam pela Central Reguladora de Vagas da DRS VII; com diagnóstico de câncer, o médico do SUS "
+               "insere o caso na CROSS. Tem também enfermagem, nutrição, serviço social, psicologia e odontologia.",
+          contato="Oncologia Clínica: (19) 3521-7496 e (19) 3521-7363.",
+          grupo="Campinas"),
+    _item("icesp", "referencia", "hospitais", "São Paulo (capital)",
+          "ICESP – Instituto do Câncer do Estado de São Paulo",
+          "hospital público estadual só de câncer; atende pacientes encaminhados pela regulação",
+          "ICESP",
+          "https://icesp.org.br/como-ser-atendido/",
+          como="Atende só pacientes encaminhados pela rede estadual (UBS, AMEs e hospitais gerais), pela Central de "
+               "Regulação (CROSS), priorizando as regiões que têm o ICESP como referência.",
+          contato="(11) 3893-2000.",
+          grupo="Capital e Grande São Paulo"),
+    _item("hospital_da_mulher_sp", "referencia", "hospitais", "São Paulo (capital)",
+          "Hospital da Mulher (antigo Pérola Byington)",
+          "centro estadual de referência em saúde da mulher: câncer de mama, de útero e de ovário",
+          "Secretaria de Estado da Saúde de SP e Hospital da Mulher",
+          "https://hospitaldamulhersp.org.br/",
+          como="Referência estadual do SUS em saúde da mulher, com ênfase no câncer de mama e ginecológico: milhares de "
+               "cirurgias por ano de tumores de mama, útero e ovário. Também atende violência sexual (caminho "
+               "Proteger).",
+          confirmar="O hospital mudou de nome e de prédio: confira endereço e telefone na página oficial.",
+          grupo="Capital e Grande São Paulo"),
+    _item("ibcc", "referencia", "hospitais", "São Paulo (capital)",
+          "IBCC Oncologia – Instituto Brasileiro de Controle do Câncer",
+          "pioneiro no controle do câncer de mama e ginecológico em São Paulo; atende SUS e convênios",
+          "IBCC",
+          "https://www.ibcc.org.br/",
+          como="Centro de oncologia de alta complexidade fundado em 1968, com oncologia clínica, cirurgia oncológica, "
+               "mastologia e exames como mamografia e biópsia. Atende pacientes do SUS e de convênios.",
+          contato="Av. Alcântara Machado, 2576 – Mooca. (11) 3474-4222.",
+          confirmar="Pelo SUS, o acesso é pela regulação: confirme com a unidade de saúde.",
+          grupo="Capital e Grande São Paulo"),
+    _item("hc_ribeirao", "referencia", "hospitais", "Ribeirão Preto",
+          "HC de Ribeirão Preto (FMRP-USP) – Oncologia Clínica",
+          "referência da Rede Hebe Camargo; recebe pacientes encaminhados pela CROSS",
+          "Oncologia Clínica – FMRP-USP",
+          "https://oncologia.fmrp.usp.br/regulacao-de-pacientes/",
+          como="Recebe pacientes com diagnóstico de câncer vindos das unidades básicas, ambulatórios e hospitais "
+               "gerais, sempre encaminhados pela Central de Regulação (CROSS). Não há atendimento direto.",
+          contato="Av. Bandeirantes, 3900 – HC, 7º andar – Campus USP, Ribeirão Preto.",
+          grupo="Barretos, Franca, Ribeirão Preto e Araraquara (RRAS 13)"),
+    _item("cancer_franca", "referencia", "hospitais", "Franca",
+          "Hospital do Câncer do Grupo Santa Casa de Franca",
+          "atende pelo SUS Franca e mais 20 municípios, com radioterapia e quimioterapia",
+          "Grupo Santa Casa de Franca",
+          "https://www.gruposantacasadefranca.com.br/hospital-do-cancer/",
+          como="Hospital de referência regional em câncer, com consultas, radioterapia, quimioterapia e "
+               "hormonioterapia pelo SUS para cerca de 750 mil habitantes da região.",
+          grupo="Barretos, Franca, Ribeirão Preto e Araraquara (RRAS 13)"),
+    _item("santa_casa_araraquara", "referencia", "hospitais", "Araraquara",
+          "Hospital do Câncer da Santa Casa de Araraquara",
+          "UNACON com quimioterapia, radioterapia e onco-hematologia; referência regional do SUS",
+          "Santa Casa de Araraquara",
+          "https://santacasaararaquara.com.br/oncologia/",
+          como="Habilitada como UNACON pelo Ministério da Saúde. Atende pelo SUS e convênios, com equipe "
+               "multiprofissional.",
+          grupo="Barretos, Franca, Ribeirão Preto e Araraquara (RRAS 13)"),
+    _item("santa_casa_sao_carlos", "referencia", "hospitais", "São Carlos",
+          "Santa Casa de São Carlos – Oncologia",
+          "UNACON com radioterapia, para cerca de 390 mil habitantes da microrregião",
+          "Santa Casa de São Carlos",
+          "https://www.santacasasaocarlos.com.br/",
+          como="Habilitada como UNACON com radioterapia: diagnóstico e tratamento do câncer pelo SUS.",
+          grupo="Barretos, Franca, Ribeirão Preto e Araraquara (RRAS 13)"),
+    _item("santa_casa_aracatuba", "referencia", "hospitais", "Araçatuba",
+          "Santa Casa de Araçatuba – Centro de Tratamento Oncológico",
+          "UNACON com radioterapia e hematologia, referência para 40 municípios",
+          "Santa Casa de Araçatuba",
+          "https://www.santacasadearacatuba.com.br/",
+          como="Integra a Rede Hebe Camargo. Referência para o tratamento especializado de quase todos os tipos de "
+               "câncer na região.",
+          grupo="Rio Preto, Araçatuba e Jales (RRAS 12)"),
+    _item("hospital_de_amor_jales", "referencia", "hospitais", "Jales",
+          "Hospital de Amor Jales",
+          "a primeira unidade do Hospital de Amor fora de Barretos, 100% SUS",
+          "Hospital de Amor",
+          "https://hospitaldeamor.com.br/hospital-de-amor-jales/",
+          como="Inaugurado em 2010, atende 100% pelo SUS, com radioterapia de alta precisão e cirurgias oncológicas.",
+          grupo="Rio Preto, Araçatuba e Jales (RRAS 12)"),
+    _item("amaral_carvalho", "referencia", "hospitais", "Jaú",
+          "Hospital Amaral Carvalho",
+          "referência nacional em câncer e transplante de medula óssea; quase toda a capacidade é para o SUS",
+          "Hospital Amaral Carvalho",
+          "https://www.amaralcarvalho.org.br/informacoes",
+          como="Hospital filantrópico de 1915, com cerca de 320 leitos. Para saber como ser atendida, procure o "
+               "Serviço Social do hospital.",
+          contato="Rua Dona Silvéria, 150 – Chácara Braz Miraglia, Jaú. (14) 3602-1200.",
+          grupo="Centro-Oeste: Jaú, Bauru, Botucatu e Marília"),
+    _item("hc_botucatu", "referencia", "hospitais", "Botucatu",
+          "HC da Faculdade de Medicina de Botucatu (Unesp) – Oncologia",
+          "centro de oncologia de referência regional, com quimioterapia e onco-hematologia",
+          "HC Botucatu (Unesp)",
+          "https://hcfmb.unesp.br/servico-de-oncologia/",
+          como="Referência regional: cerca de 17 mil consultas e 18 mil sessões de quimioterapia por ano (2021).",
+          grupo="Centro-Oeste: Jaú, Bauru, Botucatu e Marília"),
+    _item("bauru_oncologia", "referencia", "hospitais", "Bauru",
+          "Bauru: SOPC (prevenção e diagnóstico) e Hospital Estadual de Bauru",
+          "o SOPC investiga a suspeita de câncer e encaminha ao tratamento pela Rede Hebe Camargo",
+          "Prefeitura de Bauru",
+          "https://www2.bauru.sp.gov.br/materia.aspx?n=37669",
+          como="O Serviço de Orientação e Prevenção do Câncer (SOPC), 100% SUS, atende Bauru e mais 17 cidades da "
+               "DRS VI: recebe a suspeita de câncer vinda da rede básica e encaminha os casos confirmados aos "
+               "hospitais de referência. O Hospital Estadual de Bauru é UNACON.",
+          confirmar="A habilitação do Hospital Estadual de Bauru veio de lista de associação de pacientes: confira na "
+                    "lista da FOSP.",
+          grupo="Centro-Oeste: Jaú, Bauru, Botucatu e Marília"),
+    _item("hc_famema", "referencia", "hospitais", "Marília",
+          "HC da Famema (Marília) – Oncologia",
+          "alta complexidade em câncer, com quimioterapia e radioterapia, para 62 municípios",
+          "HC Famema (Governo do Estado de SP)",
+          "https://www.hcfamema.sp.gov.br/hcfamema",
+          como="Referência de média e alta complexidade para cerca de 1,2 milhão de pessoas do centro-oeste paulista, "
+               "com quimioterapia e radioterapia.",
+          confirmar="A habilitação mudou em 2026 (de CACON para UNACON com radioterapia, segundo notícia): confira "
+                    "na lista da FOSP.",
+          grupo="Centro-Oeste: Jaú, Bauru, Botucatu e Marília"),
+    _item("prudente_cancer", "referencia", "hospitais", "Presidente Prudente",
+          "Hospital Regional do Câncer de Presidente Prudente (Hospital de Esperança)",
+          "UNACON com hematologia, oncologia pediátrica e radioterapia pelo SUS",
+          "Governo Federal (Planalto) – credenciamento de 2021",
+          "https://www.gov.br/planalto/pt-br/acompanhe-o-planalto/noticias/2021/07/hospital-de-presidente-prudente-sp-"
+          "e-credenciado-para-assistencia-de-alta-complexidade-em-oncologia",
+          como="Credenciado em 2021 como UNACON, com 122 leitos para o SUS. Na cidade, a Santa Casa de Presidente "
+               "Prudente também é UNACON.",
+          confirmar="O nome do hospital mudou: confira na lista da FOSP.",
+          grupo="Oeste, Sorocaba, Vale do Paraíba e Litoral"),
+    _item("sorocaba_oncologia", "referencia", "hospitais", "Sorocaba",
+          "Sorocaba: Santa Casa (Hospital do Câncer) e Conjunto Hospitalar",
+          "Santa Casa: UNACON com radioterapia; Conjunto Hospitalar: UNACON com hematologia",
+          "Prefeitura de Sorocaba (Agência de Notícias)",
+          "https://noticias.sorocaba.sp.gov.br/hospital-do-cancer-da-santa-casa-inaugura-consultorio-odontologico/",
+          como="A Santa Casa de Sorocaba é UNACON desde 2008 e tem radioterapia com acelerador linear desde 2020, com "
+               "equipe multiprofissional.",
+          confirmar="A habilitação do Conjunto Hospitalar veio de lista de associação de pacientes: confira na lista "
+                    "da FOSP.",
+          grupo="Oeste, Sorocaba, Vale do Paraíba e Litoral"),
+    _item("pio_xii_sjc", "referencia", "hospitais", "São José dos Campos",
+          "Hospital Pio XII (São José dos Campos)",
+          "UNACON do Vale do Paraíba; mais de 80% dos pacientes são do SUS",
+          "Hospital Pio XII",
+          "https://www.hpioxii.org.br/o-hospital/",
+          como="Referência em oncologia (UNACON) desde 1977 para São José dos Campos e o Vale do Paraíba.",
+          grupo="Oeste, Sorocaba, Vale do Paraíba e Litoral"),
+    _item("guilherme_alvaro", "referencia", "hospitais", "Santos",
+          "Hospital Guilherme Álvaro (Santos)",
+          "UNACON com radioterapia; unidade regional do ICESP na Baixada Santista",
+          "Secretaria de Estado da Saúde de SP",
+          "https://www.saude.sp.gov.br/humanizacao/unidades-participantes/hospitais-e-outros-servicos-de-saude/"
+          "hospital-guilherme-alvaro/informacoes-gerais",
+          como="Hospital estadual de referência da Baixada Santista, com centro de referência em câncer ligado ao "
+               "ICESP.",
+          grupo="Oeste, Sorocaba, Vale do Paraíba e Litoral"),
+
+    # ---------------- PROTEGER (mais rede de apoio no Estado) ----------------
+    _item("casa_mulher_brasileira", "proteger", "caminho", "São Paulo (capital)",
+          "Casa da Mulher Brasileira",
+          "24 horas: delegacia, Defensoria, Ministério Público, juiz de medida protetiva e IML no mesmo lugar",
+          "Ministério das Mulheres (Governo Federal)",
+          "https://www.gov.br/mulheres/pt-br/central-de-conteudos/noticias/2026/agosto-defeso-eleitoral/casa-da-"
+          "mulher-brasileira-como-funciona-o-atendimento-e-onde-encontrar-uma-unidade",
+          como="Acolhimento com apoio psicológico e assistencial, e no mesmo prédio a 1ª Delegacia de Defesa da "
+               "Mulher, o Ministério Público, a Defensoria, um anexo do Tribunal de Justiça para medidas protetivas "
+               "e o IML. Gratuito, com intérprete de Libras.",
+          contato="Rua Vieira Ravasco, 26 – Cambuci, São Paulo. (11) 3275-8000. 24 horas, todos os dias."),
+    _item("ddm_estado", "proteger", "caminho", "Estado de SP",
+          "Delegacias de Defesa da Mulher (DDM)",
+          "registrar ocorrência e pedir medida protetiva; há salas DDM 24 horas em todo o Estado",
+          "Governo do Estado de SP (SP por Todas / Agência SP)",
+          "https://www.spportodas.sp.gov.br/sp-por-todas/seguranca_mulher/delegacias_da_mulher",
+          como="A página do SP por Todas mostra a DDM ou a sala DDM 24 horas mais próxima. Pela internet, a "
+               "Delegacia Eletrônica também registra a ocorrência."),
+    _item("casas_mulher_paulista", "proteger", "caminho", "Estado de SP",
+          "Casas da Mulher Paulista",
+          "acolhimento, apoio psicológico, orientação jurídica e ajuda para voltar ao trabalho",
+          "Governo do Estado de SP (Secretaria da Mulher)",
+          "https://www.spportodas.sp.gov.br/sp-por-todas/seguranca_mulher/casas%20da%20mulher%20paulista",
+          como="Espaços do Estado que reúnem num lugar só atendimento psicológico, orientação jurídica, assistência "
+               "social, capacitação profissional (currículo, entrevista) e prevenção à violência. Em 2024 foram "
+               "abertas 15 novas unidades.",
+          confirmar="Veja na página se há uma Casa da Mulher Paulista na sua cidade."),
+    _item("defensoria_nudem", "proteger", "caminho", "Estado de SP",
+          "Defensoria Pública – Núcleo de Defesa dos Direitos das Mulheres",
+          "advogada de graça: medida protetiva, divórcio, guarda e pensão para quem não pode pagar",
+          "Defensoria Pública do Estado de SP",
+          "https://www.defensoria.sp.def.br/nucleos-especializados/pagina-inicial-nucleos-especializados/"
+          "promocao-e-defesa-dos-direitos-das-mulheres",
+          como="Pede medida protetiva mesmo sem boletim de ocorrência, orienta, recorre quando a medida é negada e "
+               "cuida de divórcio, guarda e pensão. Atendimento gratuito para quem não pode pagar advogado; o "
+               "agendamento é pelo site da Defensoria."),
+    _item("violencia_sexual_24h", "proteger", "caminho", "São Paulo (capital)",
+          "Violência sexual: atendimento 24 horas (programa Bem-me-quer)",
+          "no Hospital da Mulher (antigo Pérola Byington): atendimento médico, psicológico e jurídico, 24 horas",
+          "Secretaria de Estado da Saúde de SP",
+          "https://www.saude.sp.gov.br/humanizacao/homepage/destaques/conheca-o-nucleo-de-programas-especiais-npe-"
+          "centro-de-referencia-da-saude-da-mulher",
+          como="Referência no Estado: a porta nunca fecha. A mulher passa por médico, psicólogo, assistente social e "
+               "perícia. A Defensoria mantém a lista da rede de atendimento à violência sexual nas outras regiões.",
+          confirmar="O hospital mudou de prédio: confira o endereço antes de ir."),
+
+    # ---------------- SEUS DIREITOS ----------------
+    _item("tfd", "direitos", "caminho", "SUS (todo o Brasil)",
+          "Tratamento Fora do Domicílio (TFD): transporte e diárias para tratar em outra cidade",
+          "se o tratamento é a mais de 50 km e não existe na sua região, o SUS pode pagar transporte e diárias",
+          "INCA – cartilha Direitos sociais da pessoa com câncer",
+          "https://www.inca.gov.br/publicacoes/cartilhas/direitos-sociais-da-pessoa-com-cancer-orientacoes-aos-usuarios",
+          como="O médico do SUS faz o pedido e uma comissão do município (ou do Estado) autoriza. Cobre transporte e "
+               "diárias de alimentação e pernoite para a paciente e, se preciso, um acompanhante, conforme o "
+               "orçamento. Depois da consulta, guarde o comprovante para a prestação de contas.",
+          confirmar="Em Rio Claro, pergunte à Fundação Municipal de Saúde onde se pede o TFD."),
+    _item("fgts_pis", "direitos", "caminho", "Todo o Brasil",
+          "Saque do FGTS e do PIS/PASEP",
+          "quem tem câncer pode sacar todo o FGTS e o PIS/PASEP na Caixa",
+          "INCA – Direitos sociais da pessoa com câncer",
+          "https://www.gov.br/inca/pt-br/acesso-a-informacao/perguntas-frequentes/direitos-sociais-da-pessoa-com-cancer",
+          levar="Atestado médico (vale 30 dias), resultado da biópsia, exame que confirma o tipo de tumor, RG, CPF e "
+                "número do PIS/PASEP.",
+          como="Vá a qualquer agência da Caixa Econômica Federal com os documentos."),
+    _item("auxilio_inss", "direitos", "caminho", "Todo o Brasil",
+          "Auxílio-doença (INSS) e isenção de imposto de renda",
+          "afastamento do trabalho pago pelo INSS e isenção de IR sobre aposentadoria e pensão",
+          "INCA – Direitos sociais da pessoa com câncer",
+          "https://www.gov.br/inca/pt-br/acesso-a-informacao/perguntas-frequentes/direitos-sociais-da-pessoa-com-cancer",
+          como="Quem contribui para o INSS e fica temporariamente sem poder trabalhar tem direito ao auxílio. A "
+               "isenção de imposto de renda vale para aposentadoria, reforma e pensão: pede-se ao órgão que paga o "
+               "benefício (INSS, prefeitura, Estado), com o formulário da Receita Federal."),
+    _item("reconstrucao_mamaria", "direitos", "caminho", "SUS (todo o Brasil)",
+          "Reconstrução da mama pelo SUS",
+          "a mulher que retira a mama tem direito à reconstrução, de preferência na mesma cirurgia",
+          "Senado Federal – Lei 12.802/2013",
+          "https://www12.senado.leg.br/noticias/materias/2013/05/07/lei-garante-reconstrucao-da-mama-em-seguida-a-"
+          "retirada-de-cancer",
+          como="Quando há condições técnicas, a reconstrução é feita no mesmo ato da retirada do tumor. Se não for "
+               "possível, a mulher é acompanhada e tem garantida a cirurgia assim que tiver condições clínicas. Não há "
+               "limite de idade."),
+    _item("cartilha_inca", "direitos", "caminho", "Todo o Brasil",
+          "Cartilha do INCA: direitos sociais da pessoa com câncer",
+          "todos os direitos num lugar só, em linguagem simples",
+          "Instituto Nacional de Câncer (INCA)",
+          "https://www.inca.gov.br/publicacoes/cartilhas/direitos-sociais-da-pessoa-com-cancer-orientacoes-aos-usuarios",
+          como="Explica benefícios do INSS, FGTS e PIS, isenções, transporte, prioridade na Justiça e outros direitos."),
+
+    # ---------------- CUIDAR (mais apoio) ----------------
+    _item("ames_estado", "cuidar", "caminho", "Estado de SP",
+          "AMEs – Ambulatórios Médicos de Especialidades",
+          "especialistas e exames do Estado, marcados pela unidade básica de saúde",
+          "Governo do Estado de SP",
+          "https://www.saopaulo.sp.gov.br/spnoticias/ultimas-noticias/veja-a-relacao-dos-ames-ambulatorios-medicos-"
+          "de-especialidades-no-estado/",
+          como="Os AMEs fazem consultas com especialistas e exames (muitos fazem mamografia). A consulta é marcada "
+               "pela UBS do município, por sistema online."),
+    _item("rede_feminina", "cuidar", "caminho", "Estado de SP",
+          "Rede Feminina de Combate ao Câncer",
+          "entidade voluntária que apoia pacientes com câncer e divulga a prevenção",
+          "Rede Feminina de Combate ao Câncer do Estado de SP",
+          "https://redefemininaesp.org.br/",
+          como="Entidade filantrópica com núcleos em muitas cidades: apoio emocional e material a pacientes de baixa "
+               "renda e informação sobre prevenção. Não é serviço público."),
+
+    # ---------------- RIO CLARO (mais portas) ----------------
+    _item("rc_ame", "descobrir", "rio_claro", "Rio Claro",
+          "AME Rio Claro – Ambulatório Médico de Especialidades",
+          "especialistas do Estado na cidade, inclusive mastologia (mama); marcado pela UBS",
+          "AME Rio Claro (Seconci-SP)",
+          "https://seconci-sp.org.br/amerioclaro/",
+          como="Tem especialidade dedicada às mamas, na prevenção e no tratamento. A consulta é marcada pela unidade "
+               "de saúde do município.",
+          contato="Rua 9 (esquina com a Avenida da Saudade), 165 – Bairro dos Estádios. (19) 3526-2300.",
+          confirmar="Algumas fontes trazem outro telefone: confirme na página do AME."),
+    _item("rc_ddm", "proteger", "rio_claro", "Rio Claro",
+          "Delegacia de Defesa da Mulher (DDM) de Rio Claro",
+          "registrar ocorrência e pedir medida protetiva na cidade",
+          "OAB Rio Claro e Polícia Civil",
+          "https://www.oabrioclaro.org.br/1955-2/",
+          como="Rio Claro tem DDM. Em perigo imediato, ligue 190; pela internet, use a Delegacia Eletrônica.",
+          confirmar="Endereços e telefones diferentes aparecem em fontes diferentes: confirme pela página das "
+                    "Delegacias da Mulher do SP por Todas antes de ir."),
+    _item("rc_patrulha", "proteger", "rio_claro", "Rio Claro",
+          "Patrulha Maria da Penha (Guarda Civil Municipal)",
+          "visitas e acompanhamento para mulheres com medida protetiva",
+          "Prefeitura de Rio Claro (Secretaria de Segurança)",
+          "https://seguranca.rioclaro.sp.gov.br/patrulha-maria-da-penha/",
+          como="Criada em dezembro de 2018: a Guarda Civil visita as mulheres com medida protetiva e verifica se a "
+               "decisão da Justiça está sendo cumprida. Trabalha com a DDM, o CREAS, o Conselho Tutelar, o CAPS e o "
+               "Anexo de Violência Doméstica."),
+    _item("rc_rede_feminina", "cuidar", "rio_claro", "Rio Claro",
+          "Rede Rio-Clarense \"Carmem Prudente\" (Rede Feminina de Combate ao Câncer)",
+          "núcleo da Rede Feminina em Rio Claro: apoio voluntário a pacientes com câncer",
+          "Rede Feminina de Combate ao Câncer (página do núcleo de Rio Claro)",
+          "https://www.facebook.com/tukatrivelato/",
+          como="Núcleo local da Rede Feminina, entidade filantrópica de apoio a pacientes com câncer de baixa renda. "
+               "Não é serviço público.",
+          confirmar="A única página encontrada é a do núcleo numa rede social: confirme o contato."),
 ]
 GRUPOS_BARRETOS = ["Hospitais de referência", "Prevenção", "Câncer de mama", "Câncer do colo do útero",
                    "Tratamento e acesso pelo SUS", "Carretas e unidades móveis", "Ensino e pesquisa",
                    "No Estado de SP"]
+GRUPOS_HOSPITAIS = ["Como chegar e listas oficiais", "Rio Claro e Piracicaba (RRAS 14)", "Campinas",
+                    "Capital e Grande São Paulo", "Barretos, Franca, Ribeirão Preto e Araraquara (RRAS 13)",
+                    "Rio Preto, Araçatuba e Jales (RRAS 12)", "Centro-Oeste: Jaú, Bauru, Botucatu e Marília",
+                    "Oeste, Sorocaba, Vale do Paraíba e Litoral"]
+GRUPOS = {"barretos": GRUPOS_BARRETOS, "hospitais": GRUPOS_HOSPITAIS}
 POR_ID = {i["id"]: i for i in ITENS}
 
 
 def itens(caminho=None, lamina=None):
     return [i for i in ITENS if (caminho is None or i["caminho"] == caminho)
             and (lamina is None or i["lamina"] == lamina)]
+
+
+def do_grupo(lam, g):
+    """Itens de um tema ou região: os que moram ali (cartão completo) e
+    os que só aparecem ali ("tambem", cartão curto)."""
+    casa = [i for i in ITENS if i["lamina"] == lam and i["grupo"] == g]
+    visitas = [i for i in ITENS if (lam, g) in i["tambem"]]
+    return casa, visitas
 
 
 # ---------- ações (o que um botão faz) ----------
@@ -465,10 +821,18 @@ def lamina(id):
     return {"tipo": "apoio_lamina", "id": id}
 
 
+def grupo(lam, id):
+    return {"tipo": "apoio_grupo", "lamina": lam, "id": id}
+
+
 SOBRE = {"tipo": "apoio_sobre"}
 
 AVISO = (f"Conferi em {CONFERIDO} nas páginas oficiais. Regras, endereços e telefones mudam: confirme antes de "
          "ir. Eu não sou médica; quem orienta o seu caso é a equipe de saúde.")
+
+# Até quantos itens de outra lâmina um caminho mostra um a um; acima
+# disso, só aponta a lâmina ("23 itens na lâmina Hospitais no Estado").
+MAX_APONTADOS = 3
 
 
 def _proximo(c):
@@ -479,10 +843,14 @@ def _proximo(c):
     return []
 
 
-def _nas_laminas(c):
-    """Os itens de Rio Claro e Barretos deste caminho: a casa deles é a
-    lâmina própria; aqui o caminho só aponta (sem repetir o texto)."""
-    return [i for i in ITENS if i["caminho"] == c and i["lamina"] in ("rio_claro", "barretos")]
+def nas_laminas(c):
+    """{lâmina: itens} deste caminho que moram em outras lâminas: aqui
+    o caminho só aponta para eles (sem repetir o texto)."""
+    fora = {}
+    for i in ITENS:
+        if i["caminho"] == c and i["lamina"] != "caminho":
+            fora.setdefault(i["lamina"], []).append(i)
+    return fora
 
 
 def saudacao():
@@ -491,7 +859,8 @@ def saudacao():
              "com as páginas oficiais.",
         expressao="acolhedora",
         botoes=[(r, caminho(c)) for c, r, _, _ in CAMINHOS]
-        + [("Rio Claro: o que tem aqui", lamina("rio_claro")), ("Barretos: Hospital de Amor", lamina("barretos")),
+        + [("Hospitais de referência no Estado", lamina("hospitais")),
+           ("Rio Claro: o que tem aqui", lamina("rio_claro")), ("Barretos: Hospital de Amor", lamina("barretos")),
            ("De onde vêm estas informações?", SOBRE)],
         destino={"aba": LAMINAS["caminho"]},
     )
@@ -502,17 +871,32 @@ def responder_caminho(c):
     lista = itens(caminho=c, lamina="caminho")
     fala = f"**{rotulo}.** {abertura}\n\n" + "\n".join(f"- **{i['titulo']}** · {i['onde']}: {i['resumo']}."
                                                         for i in lista)
-    apontados = _nas_laminas(c)
-    if apontados:
-        fala += "\n\nTambém para este caminho: " + "; ".join(
-            f"{i['titulo']} (lâmina {LAMINAS[i['lamina']]})" for i in apontados) + "."
+    botoes = [(i["titulo"], item(i["id"])) for i in lista]
+    partes = []
+    for lam, fora in nas_laminas(c).items():
+        if len(fora) > MAX_APONTADOS:
+            partes.append(f"{len(fora)} itens na lâmina {LAMINAS[lam]}")
+            botoes.append((f"Ver a lâmina {LAMINAS[lam]}", lamina(lam)))
+        else:
+            partes += [f"{i['titulo']} (lâmina {LAMINAS[lam]})" for i in fora]
+            botoes += [(i["titulo"], item(i["id"])) for i in fora]
+    if partes:
+        fala += "\n\nTambém para este caminho: " + "; ".join(partes) + "."
     return Resposta(
         fala=fala,
         expressao="acolhedora" if c == "proteger" else "explicando",
-        botoes=[(i["titulo"], item(i["id"])) for i in lista + apontados] + _proximo(c),
+        botoes=botoes + _proximo(c),
         destino={"aba": LAMINAS["caminho"], "caminho": c},
         numeros=[f"{i['titulo']}: {i['fonte']}" for i in lista],
     )
+
+
+def _voltar(i):
+    if i["grupo"]:
+        return [(f"Voltar a {i['grupo']}", grupo(i["lamina"], i["grupo"]))]
+    if i["caminho"]:
+        return [(f"Voltar a {NOME_CAMINHO[i['caminho']]}", caminho(i["caminho"]))]
+    return [(f"Voltar a {LAMINAS[i['lamina']]}", lamina(i["lamina"]))]
 
 
 def responder_item(id):
@@ -531,43 +915,62 @@ def responder_item(id):
     return Resposta(
         fala="\n\n".join(partes),
         expressao="cautelosa" if i["confirmar"] else ("acolhedora" if i["caminho"] == "proteger" else "explicando"),
-        botoes=([(f"Voltar a {NOME_CAMINHO[i['caminho']]}", caminho(i["caminho"]))] if i["caminho"] else
-                [(f"Voltar a {LAMINAS[i['lamina']]}", lamina(i["lamina"]))]) + _proximo(i["caminho"]),
-        destino={"aba": LAMINAS[i["lamina"]], "caminho": i["caminho"], "item": id},
+        botoes=_voltar(i) + _proximo(i["caminho"]),
+        destino={"aba": LAMINAS[i["lamina"]], "caminho": i["caminho"], "grupo": i["grupo"], "item": id},
         numeros=[f"Fonte: {i['fonte']}", f"Página: {i['link']}", f"Conferido em {CONFERIDO}"],
     )
 
 
 def responder_lamina(id):
-    lista = itens(lamina=id)
-    if id == "rio_claro":
+    if id in GRUPOS:
+        if id == "barretos":
+            fala = ("**Barretos** reúne, no **Hospital de Amor**, hospitais de referência, prevenção, carretas, "
+                    "ensino e pesquisa em câncer. Aqui estão as informações e os links oficiais, e a ligação com a "
+                    "nossa cidade: em fevereiro de 2025 a carreta do hospital esteve em Rio Claro. Escolha um tema.")
+        else:
+            fala = ("Estes são **hospitais que tratam câncer pelo SUS no Estado de São Paulo**, por região. Eles não "
+                    "são porta de entrada: chega-se a eles pela regulação (CROSS), a partir da unidade de saúde. Para "
+                    "quem mora em Rio Claro, as referências são Rio Claro e Piracicaba, e o HC da Unicamp também "
+                    "atende a região. Escolha uma região.")
+        contagem = {g: sum(len(x) for x in do_grupo(id, g)) for g in GRUPOS[id]}
+        fala += "\n\n" + "\n".join(f"- **{g}**: {n} {'item' if n == 1 else 'itens'}"
+                                     for g, n in contagem.items())
+        botoes = [(g, grupo(id, g)) for g in GRUPOS[id]]
+        numeros = []
+    else:  # Rio Claro
+        lista = itens(lamina=id)
         fala = (f"**Rio Claro** é a cidade do trabalho do Escudo. Aqui estão as portas da própria cidade. Rio Claro "
-                f"faz parte da **{REGIAO}**: as referências de câncer da região ficam em Rio Claro e em Piracicaba "
-                "(caminho Encontrar referência).")
-    else:
-        fala = ("**Barretos** reúne, no **Hospital de Amor**, hospitais de referência, prevenção, carretas, ensino e "
-                "pesquisa em câncer. Aqui estão as informações e os links oficiais, e a ligação com a nossa cidade: "
-                "em fevereiro de 2025 a carreta do hospital esteve em Rio Claro.")
-    if id == "barretos":
-        lista = [i for g in GRUPOS_BARRETOS for i in lista if i["grupo"] == g]
-    fala += "\n\n" + "\n".join(f"- **{i['titulo']}**: {i['resumo']}." for i in lista)
-    extra = [("Referências na região de Rio Claro", caminho("referencia"))] if id == "rio_claro" else \
-            [("Rio Claro: o que tem aqui", lamina("rio_claro"))]
+                f"faz parte da **{REGIAO}**: as referências de câncer da região ficam em Rio Claro e em Piracicaba, "
+                "e o HC da Unicamp também atende a região (lâmina Hospitais no Estado).")
+        fala += "\n\n" + "\n".join(f"- **{i['titulo']}**: {i['resumo']}." for i in lista)
+        botoes = [(i["titulo"], item(i["id"])) for i in lista] + [
+            ("Hospitais da região de Rio Claro", grupo("hospitais", "Rio Claro e Piracicaba (RRAS 14)"))]
+        numeros = [f"{i['titulo']}: {i['fonte']}" for i in lista]
+    return Resposta(fala=fala, expressao="explicando", botoes=botoes, destino={"aba": LAMINAS[id]},
+                    numeros=numeros)
+
+
+def responder_grupo(lam, g):
+    casa, visitas = do_grupo(lam, g)
+    fala = f"**{g}.**\n\n" + "\n".join(f"- **{i['titulo']}** · {i['onde']}: {i['resumo']}."
+                                         for i in casa + visitas)
     return Resposta(
         fala=fala,
         expressao="explicando",
-        botoes=[(i["titulo"], item(i["id"])) for i in lista] + extra,
-        destino={"aba": LAMINAS[id]},
-        numeros=[f"{i['titulo']}: {i['fonte']}" for i in lista],
+        botoes=[(i["titulo"], item(i["id"])) for i in casa + visitas]
+        + [(f"Voltar a {LAMINAS[lam]}", lamina(lam))],
+        destino={"aba": LAMINAS[lam], "grupo": g},
+        numeros=[f"{i['titulo']}: {i['fonte']}" for i in casa + visitas],
     )
 
 
 def responder_sobre():
     pendentes = [i["titulo"] for i in ITENS if i["confirmar"]]
     return Resposta(
-        fala=(f"Juntei estas informações em {CONFERIDO}, a partir do portal da Saúde do Estado de SP, da rede "
-              "oncológica da FOSP, da Fundação Municipal de Saúde de Rio Claro, das prefeituras de Campinas, "
-              "Ribeirão Preto, Rio Preto e Piracicaba e do Hospital de Amor. Cada item traz a página oficial. "
+        fala=(f"Juntei estas informações em {CONFERIDO}, a partir de páginas oficiais: Secretaria da Saúde e "
+              "Secretaria da Mulher do Estado de SP, FOSP, INCA, Ministério da Saúde e das Mulheres, Defensoria "
+              "Pública, Poupatempo, Fundação Municipal de Saúde e Prefeitura de Rio Claro, prefeituras de outras "
+              "cidades e os próprios hospitais. Cada item traz a página oficial. "
               f"{len(pendentes)} de {len(ITENS)} itens ainda pedem confirmação na própria página: estão marcados. "
               "Isto é um guia de onde procurar, não orientação médica nem garantia de vaga."),
         expressao="pensativa",
@@ -584,8 +987,10 @@ def responder(acao):
         r = responder_caminho(acao["id"])
     elif tipo == "apoio_item" and acao.get("id") in POR_ID:
         r = responder_item(acao["id"])
-    elif tipo == "apoio_lamina" and acao.get("id") in ("rio_claro", "barretos"):
+    elif tipo == "apoio_lamina" and acao.get("id") in ("hospitais", "rio_claro", "barretos"):
         r = responder_lamina(acao["id"])
+    elif tipo == "apoio_grupo" and acao.get("id") in GRUPOS.get(acao.get("lamina"), ()):
+        r = responder_grupo(acao["lamina"], acao["id"])
     elif tipo == "apoio_sobre":
         r = responder_sobre()
     else:

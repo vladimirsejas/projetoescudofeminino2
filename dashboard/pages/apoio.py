@@ -43,6 +43,7 @@ div[data-testid="stRadio"]:has(input[value="Encontre um caminho"]) > div { gap: 
 .apoio-cartao { border-left: 6px solid #cdbfeb; }
 .apoio-cartao.confirmar { border-left-color: #f0b58d; }
 .apoio-cartao.destaque { box-shadow: 0 0 0 2px #7565a8; }
+.apoio-cartao.curto { border-left-style: dashed; }
 .apoio-resumo { color: #4d4863; margin: 2px 0 6px; }
 .apoio-cartao ul { padding-left: 18px; margin: 4px 0; }
 .apoio-fonte { color: #8a8599; font-size: .85rem; margin-top: 8px; }
@@ -79,8 +80,9 @@ a.apoio-botao:hover { background: #1f5fae; }
 
 ABAS = list(apoio.LAMINAS.values())
 ROTULO = apoio.NOME_CAMINHO
-TODOS = "Todos os temas"
-PADROES = {"ap_aba": ABAS[0], "ap_caminho": "prevenir", "ap_item": None, "ap_tema_barretos": TODOS}
+TODOS = {"barretos": "Todos os temas", "hospitais": "Todas as regiões"}
+PADROES = {"ap_aba": ABAS[0], "ap_caminho": "prevenir", "ap_item": None,
+           "ap_grupo_barretos": TODOS["barretos"], "ap_grupo_hospitais": TODOS["hospitais"]}
 for chave, valor in PADROES.items():
     st.session_state.setdefault(chave, valor)
 st.session_state.setdefault("ap_lia", {"atual": apoio.responder(INICIO), "pilha": [], "falas": 0})
@@ -109,9 +111,9 @@ def aplicar_destino(destino):
     if destino.get("caminho") in ROTULO:
         definir("ap_caminho", destino["caminho"])
     definir("ap_item", destino.get("item"))
-    if destino.get("aba") == apoio.LAMINAS["barretos"]:
-        grupo = apoio.POR_ID[destino["item"]]["grupo"] if destino.get("item") else None
-        definir("ap_tema_barretos", grupo or TODOS)
+    for lam in apoio.GRUPOS:  # lâmina com temas/regiões: vai ao do item (ou a todos)
+        if destino.get("aba") == apoio.LAMINAS[lam]:
+            definir(f"ap_grupo_{lam}", destino.get("grupo") or TODOS[lam])
 
 
 def lia_clicar(acao):
@@ -199,6 +201,34 @@ def cartao(i):
     )
 
 
+def cartao_curto(i):
+    """Item que mora em outra lâmina: título, resumo e o botão azul (o
+    texto completo fica na casa dele, sem repetir)."""
+    e = html.escape
+    st.markdown(
+        f'<div class="escudo-cartao apoio-cartao curto"><h4>{e(i["titulo"])}<span class="apoio-selo">{e(i["onde"])}'
+        f'</span></h4><div class="apoio-resumo">{e(i["resumo"][0].upper() + i["resumo"][1:])}.</div>'
+        f'<a class="apoio-botao" href="{e(i["link"])}" target="_blank" rel="noopener">Abrir a página oficial ↗</a>'
+        f'<div class="apoio-fonte">Detalhes completos na lâmina {apoio.LAMINAS[i["lamina"]]}.</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def lamina_por_grupos(lam, rotulo_seletor):
+    """Lâmina organizada em temas ou regiões, escolhidos como botões."""
+    with pilulas(lam):
+        escolha = seletor(st, rotulo_seletor, f"ap_grupo_{lam}", [TODOS[lam]] + apoio.GRUPOS[lam], horizontal=True,
+                          label_visibility="collapsed")
+    for g in (apoio.GRUPOS[lam] if escolha == TODOS[lam] else [escolha]):
+        casa, visitas = apoio.do_grupo(lam, g)
+        if casa or visitas:
+            st.markdown(f'<div class="apoio-grupo">{g}</div>', unsafe_allow_html=True)
+            for i in casa:
+                cartao(i)
+            for i in visitas:
+                cartao_curto(i)
+
+
 # ============================================================
 # TOPO
 # ============================================================
@@ -257,14 +287,15 @@ if aba == apoio.LAMINAS["caminho"]:
     for i in apoio.itens(caminho=c, lamina="caminho"):
         cartao(i)
 
-    apontados = [i for i in apoio.ITENS if i["caminho"] == c and i["lamina"] != "caminho"]
-    if apontados:
-        st.markdown('<div class="escudo-info"><b>Também para este caminho, nas lâminas próprias</b><ul>'
-                    + "".join(f"<li>{html.escape(i['titulo'])} → lâmina {apoio.LAMINAS[i['lamina']]}</li>"
-                              for i in apontados) + "</ul></div>", unsafe_allow_html=True)
-        for lam in dict.fromkeys(i["lamina"] for i in apontados):
-            st.button(f"Ver na lâmina {apoio.LAMINAS[lam]}", key=f"ir_{c}_{lam}",
-                      on_click=aplicar_destino, args=({"aba": apoio.LAMINAS[lam], "caminho": c},))
+    for lam, fora in apoio.nas_laminas(c).items():
+        st.markdown(f'<div class="apoio-grupo">Também para este caminho: lâmina {apoio.LAMINAS[lam]}</div>',
+                    unsafe_allow_html=True)
+        if len(fora) > apoio.MAX_APONTADOS:
+            st.button(f"Ver os {len(fora)} itens na lâmina {apoio.LAMINAS[lam]} →", key=f"ir_{c}_{lam}",
+                      type="primary", on_click=aplicar_destino, args=({"aba": apoio.LAMINAS[lam]},))
+        else:
+            for i in fora:
+                cartao_curto(i)
     leitura("Como usar", [
         "Cada cartão traz a página oficial e a data em que foi conferido. Borda laranja = ainda falta confirmar "
         "algum detalhe na própria página.",
@@ -274,13 +305,32 @@ if aba == apoio.LAMINAS["caminho"]:
 
 
 # ============================================================
+# HOSPITAIS NO ESTADO — onde se trata câncer pelo SUS, por região
+# ============================================================
+
+if aba == apoio.LAMINAS["hospitais"]:
+    pergunta("Onde se trata câncer pelo SUS no Estado de São Paulo?")
+    dica("Hospitais habilitados para tratar câncer (CACON e UNACON), por região. Eles não são porta de entrada: "
+         "a vaga é pedida pela unidade de saúde, pela regulação do Estado (CROSS).")
+    onde_clicar("Clique numa região. Em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
+    lamina_por_grupos("hospitais", "Região")
+    leitura("Como chegar a um destes hospitais", [
+        "Com suspeita ou diagnóstico de câncer, procure a unidade de saúde do bairro: o médico do SUS pede a vaga "
+        "pela CROSS, que encaminha a um centro perto de onde você mora.",
+        "Se o tratamento for longe (mais de 50 km) e não existir na sua região, o SUS pode pagar transporte e "
+        "diárias (TFD, no caminho Seus direitos).",
+        "A lista completa e oficial é a da FOSP (primeira região desta lâmina).",
+    ])
+
+
+# ============================================================
 # RIO CLARO — a cidade do trabalho
 # ============================================================
 
 if aba == apoio.LAMINAS["rio_claro"]:
     pergunta(f"O que {apoio.CIDADE} oferece às mulheres?")
-    dica(f"{apoio.CIDADE} faz parte da {apoio.REGIAO}. As referências de câncer da região (Rio Claro e "
-         "Piracicaba) estão no caminho Encontrar referência.")
+    dica(f"{apoio.CIDADE} faz parte da {apoio.REGIAO}. As referências de câncer da região são Rio Claro e "
+         "Piracicaba, e o HC da Unicamp também atende a região (lâmina Hospitais no Estado).")
     onde_clicar("Em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
     lista = apoio.itens(lamina="rio_claro")
     for c in [c for c, _, _, _ in apoio.CAMINHOS]:
@@ -289,8 +339,9 @@ if aba == apoio.LAMINAS["rio_claro"]:
             st.markdown(f'<div class="apoio-grupo">{ROTULO[c]}</div>', unsafe_allow_html=True)
             for i in do_caminho:
                 cartao(i)
-    st.button("Referências de câncer na região", key="ir_referencia_rc", on_click=aplicar_destino,
-              args=({"aba": apoio.LAMINAS["caminho"], "caminho": "referencia"},))
+    st.button("Hospitais de referência da região →", key="ir_referencia_rc", type="primary",
+              on_click=aplicar_destino, args=({"aba": apoio.LAMINAS["hospitais"],
+                                              "grupo": "Rio Claro e Piracicaba (RRAS 14)"},))
     leitura("Como usar", [
         "Para quase tudo, a porta é a Unidade de Saúde da Família ou a UBS do bairro.",
         "Vários dados de Rio Claro vêm de páginas antigas da Prefeitura e da Fundação Municipal de Saúde: estão "
@@ -307,16 +358,7 @@ if aba == apoio.LAMINAS["barretos"]:
     dica("Barretos concentra, no Hospital de Amor, prevenção, diagnóstico, tratamento, ensino e pesquisa em câncer, "
          "com ações que chegam a outros municípios, como Rio Claro.")
     onde_clicar("Clique num tema. Em cada cartão, clique no botão azul <b>Abrir a página oficial</b>.")
-    with pilulas("barretos"):
-        tema = seletor(st, "Tema", "ap_tema_barretos", [TODOS] + apoio.GRUPOS_BARRETOS, horizontal=True,
-                       label_visibility="collapsed")
-    lista = apoio.itens(lamina="barretos")
-    for g in (apoio.GRUPOS_BARRETOS if tema == TODOS else [tema]):
-        do_grupo = [i for i in lista if i["grupo"] == g]
-        if do_grupo:
-            st.markdown(f'<div class="apoio-grupo">{g}</div>', unsafe_allow_html=True)
-            for i in do_grupo:
-                cartao(i)
+    lamina_por_grupos("barretos", "Tema")
     st.markdown('<div class="escudo-alerta">Para quem mora em Rio Claro, o caminho do SUS passa primeiro pela '
                 'referência da própria região (RRAS 14: Rio Claro e Piracicaba). Converse com a equipe que '
                 'acompanha você.</div>', unsafe_allow_html=True)
@@ -351,7 +393,7 @@ if aba == apoio.LAMINAS["sobre"]:
 """)
     tabela = pd.DataFrame([{
         "Item": i["titulo"], "Onde": i["onde"], "Lâmina": apoio.LAMINAS[i["lamina"]],
-        "Caminho": ROTULO.get(i["caminho"], "—"), "Fonte": i["fonte"], "Situação": "a confirmar" if i["confirmar"] else "conferido",
+        "Caminho": ROTULO.get(i["caminho"], "—"), "Tema ou região": i["grupo"] or "—", "Fonte": i["fonte"], "Situação": "a confirmar" if i["confirmar"] else "conferido",
         "Página": i["link"]} for i in apoio.ITENS])
     st.dataframe(tabela, use_container_width=True, hide_index=True)
 

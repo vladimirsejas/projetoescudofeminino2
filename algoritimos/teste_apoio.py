@@ -40,13 +40,24 @@ checar("todo item de Barretos está num tema da lâmina",
 checar("Barretos tem hospitais de referência e carretas",
        apoio.itens(lamina="barretos") and all(any(i["grupo"] == g for i in apoio.ITENS)
                                               for g in ("Hospitais de referência", "Carretas e unidades móveis")))
-checar("toda lâmina de item existe", all(i["lamina"] in ("caminho", "rio_claro", "barretos") for i in apoio.ITENS))
+checar("toda lâmina de item existe", all(i["lamina"] in apoio.LAMINAS and i["lamina"] != "sobre"
+                                         for i in apoio.ITENS))
+checar("todo item de lâmina com temas/regiões está num deles",
+       all(i["grupo"] in apoio.GRUPOS[lam] for lam in apoio.GRUPOS for i in apoio.itens(lamina=lam)))
+checar("todo 'também em' aponta para um tema/região que existe",
+       all(g in apoio.GRUPOS.get(lam, ()) for i in apoio.ITENS for lam, g in i["tambem"]))
+checar("todo tema/região tem pelo menos um item", all(sum(map(len, apoio.do_grupo(lam, g)))
+                                                       for lam in apoio.GRUPOS for g in apoio.GRUPOS[lam]))
+checar("Hospitais no Estado: pelo menos 20 hospitais", len(apoio.itens(lamina="hospitais")) >= 20)
+checar("proteção à mulher: pelo menos 8 portas", len(apoio.itens(caminho="proteger")) >= 8)
+checar("caminho Seus direitos com TFD e reconstrução da mama",
+       {"tfd", "reconstrucao_mamaria"} <= {i["id"] for i in apoio.itens(caminho="direitos")})
 checar("todo caminho tem pelo menos um item", all(apoio.itens(caminho=c) for c in apoio.NOME_CAMINHO))
 checar("Rio Claro tem lâmina com itens", len(apoio.itens(lamina="rio_claro")) >= 4)
 checar("Barretos tem lâmina com itens", len(apoio.itens(lamina="barretos")) >= 3)
 outras = {"Campinas", "Ribeirão Preto", "São José do Rio Preto"}
-checar("outras cidades entram só nos caminhos (sem lâmina própria)",
-       all(i["lamina"] == "caminho" for i in apoio.ITENS if i["onde"] in outras)
+checar("outras cidades entram só nos caminhos e na lista de hospitais (sem lâmina própria)",
+       all(i["lamina"] in ("caminho", "hospitais") for i in apoio.ITENS if i["onde"] in outras)
        and any(i["onde"] in outras for i in apoio.ITENS)
        and any(i["onde"].startswith("Piracicaba") for i in apoio.ITENS))
 checar("texto sem seta ASCII (->)", not any("->" in str(v) for i in apoio.ITENS for v in i.values()))
@@ -73,7 +84,7 @@ while fila:
         problemas.append(f"destino: {acao}")
     if acao is not INICIO and (not r.botoes or r.botoes[-1] != ("Começar de novo", INICIO)):
         problemas.append(f"sem começar de novo: {acao}")
-    for proibida in ("vai conseguir", "garantid", "tome ", "você tem câncer"):
+    for proibida in ("vai conseguir", "vaga garantida", "garantimos", "tome ", "você tem câncer"):
         if proibida in r.fala.lower():
             problemas.append(f"fala proibida '{proibida}': {acao}")
     if acao.get("tipo") == "apoio_item":

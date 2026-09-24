@@ -21,6 +21,7 @@ RAIZ = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 sys.path.insert(0, os.path.join(RAIZ, "algoritimos"))
 
 import apoio  # noqa: E402
+from html import escape as _html_esc  # noqa: E402
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 falhas = []
@@ -121,15 +122,20 @@ for c in apoio.NOME_CAMINHO:
     texto = " ".join(m.value for m in at.markdown)
     esperados = [i["titulo"] for i in apoio.itens(caminho=c, lamina="caminho")]
     checar(f"D. caminho {c} mostra seus {len(esperados)} cartões",
-           not erros(at) and all(t.replace('"', "&quot;") in texto or t in texto for t in esperados))
+           not erros(at) and all(_html_esc(t) in texto for t in esperados))
 
-at.session_state["ap_aba"] = apoio.LAMINAS["barretos"]
-for g in apoio.GRUPOS_BARRETOS:
-    at.session_state["ap_tema_barretos"] = g
-    at.run()
-    texto = " ".join(m.value for m in at.markdown)
-    checar(f"D. Barretos, tema {g}: só os cartões dele",
-           not erros(at) and all((i["grupo"] == g) == (i["titulo"] in texto) for i in apoio.itens(lamina="barretos")))
+import html as _html
+for lam in apoio.GRUPOS:
+    at.session_state["ap_aba"] = apoio.LAMINAS[lam]
+    for g in apoio.GRUPOS[lam]:
+        at.session_state[f"ap_grupo_{lam}"] = g
+        at.run()
+        texto = " ".join(m.value for m in at.markdown)
+        casa, visitas = apoio.do_grupo(lam, g)
+        checar(f"D. {apoio.LAMINAS[lam]}, {g}: {len(casa)} + {len(visitas)} cartões, só os dele",
+               not erros(at) and all(_html.escape(i["titulo"]) in texto for i in casa + visitas)
+               and not any(_html.escape(i["titulo"]) in texto for i in apoio.itens(lamina=lam) if i["grupo"] != g
+                           and (lam, g) not in i["tambem"]))
 checar("D. cartões com o botão Abrir a página oficial", "apoio-botao" in texto)
 
 print(f"\n({time.time() - inicio:.0f} s)")
