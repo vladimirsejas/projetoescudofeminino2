@@ -117,9 +117,24 @@ painel ao gráfico dela. As falas são as da própria Lia
 árvore deixa a pessoa escolher; o Passeio conduz — serve para quem
 chega pela primeira vez e para apresentar à Secretaria.
 
-**Anos incompletos.** Quando a fonte não oferece todos os meses de um
-ano, a Lia avisa ("o DATASUS não oferece todos os meses de N anos… uso
-a média dos meses disponíveis × 12") e explica a regra no Método.
+**Anos incompletos — o fechamento das informações da Lia (combinado
+com o autor, 09/2026).** O DATASUS não disponibilizou 35 dos 156 meses
+de 2013 a 2025; conferimos duas vezes (nos arquivos e consultando a
+fonte oficial de novo) e não há o que recuperar. A Lia assume isso com
+honestidade, seguindo duas regras: **mês ausente não é zero** e **ano
+incompleto não é ano normal**.
+
+- Caminho **"Os dados estão completos?"**: responde, antes de qualquer
+  tendência, com os meses que a fonte oferece em cada ano, as duas
+  conferências e a regra da média mensal × 12. Sem a informação de
+  meses (banco antigo), diz que ainda não sabe — não inventa.
+- Ano fora do padrão que cai num ano incompleto vem marcado ("ano com
+  7 de 12 meses na fonte: leia com cautela"), com o botão para a
+  completude.
+- Nada de afirmar "em 2018 houve queda": a nota de anos incompletos
+  aparece em toda fala que compara anos.
+- Projeção sem promessa: "a tendência aponta para…", nunca "vai" ou
+  "deve ficar".
 
 **Teste de aceitação:** `dashboard/teste_painel.py` abre o painel e
 clica em tudo — a árvore, os 56 pares câncer × ação, Voltar, Começar

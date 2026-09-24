@@ -138,7 +138,13 @@ Estado atual:
   `teste_lia.py`. **A caixa de texto livre saiu (decisão do autor,
   09/2026):** respondia o mesmo que os botões, com menos precisão; a
   Lia conduz só por botões. Mais opções devem entrar como caminhos
-  novos na árvore, não como texto livre. **Passeio pelo Escudo**
+  novos na árvore, não como texto livre. **Fechamento das informações
+  da Lia (09/2026):** mês ausente não é zero; ano incompleto não é ano
+  normal. Caminho "Os dados estão completos?" (`lia.completude`), ano
+  fora do padrão em ano incompleto marcado com cautela, projeção como
+  "a tendência aponta" (nunca "vai"/"deve ficar"). A Lia só usa
+  `inteligencia.py` (não depende de motor_raciocinio, memoria_ia,
+  base_conhecimento, padroes_analiticos nem conversa.py). **Passeio pelo Escudo**
   (`algoritimos/passeio.py`, 09/2026): interação a mais, combinada com
   o autor -- 6 paradas na ordem, só cliques, cartão verde-água logo
   abaixo do rosto da Lia (convite no fim da lateral), falas da própria

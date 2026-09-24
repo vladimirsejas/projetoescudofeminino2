@@ -841,6 +841,10 @@ if aba == "Método":
   total do tratamento (quimioterapia e radioterapia ambulatoriais ficam fora). Valores nominais, sem inflação.
 - **O ano é o de processamento da internação** (competência da AIH), que pode não coincidir com o ano em que
   ela aconteceu.
+- **Meses que a fonte não oferece:** o DATASUS não disponibiliza todos os meses de 2013 a 2024 (2018 tem só 6).
+  Conferimos duas vezes, nos arquivos e na própria fonte: esses dados não existem para recuperar. Mês ausente não
+  é zero e ano incompleto não é ano normal: para comparar anos, o Escudo usa a média dos meses disponíveis × 12
+  (marcador vazado no gráfico); os totais do período são o que foi registrado.
 - **Linha cinza (Estado de SP):** a série do Estado redimensionada para o tamanho de {nome_cidade}. Compara o
   *ritmo*, não o volume.
 - **Fora do padrão:** o ano ficou longe do esperado pela tendência dos *outros* anos, além da oscilação normal

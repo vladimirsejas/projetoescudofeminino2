@@ -71,7 +71,7 @@ checar("A. todo destino aponta para uma aba que existe",
        all(r.destino is None or r.destino.get("aba") in ABAS for r in respostas.values()))
 checar("A. toda medida pedida existe no painel",
        all(r.destino is None or r.destino.get("medida") in (None, *MEDIDAS) for r in respostas.values()))
-checar("A. os 8 caminhos da saudação existem", len(responder(ctx, INICIO).botoes) == len(CAMINHOS))
+checar("A. todos os caminhos da saudação existem", len(responder(ctx, INICIO).botoes) == len(CAMINHOS))
 
 # ---- B. regras ----
 r = responder(ctx, caminho("atencao"))
@@ -93,6 +93,29 @@ checar("B. método: expressão pensativa e o que os dados não permitem", r.expr
        and "não" in r.fala and "causas" in r.fala)
 checar("B. câncer inexistente na cidade volta ao começo",
        responder(ctx, sobre("XYZ", "evolucao")).expressao == "acolhedora")
+
+# ---- E. dados incompletos na fonte (mês ausente não é zero; ano incompleto não é normal) ----
+from inteligencia import ajustar_meses
+from lia import completude
+meses_fonte = {2013: 10, 2014: 10, 2015: 8, 2016: 9, 2017: 11, 2018: 6, 2019: 7, 2020: 8,
+               2021: 11, 2022: 10, 2023: 11, 2024: 8, 2025: 12}
+ctx_m = Contexto(serie=ajustar_meses(serie, meses_fonte), cidade="Rio Claro", faixas=faixas)
+r = responder(ctx_m, caminho("completude"))
+checar("E. 'Os dados estão completos?': não, com os meses de cada ano e as duas regras",
+       r.fala.startswith("**Não.**") and "2018: 6 de 12" in r.fala and "mês ausente não é zero" in r.fala
+       and "ano incompleto não é ano normal" in r.fala and "Conferimos duas vezes" in r.fala
+       and r.destino["aba"] == "Método")
+checar("E. sem a informação de meses, a Lia diz que ainda não sabe (não inventa)",
+       "Ainda não consigo dizer" in completude(ctx).fala)
+r = responder(ctx_m, caminho("fora_padrao"))
+checar("E. ano fora do padrão em ano incompleto vem com cautela",
+       "2019 (acima do esperado — ano com 7 de 12 meses na fonte: leia com cautela)" in r.fala and any(
+           b[0] == "Os dados estão completos?" for b in r.botoes))
+r = responder(ctx_m, sobre("MAMA", "projecao"))
+checar("E. projeção sem promessa ('deve ficar' não aparece; 'a tendência aponta')",
+       "deve ficar" not in r.fala and "a tendência aponta" in r.fala)
+r = responder(ctx_m, sobre("MAMA", "evolucao"))
+checar("E. a Lia avisa os anos incompletos ao falar de evolução", "não oferece todos os meses" in r.fala)
 
 print()
 if falhas:

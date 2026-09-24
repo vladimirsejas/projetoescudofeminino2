@@ -83,6 +83,7 @@ CAMINHOS = [
     ("Comparar com São Paulo", "estado"),
     ("Olhar para frente", "futuro"),
     ("Anos fora do padrão", "fora_padrao"),
+    ("Os dados estão completos?", "completude"),
     ("Como esses dados funcionam?", "metodo"),
 ]
 
@@ -305,7 +306,8 @@ def fora_padrao(ctx):
                         botoes=[("Está aumentando?", caminho("aumentando"))],
                         destino={"aba": "Investigar"})
     itens = [f"{l['doenca']} em {l['ano']} ({l['direcao']} do esperado"
-             + (", poucos casos" if l["numeros_pequenos"] else "") + ")" for _, l in todos.iterrows()]
+             + (", poucos casos" if l["numeros_pequenos"] else "") + _cuidado_ano(ctx, l["ano"]) + ")"
+             for _, l in todos.iterrows()]
     fala = "Encontrei estes anos fora do padrão: " + "; ".join(itens) + "."
     repetido = todos["ano"].value_counts()
     if repetido.iloc[0] >= 2:
@@ -317,10 +319,63 @@ def fora_padrao(ctx):
     return Resposta(
         fala=fala,
         expressao="cautelosa" if todos["numeros_pequenos"].any() or repetido.iloc[0] >= 2 else "atenta",
-        botoes=_mais(codigo, "evolucao", "porque") + [("Como esses dados funcionam?", caminho("metodo"))],
+        botoes=_mais(codigo, "evolucao", "porque") + (
+            [("Os dados estão completos?", caminho("completude"))] if anos_incompletos(ctx.serie)
+            else [("Como esses dados funcionam?", caminho("metodo"))]),
         destino={"aba": "Investigar"},
         numeros=[f"{l['doenca']} {l['ano']}: {formatar_numero(l['observado'])} internações, esperado "
                  f"~{formatar_numero(l['esperado'])}" for _, l in todos.iterrows()],
+    )
+
+
+def _cuidado_ano(ctx, ano):
+    """' (ano com 7 de 12 meses na fonte: leia com cautela)' se o ano
+    for incompleto; '' se não."""
+    meses = anos_incompletos(ctx.serie).get(int(ano))
+    return f" — ano com {meses} de 12 meses na fonte: leia com cautela" if meses else ""
+
+
+def completude(ctx):
+    """Os dados estão completos? Responde com os meses que a fonte
+    oferece, antes de qualquer interpretação de tendência. Regras:
+    mês ausente não é zero; ano incompleto não é ano normal."""
+    serie = ctx.serie
+    anos = sorted(int(a) for a in serie["ano"].unique())
+    if "meses" not in serie or serie["meses"].isna().all():
+        return Resposta(
+            fala=("Ainda não consigo dizer: esta base foi carregada sem o mês de cada internação. Quando a carga "
+                  "for rodada de novo (py etl\\carga_todas_bases.py), eu passo a mostrar quais meses a fonte "
+                  "oferece em cada ano."),
+            expressao="cautelosa",
+            botoes=[("Como esses dados funcionam?", caminho("metodo"))],
+            destino={"aba": "Método"},
+        )
+    incompletos = anos_incompletos(serie)
+    if not incompletos:
+        return Resposta(
+            fala=f"Sim: todos os anos de {anos[0]} a {anos[-1]} têm os 12 meses na fonte.",
+            expressao="explicando",
+            botoes=[("Está aumentando?", caminho("aumentando")), ("Como esses dados funcionam?", caminho("metodo"))],
+            destino={"aba": "Método"},
+        )
+    pior = min(incompletos, key=incompletos.get)
+    lista = "; ".join(f"{a}: {m} de 12" for a, m in sorted(incompletos.items()))
+    faltam = sum(12 - m for m in incompletos.values())
+    fala = (f"**Não.** O DATASUS, fonte oficial do SIH/SUS, não disponibiliza todos os meses: **{len(incompletos)} "
+            f"dos {len(anos)} anos estão incompletos** ({faltam} meses no total). {lista}."
+            f"\n\nConferimos duas vezes — nos arquivos baixados e consultando de novo a fonte oficial: esses meses "
+            f"não foram disponibilizados, então não há o que recuperar. Não é falha do Escudo."
+            f"\n\nPor isso eu sigo duas regras: **mês ausente não é zero** e **ano incompleto não é ano normal**. "
+            f"Para comparar anos, uso a média dos meses disponíveis × 12; os totais do período são o que foi "
+            f"registrado. Anos com poucos meses, como {pior} ({incompletos[pior]} de 12), são estimativas menos "
+            f"firmes: nenhuma queda ou salto nesses anos deve ser lido como fato sem cautela.")
+    return Resposta(
+        fala=fala,
+        expressao="cautelosa",
+        botoes=[("Está aumentando?", caminho("aumentando")), ("Anos fora do padrão", caminho("fora_padrao")),
+                ("Como esses dados funcionam?", caminho("metodo"))],
+        destino={"aba": "Método"},
+        numeros=[f"{a}: {m} de 12 meses na fonte" for a, m in sorted(incompletos.items())],
     )
 
 
@@ -348,7 +403,9 @@ def _evolucao(ctx, c):
     ano_fim, ultimo = int(mun["ano"].max()), mun["internacoes"].iloc[-1]
     ritmo = comp["ritmo_municipio"]
     verbo = "crescem" if ritmo > 1 else ("caem" if ritmo < -1 else "ficam estáveis")
-    fala = (f"**O que aconteceu:** em {ano_fim} foram {formatar_numero(ultimo)} internações por {cancer_de(c)}. "
+    meses_fim = anos_incompletos(ctx.serie).get(ano_fim)
+    fala = (f"**O que aconteceu:** em {ano_fim} foram {formatar_numero(ultimo)} internações por {cancer_de(c)}"
+            + (f" (estimado: a fonte só tem {meses_fim} de 12 meses desse ano)" if meses_fim else "") + ". "
             f"\n\n**O que está acontecendo:** desde {int(mun['ano'].min())}, as internações {verbo} "
             f"{formatar_numero(abs(ritmo), 1)}% ao ano em média")
     if comp["ritmo_estado"] is not None:
@@ -356,7 +413,8 @@ def _evolucao(ctx, c):
     fala += "."
     fora = anos_fora_do_padrao(mun)
     if not fora.empty:
-        fala += " Anos fora do padrão: " + ", ".join(f"{a} ({d})" for a, d in zip(fora["ano"], fora["direcao"])) + "."
+        fala += (" Anos fora do padrão: " + ", ".join(f"{a} ({d}{_cuidado_ano(ctx, a)})"
+                                                     for a, d in zip(fora["ano"], fora["direcao"])) + ".")
     if _pequeno(ctx, c):
         fala += " São poucas internações por ano, então variações podem ser acaso."
     return Resposta(
@@ -448,8 +506,8 @@ def _projecao(ctx, c):
     ano_fim = int(mun["ano"].max())
     fala = (f"**O que aconteceu:** em {ano_fim}, {formatar_numero(i['atual'])} internações por {cancer_de(c)}. "
             f"\n\n**O que está acontecendo:** a tendência é de {formatar_numero(comp['ritmo_municipio'], 1)}% ao ano. "
-            f"\n\n**O que pode acontecer:** se esse comportamento continuar, {i['ano']} deve ficar entre "
-            f"**{formatar_numero(i['minimo'])} e {formatar_numero(i['maximo'])} internações** (em torno de "
+            f"\n\n**O que pode acontecer:** se esse comportamento continuar, a tendência aponta para "
+            f"**{formatar_numero(i['minimo'])} a {formatar_numero(i['maximo'])} internações em {i['ano']}** (em torno de "
             f"{formatar_numero(i['previsto'])}), com {_quanto(p['dias_permanencia'], ' dias')} "
             f"de internação e {_quanto(p['valor_total'], '', 'R$ ')} em valores hospitalares registrados.")
     teste = testar_projecao(mun)
@@ -488,7 +546,7 @@ def _porque(ctx, c):
 ACOES = {"evolucao": _evolucao, "obitos": _obitos, "valores": _valores, "tempo": _tempo, "idade": _idade,
          "estado": _estado_cancer, "projecao": _projecao, "porque": _porque}
 
-CAMINHOS_FUNCOES = {"mais_aparece": mais_aparece, "aumentando": aumentando, "atencao": atencao,
+CAMINHOS_FUNCOES = {"completude": completude, "mais_aparece": mais_aparece, "aumentando": aumentando, "atencao": atencao,
                     "valores": valores, "estado": estado, "fora_padrao": fora_padrao, "metodo": metodo}
 
 
