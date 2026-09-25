@@ -175,13 +175,13 @@ def botao_inicio(onde, chave):
     except TypeError:  # Streamlit antigo: sem key em container
         caixa = onde.container()
     with caixa:
-        if st.button("🏠 Início · Panorama", key=f"inicio_{chave}", use_container_width=True,
-                     help="Volta ao painel do Escudo, na aba Panorama."):
+        if st.button("🏠 Início", key=f"inicio_{chave}", use_container_width=True,
+                     help="Volta à página inicial do Escudo."):
             st.session_state["aba"] = "Panorama"
             try:
                 st.switch_page("app.py")
             except Exception:  # Streamlit antigo, ou esta página aberta sozinha num teste
-                st.markdown('<a href="/" target="_self">Abrir o Panorama</a>', unsafe_allow_html=True)
+                st.markdown('<a href="/" target="_self">Ir para o início</a>', unsafe_allow_html=True)
 
 
 def pergunta(texto):

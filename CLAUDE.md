@@ -161,7 +161,7 @@ Estado atual:
   Testes: `algoritimos/teste_apoio.py` e `dashboard/teste_apoio_tela.py`.
   **Botão "Início" (autor, 09/2026):** volta ao Panorama, a página inicial.
   No painel fica ao lado das abas (`inicio_painel`); no apoio, no topo e no
-  fim da lateral (`inicio_topo`/`inicio_lateral`), marca `aba = "Panorama"` e
+  fim da lateral (`inicio_topo`/`inicio_lateral`). Rótulo só "🏠 Início" (autor: "Panorama" confunde quem é de fora). Marca `aba = "Panorama"` e
   troca de página (`st.switch_page`). Substituiu o link "← Estudo da doença".
   **"O importante é saber onde clicar" (autor):** cada cartão tem o botão azul
   "Abrir a página oficial"; caminhos e temas aparecem como botões (container

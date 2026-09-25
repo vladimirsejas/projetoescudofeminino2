@@ -387,7 +387,7 @@ with col_inicio:
         caixa_inicio = st.container()
     caixa_inicio.button("🏠 Início", key="inicio_painel", on_click=definir, args=("aba", "Panorama"),
                         use_container_width=True, disabled=aba == "Panorama",
-                        help="Volta à aba Panorama, a página inicial do Escudo.")
+                        help="Volta à página inicial do Escudo.")
 
 
 # ============================================================
