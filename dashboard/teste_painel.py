@@ -204,6 +204,14 @@ def main():
         at.run()
         checar(f"D. aba {aba} abre sem erro", not erros(at))
 
+    # ---- D2. botão Início: de qualquer aba volta ao Panorama ----
+    for aba in ["Evolução", "Investigar", "Planejamento", "Método"]:
+        at.session_state["aba"] = aba
+        at.run()
+        at.button(key="inicio_painel").click().run()
+        checar(f"D2. 'Início' na aba {aba} volta ao Panorama",
+               not erros(at) and at.session_state["aba"] == "Panorama")
+
     # ---- E. banco atualizado com o painel aberto: o cache não pode segurar os dados velhos ----
     at = abrir()
     antes = list(next(r for r in at.radio if r.label == "Câncer em foco").options)

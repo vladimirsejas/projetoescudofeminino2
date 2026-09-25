@@ -112,5 +112,9 @@ div[data-testid="stRadio"]:has(input[value="Panorama"]) > div { gap: 4px; border
 [class*="st-key-botao_apoio"] a:hover { background: #a51f2e; border-color: #a51f2e; }
 [class*="st-key-botao_apoio"] a, [class*="st-key-botao_apoio"] a p, [class*="st-key-botao_apoio"] a span {
     color: #ffffff !important; font-weight: 700; font-size: 1rem; }
+[class*="st-key-botao_inicio"] button { background: #ffffff; border: 1px solid #2a78d6; color: #2a78d6;
+    border-radius: 12px; font-weight: 700; }
+[class*="st-key-botao_inicio"] button:hover { background: #2a78d6; color: #ffffff; }
+[class*="st-key-botao_inicio"] button p { font-weight: 700; }
 </style>
 """

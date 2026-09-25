@@ -164,6 +164,14 @@ checar("D. lâmina Carretas mostra onde a carreta está agora",
        not erros(at) and "Onde a carreta da mamografia está agora?" in texto
        and ("carreta-grade" in texto or "escudo-alerta" in texto))
 
+# ---------- E. botão Início (volta ao painel, na aba Panorama) ----------
+at = abrir()
+checar("E. botão Início no topo e na lateral",
+       botao(at, "inicio_topo") is not None and any(b.key == "inicio_lateral" for b in at.sidebar.button))
+at.session_state["aba"] = "Evolução"  # o painel tinha ficado noutra aba
+botao(at, "inicio_topo").click().run()
+checar("E. Início marca o Panorama no painel", not erros(at) and at.session_state["aba"] == "Panorama")
+
 print(f"\n({time.time() - inicio:.0f} s)")
 print("Todas as checagens da lâmina de apoio passaram." if not falhas else f"{len(falhas)} falha(s).")
 sys.exit(1 if falhas else 0)

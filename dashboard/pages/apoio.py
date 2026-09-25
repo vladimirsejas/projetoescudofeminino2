@@ -166,13 +166,22 @@ def rosto(expressao, tamanho):
     return f'<div class="lia-rosto">{rosto_lia(expressao, tamanho)}</div>'
 
 
-def link_pagina(onde, destino, rotulo, href):
-    """st.page_link quando o Streamlit conhece a página; senão (Streamlit
-    antigo, ou esta página aberta sozinha num teste) um link comum."""
+def botao_inicio(onde, chave):
+    """Botão "Início" (pedido do autor, 09/2026): volta ao painel já na aba
+    Panorama, a página inicial do Escudo. O session_state é o mesmo nas
+    duas páginas, então basta marcar a aba do painel antes de trocar."""
     try:
-        onde.page_link(destino, label=rotulo)
-    except Exception:  # StreamlitPageNotFoundError / AttributeError
-        onde.markdown(f'<a href="{href}" target="_self">{rotulo}</a>', unsafe_allow_html=True)
+        caixa = onde.container(key=f"botao_inicio_{chave}")
+    except TypeError:  # Streamlit antigo: sem key em container
+        caixa = onde.container()
+    with caixa:
+        if st.button("🏠 Início · Panorama", key=f"inicio_{chave}", use_container_width=True,
+                     help="Volta ao painel do Escudo, na aba Panorama."):
+            st.session_state["aba"] = "Panorama"
+            try:
+                st.switch_page("app.py")
+            except Exception:  # Streamlit antigo, ou esta página aberta sozinha num teste
+                st.markdown('<a href="/" target="_self">Abrir o Panorama</a>', unsafe_allow_html=True)
 
 
 def pergunta(texto):
@@ -357,7 +366,7 @@ with col_titulo:
                 'tratamento e proteção, com as páginas oficiais do Estado de SP, da região e da cidade. '
                 'Um guia de onde procurar, não orientação médica.</div>', unsafe_allow_html=True)
 with col_link:
-    link_pagina(st, "app.py", "← Estudo da doença (painel)", "/")
+    botao_inicio(st, "topo")
     st.caption(f"Informações conferidas em {apoio.CONFERIDO}. Confirme antes de ir.")
 
 # Boas-vindas da Lia no centro (primeiro acesso), como no painel.
@@ -546,6 +555,6 @@ with st.sidebar:
                 c_voltar.button("← Voltar", key="lia_discreto_voltar_ap", on_click=lia_voltar)
             c_inicio.button("Começar de novo", key="lia_discreto_inicio_ap", on_click=lia_clicar, args=(INICIO,))
     st.divider()
-    link_pagina(st, "app.py", "← Estudo da doença (painel)", "/")
+    botao_inicio(st.sidebar, "lateral")
 
 st.caption("Escudo Feminino · Apoio à mulher · guia de onde procurar; confirme sempre na unidade de saúde.")

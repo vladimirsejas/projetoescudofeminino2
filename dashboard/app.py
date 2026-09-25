@@ -375,7 +375,19 @@ if not st.session_state.get("lia_fechada"):
         st.button("Prefiro explorar sozinha", key="bv_fechar",
                   on_click=lambda: st.session_state.update(lia_fechada=True))
 
-aba = seletor(st, "Navegação", "aba", ABAS, horizontal=True, label_visibility="collapsed")
+# Abas + botão "Início" (pedido do autor, 09/2026): de qualquer aba, um
+# clique volta ao Panorama, a página inicial do Escudo.
+col_abas, col_inicio = st.columns([5, 1])
+with col_abas:
+    aba = seletor(st, "Navegação", "aba", ABAS, horizontal=True, label_visibility="collapsed")
+with col_inicio:
+    try:
+        caixa_inicio = st.container(key="botao_inicio_painel")
+    except TypeError:  # Streamlit antigo: sem key em container
+        caixa_inicio = st.container()
+    caixa_inicio.button("🏠 Início", key="inicio_painel", on_click=definir, args=("aba", "Panorama"),
+                        use_container_width=True, disabled=aba == "Panorama",
+                        help="Volta à aba Panorama, a página inicial do Escudo.")
 
 
 # ============================================================

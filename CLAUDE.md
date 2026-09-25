@@ -159,6 +159,10 @@ Estado atual:
   os sites do governo): itens com detalhe antigo ou de reportagem
   estão marcados "a confirmar" -- conferir no Windows e tirar a marca.
   Testes: `algoritimos/teste_apoio.py` e `dashboard/teste_apoio_tela.py`.
+  **Botão "Início" (autor, 09/2026):** volta ao Panorama, a página inicial.
+  No painel fica ao lado das abas (`inicio_painel`); no apoio, no topo e no
+  fim da lateral (`inicio_topo`/`inicio_lateral`), marca `aba = "Panorama"` e
+  troca de página (`st.switch_page`). Substituiu o link "← Estudo da doença".
   **"O importante é saber onde clicar" (autor):** cada cartão tem o botão azul
   "Abrir a página oficial"; caminhos e temas aparecem como botões (container
   `ap_pilulas_*`); Barretos organizada nos temas do modelo do autor (Hospitais de
